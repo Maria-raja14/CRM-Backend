@@ -1,3 +1,6 @@
-import { login, logout } from "./user.controller.js";
+import users from "./user.controller.js";
+import addUsers from "./addUser.controller.js";
+import roleController from "./roleController.js";
 
-export { login, logout };
+
+export default { users, addUsers ,roleController};

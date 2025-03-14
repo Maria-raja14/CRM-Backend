@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import bcrypt from "bcrypt";
-import User from "../models/user.model.js"; 
+import User from "../models/olduser.model.js"; 
 import connectDB from "../config/db.js"; 
 import adminUsers from "./index.seeder.js";
 
@@ -19,7 +19,7 @@ const seedAdminUsers = async () => {
         if (existingAdmins.length > 0) {
             console.log("Admin users already exist");
             process.exit(0);
-        }
+        }    
 
        
         const hashedUsers = await Promise.all(
