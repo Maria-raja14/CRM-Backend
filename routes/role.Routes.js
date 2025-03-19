@@ -1,11 +1,14 @@
-const express = require("express");
+import express from "express";
+
 const router = express.Router();
-const roleController = require("../controllers/roleController");
-const { default: indexControllers } = require("../controllers/index.controllers");
 
-router.post("/", indexControllers.roleController.createRole);
-router.get("/", indexControllers. roleController.getRoles);
-router.put("/:id",indexControllers. roleController.updateRole);
-router.delete("/:id",indexControllers. roleController.deleteRole);
+import indexControllers from "../controllers/index.controllers.js";
 
-module.exports = router;
+router.post("/createrole", indexControllers.roleController.createRole);
+router.get("/getrole", indexControllers.roleController.getRoles);
+router.get("/rolename", indexControllers.roleController.getUsersByRole);
+
+router.put("/update/:id", indexControllers.roleController.updateRole);
+router.delete("delete/:id", indexControllers.roleController.deleteRole);
+
+export default router;
