@@ -1,12 +1,12 @@
 import express from 'express'
-import { login, logout } from "../controllers/index.controllers.js";
+import indexController from "../controllers/index.controllers.js";
 
 
 const router=express.Router();
 
 
-router.post("/login",login);
-router.post("/logout",logout);
+router.post("/login",indexController.users.login);
+router.post("/logout",indexController.users.logout);
 
 
 
