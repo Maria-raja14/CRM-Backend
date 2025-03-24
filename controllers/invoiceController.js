@@ -3,16 +3,17 @@ import Invoice from "../models/invoiceModel.js";
 export default {
   // ✅ Create Invoice
   createInvoice: async (req, res) => {
-    console.log("Received invoice data:", req.body);  // Log the received data
+    console.log("Received invoice data:", req.body); // Log the received data
   
     try {
-      const invoice = new Invoice(req.body);
+      const invoice = new Invoice(req.body); // Check if required fields are missing
       await invoice.save();
       res.status(201).json(invoice);
     } catch (error) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: error.message }); // Return the error message
     }
   },
+  
   
   
 
@@ -20,7 +21,9 @@ export default {
   // ✅ Get All Invoices
   getAllInvoices: async (req, res) => {
     try {
-      const invoices = await Invoice.find().populate("owner items.deal");
+      // const invoices = await Invoice.find().populate("owner items.deal");
+      const invoices = await Invoice.find().populate("owner").populate("items.deal");
+
       console.log(invoices);
       
       res.status(200).json(invoices);
