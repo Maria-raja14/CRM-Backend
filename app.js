@@ -12,9 +12,12 @@ const app=express();
 app.use(express.json());
 app.use(cors({origin:"http://localhost:5173"}
     
+    
 ));
+app.use(express.urlencoded({ extended: true }));
 //middleware
-app.use("/api",routes)
+app.use("/api/auth",routes);
+app.use("/api",routes);
 
 const PORT=process.env.PORT || 5000;
 
