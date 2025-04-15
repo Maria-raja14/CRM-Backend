@@ -94,7 +94,7 @@ export default {
             res.status(200).json({ message: "Deal updated successfully", data: updatedDeal });
         } catch (error) {
             console.error("Error updating deal:", error);
-            res.status(500).json({ message: "Error updating deal" });
+            res.status(500).json({ message:"Error updating deal"});
         }
     },
 
@@ -105,10 +105,10 @@ export default {
             const deletedDeal = await AllDeals.findByIdAndDelete(id);
 
             if (!deletedDeal) {
-                return res.status(404).json({ message: "Deal not found" });
+                return res.status(404).json({ message:"Deal not found"});
             }
 
-            res.status(200).json({ message: "Deal deleted successfully" });
+            res.status(200).json({ message:"Deal deleted  successfully"});
         } catch (error) {
             console.error("Error deleting deal:", error);
             res.status(500).json({ message: "Error deleting deal" });
