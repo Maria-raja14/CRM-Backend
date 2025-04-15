@@ -34,12 +34,12 @@ export default {
         try {
             const { title, description, leadType, dealsValue, stage, expectingClosingDate, owner, personId, organizationId } = req.body;
     
-            // ✅ Validate required fields
+            //  Validate required fields
             if (!title || !description || !leadType || !dealsValue || !stage || !expectingClosingDate || !owner) {
                 return res.status(400).json({ message: "All required fields must be provided." });
             }
     
-            // ✅ Ensure valid leadType
+            //  Ensure valid leadType
             if (leadType === "person" && !personId) {
                 return res.status(400).json({ message: "Person selection is required for lead type 'person'." });
             }
@@ -50,14 +50,14 @@ export default {
                 return res.status(400).json({ message: "Only one of Person or Organization can be selected." });
             }
     
-            // ✅ Validate stage value
+            //  Validate stage value
             req.body.stage = req.body.stage.trim();
             const validStages = ["Visit Scheduled", "Visit Completed", "Customer No Show"];
             if (!validStages.includes(req.body.stage)) {
                 return res.status(400).json({ message: "Invalid stage value." });
             }
     
-            // ✅ Create new deal
+            //  Create new deal
             const newDeal = new AllDeals({
                 title,
                 description,
@@ -70,12 +70,9 @@ export default {
                 owner
             });
     
-            // ✅ Save to database
+            // Save to database
             const savedDeal = await newDeal.save();
-    
-            console.log("New Deal Created:", savedDeal); // ✅ Log to confirm _id exists
-    
-            // ✅ Return only data (including _id) directly
+            //  Return only data (including _id) directly
             res.status(201).json(savedDeal);  
             
         } catch (error) {

@@ -6,6 +6,7 @@ import personRoutes from './person.routes.js'
 import addUser  from "./adduser.routes.js";
 import roles from "./role.Routes.js"
 import allDealsRoutes from './allDeals.routes.js'
+import activityRoutes from './activity.routes.js'
 
 
 const router = express.Router();
@@ -16,7 +17,9 @@ router.use("/organization", organizationRoutes);
 router.use("/person", personRoutes);
 router.use("/adduser",addUser);
 router.use("/alldeals",allDealsRoutes);
-router.use("/roles",roles)
+router.use("/roles",roles);
+router.use("/activity",activityRoutes);
+
 
 
 export default router;

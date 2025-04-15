@@ -4,5 +4,6 @@ import Organization from "./organization.models.js";
 import Role from "./Role.models.js"
 import Admin from "./olduser.model.js";
 import AllDeals from "./alldeals.models.js";
+import Activity from "./activity.models.js";
 
-export {User,LeadGroup,Organization,Role,Admin,AllDeals };
+export {User,LeadGroup,Organization,Role,Admin,AllDeals,Activity };
