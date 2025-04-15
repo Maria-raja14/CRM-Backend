@@ -1,12 +1,14 @@
 import express from 'express'
-import { addLeadGroup, deleteLeadGroup, editLeadGroup, getLeadGroups } from '../controllers/leadGroup.controller.js';
+import indexControllers from '../controllers/index.controllers.js';
+
+
 
 
 const router=express.Router();
 
-router.post("/add", addLeadGroup);
-router.get("/",getLeadGroups);
-router.put("/:id",editLeadGroup);
-router.delete("/:id",deleteLeadGroup);
+router.post("/add", indexControllers.LeadGroupController.addLeadGroup);
+router.get("/",indexControllers.LeadGroupController.getLeadGroups);
+router.put("/:id",indexControllers.LeadGroupController.editLeadGroup);
+router.delete("/:id",indexControllers.LeadGroupController.deleteLeadGroup);
 
 export default router;

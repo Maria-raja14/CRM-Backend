@@ -3,32 +3,87 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 
-
 dotenv.config();
 
 export default {
   // ✅ User Signup (Fix: Removed manual hashing)
+
   signup: async (req, res) => {
     try {
       const { email, password, mobileNumber } = req.body;
 
+      // Email format validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ message: "Invalid email format" });
+      }
+
+      // Password strength validation (Min 8 chars, at least 1 letter & 1 number)
+      const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/;
+      if (!passwordRegex.test(password)) {
+        return res.status(400).json({
+          message:
+            "Password must be at least 8 characters long and include at least one letter and one number",
+        });
+      }
+
       // Check if email already exists
       const existingUser = await User.findOne({ email });
-      if (existingUser) return res.status(400).json({ message: "Email already exists" });
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+
+      // Mobile number validation (10 digits, only numbers)
+      const mobileRegex = /^[0-9]{10}$/;
+      if (!mobileRegex.test(mobileNumber)) {
+        return res
+          .status(400)
+          .json({
+            message: "Invalid mobile number. It must be exactly 10 digits.",
+          });
+      }
 
       // Check if mobile number already exists
       const existingMobile = await User.findOne({ mobileNumber });
-      if (existingMobile) return res.status(400).json({ message: "Mobile number already exists" });
+      if (existingMobile) {
+        return res
+          .status(400)
+          .json({ message: "Mobile number already exists" });
+      }
 
       // ✅ Mongoose will automatically hash the password in `pre("save")`
       const newUser = new User(req.body);
       await newUser.save();
 
-      res.status(201).json({ message: "User registered successfully", user: newUser });
+      res
+        .status(201)
+        .json({ message: "User registered successfully", user: newUser });
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
   },
+
+  // signup: async (req, res) => {
+  //   try {
+  //     const { email, password, mobileNumber } = req.body;
+
+  //     // Check if email already exists
+  //     const existingUser = await User.findOne({ email });
+  //     if (existingUser) return res.status(400).json({ message: "Email already exists" });
+
+  //     // Check if mobile number already exists
+  //     const existingMobile = await User.findOne({ mobileNumber });
+  //     if (existingMobile) return res.status(400).json({ message: "Mobile number already exists" });
+
+  //     // ✅ Mongoose will automatically hash the password in `pre("save")`
+  //     const newUser = new User(req.body);
+  //     await newUser.save();
+
+  //     res.status(201).json({ message: "User registered successfully", user: newUser });
+  //   } catch (error) {
+  //     res.status(500).json({ message: error.message });
+  //   }
+  // },
 
   // ✅ User Login (Fix: Added logs to debug)
   login: async (req, res) => {
@@ -46,7 +101,9 @@ export default {
 
       // 2️⃣ Check if user is active
       if (!user.status) {
-        return res.status(403).json({ message: "Account is deactivated. Contact support." });
+        return res
+          .status(403)
+          .json({ message: "Account is deactivated. Contact support." });
       }
 
       // 3️⃣ Validate password (Fix: Log both passwords)
@@ -82,19 +139,23 @@ export default {
       res.status(500).json({ error: error.message });
     }
   },
- 
 
-  updateUser : async (req, res) => {
+  updateUser: async (req, res) => {
     try {
-      const updatedUser = await User.findByIdAndUpdate(req.params.id, req.body, {
-        new: true,
-      });
-      res.status(200).json({ message: "User updated successfully", updatedUser });
+      const updatedUser = await User.findByIdAndUpdate(
+        req.params.id,
+        req.body,
+        {
+          new: true,
+        }
+      );
+      res
+        .status(200)
+        .json({ message: "User updated successfully", updatedUser });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   },
-
 
   // ✅ Get All Active Users
   getAllActiveUsers: async (req, res) => {
@@ -126,5 +187,5 @@ export default {
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
-  }
+  },
 };

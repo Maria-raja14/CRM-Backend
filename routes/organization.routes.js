@@ -1,13 +1,12 @@
 import express from "express";
-import { createOrganization,getAllOrganizations,getOrganizationById,updateOrganization,deleteOrganization,bulkUploadOrganizations } from "../controllers/organization.controller.js";
-
+import indexControllers from "../controllers/index.controllers.js";
 const router = express.Router();
 
-router.post("/add", createOrganization);
-router.get("/", getAllOrganizations);
-router.get("/:id", getOrganizationById);
-router.put("/:id", updateOrganization);
-router.delete("/:id", deleteOrganization);
-router.post("/bulk-upload",bulkUploadOrganizations)
+router.post("/add",  indexControllers.OrganizationController.createOrganization);
+router.get("/", indexControllers.OrganizationController.getAllOrganizations);
+router.get("/:id", indexControllers.OrganizationController.getOrganizationById);
+router.put("/:id", indexControllers.OrganizationController.updateOrganization);
+router.delete("/:id", indexControllers.OrganizationController.deleteOrganization);
+router.post("/bulk-upload",indexControllers.OrganizationController.bulkUploadOrganizations);
 
 export default router;
