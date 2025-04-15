@@ -10,6 +10,9 @@ import owners from "./ownerRoutes.js"
 import deals from "./dealRoutes.js"
 import last from "./nameRoutes.js"
 import allDealsRoutes from './allDeals.routes.js'
+import templateRoutes from './templateRoutes.js'
+import proposalRoutes from './proposalRoutes.js'
+import stageRoutes from './stageRoutes.js'
 
 
 const router = express.Router();
@@ -25,6 +28,10 @@ router.use("/owners",owners)
 router.use("/deals",deals)
 router.use("/invoice",invoice)
 router.use("/lastname",last)
+router.use("/template",templateRoutes)
+router.use("/proposal",proposalRoutes)
+router.use("/stage",stageRoutes)
+
 
 
 export default router;

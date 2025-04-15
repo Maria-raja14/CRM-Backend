@@ -50,7 +50,7 @@ export default {
       // ).populate("users");
       const role = await Role.findByIdAndUpdate(
         req.params.id,
-        { $addToSet: { users: { $each: users } } }, // `users` already contains IDs
+        { $addToSet: { users: { $each: users } } },
         { new: true }
       ).populate("users");
       
@@ -64,12 +64,6 @@ export default {
       res.status(500).json({ error: error.message });
     }
   },
-  
-
-  
-  
- 
-
 
   // Get Users by Role Name
   getUsersByRole: async (req, res) => {
@@ -83,7 +77,7 @@ export default {
   
       res.json({ roleName: role.name, users: role.users });
     } catch (error) {
-      res.status(500).json({ message: "Server Error", error: error.message });
+      res.status(500).json({ message: "Server Error", error: error.message });  
     }
   },
 

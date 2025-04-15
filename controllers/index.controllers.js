@@ -8,6 +8,9 @@ import roleController from "./roleController.js";
 import invoiceController from "./invoiceController.js";
 import nameController from "./nameController.js";
 import allDealsController from "./allDeals.controller.js";
+import templateController from "./templateController.js";
+import proposalController from "./proposalController.js"
+import stageController from "./stageController.js";
 
 
 
@@ -21,5 +24,8 @@ export default {
     OrganizationController,
     allDealsController,
     invoiceController,
-    nameController
+    nameController,
+    templateController,
+    proposalController,
+    stageController,
 };
