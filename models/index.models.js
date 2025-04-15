@@ -10,9 +10,9 @@ import Admin from "./olduser.model.js";
 import AllDeals from "./alldeals.models.js";
 import Activity from "./activity.models.js";
 
-<<<<<<< HEAD
+// <<<<<<< HEAD
 export {User,LeadGroup,Organization,Role,Admin,AllDeals,Activity,owner,deal,Invoice,lastreason };
-=======
+// =======
 // export {User,Role,owner,deal,Invoice,lastreason};
 // export {
 //     User,
