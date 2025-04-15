@@ -1,5 +1,8 @@
- 
- import mongoose from "mongoose";
+
+
+
+import mongoose from "mongoose";
+
 
 const adminSchema = new mongoose.Schema({
     email: {
@@ -25,4 +28,6 @@ const adminSchema = new mongoose.Schema({
 });
 
 const Admin = mongoose.model("Adminlogin", adminSchema);
+
 export default Admin;
+
