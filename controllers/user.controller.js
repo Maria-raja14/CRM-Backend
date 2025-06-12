@@ -9,7 +9,6 @@ export default {
     login: async (req, res) => {
         try {
             const { email, password } = req.body;
-
             // Find admin in the correct model
             const admin = await Admin.findOne({ email });
 
@@ -42,7 +41,7 @@ export default {
 
     logout: async (req, res) => {
         try {
-            res.json({ message: "Logout successful" });
+            res.json({ message: "Logout successfully" });
         } catch (error) {
             res.status(500).json({ message: "Logout failed", error: error.message });
         }

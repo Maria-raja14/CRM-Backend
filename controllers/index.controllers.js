@@ -8,11 +8,12 @@ import roleController from "./roleController.js";
 import invoiceController from "./invoiceController.js";
 import nameController from "./nameController.js";
 import allDealsController from "./allDeals.controller.js";
-// <<<<<<< HEAD
+
 import activityController from "./activity.controller.js";
 import templateController from "./templateController.js";
 import proposalController from "./proposalController.js"
 import stageController from "./stageController.js";
+import meetingController from "./meeting.controller.js"
 
 
 export default { 
@@ -28,7 +29,8 @@ export default {
      nameController,
      templateController,
      proposalController,
-     stageController
+     stageController,
+     meetingController
 
 
     };

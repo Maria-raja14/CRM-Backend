@@ -17,9 +17,10 @@ import lastreason from "./LastreasonsModels.js"
 import Admin from "./olduser.model.js";
 import AllDeals from "./alldeals.models.js";
 import Activity from "./activity.models.js";
+import Meeting from './meeting.models.js'
 
 
-export {User,LeadGroup,Organization,Role,Admin,AllDeals,Activity,owner,deal,Invoice,lastreason };
+export {User,LeadGroup,Organization,Role,Admin,AllDeals,Activity,owner,deal,Invoice,lastreason,Meeting };
 
 
 

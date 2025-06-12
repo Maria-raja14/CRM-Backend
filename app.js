@@ -13,10 +13,9 @@ dotenv.config();
 const app=express();
 
 app.use(express.json());
-<<<<<<< HEAD
-app.use(cors({origin:"http://localhost:5173"}
-  
-));
+app.use(cors());
+app.use(express.urlencoded({ extended: true }));
+
 //middleware
 app.use("/api",routes)
 app.use("/api/auth",routes)
@@ -26,15 +25,11 @@ app.use("/api", socialLinksRoutes);
 app.use("/api", expenseRoutes);
 app.use("/uploads", express.static("uploads"));
 app.use("/api", areaExpensesRoutes);
-=======
-app.use(cors());
-app.use(express.urlencoded({ extended: true }));
-//middleware
-app.use("/api/auth",routes);
-app.use("/api",routes);
->>>>>>> 012441c42a66bdf9608e57519192405b4e695c3b
 
-const PORT=process.env.PORT || 5000;
+
+
+
+const PORT=process.env.PORT || 5001;
 
 
 app.listen(PORT,async()=>{
