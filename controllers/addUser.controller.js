@@ -11,6 +11,8 @@ export default {
   signup: async (req, res) => {
     try {
       const { email, password, mobileNumber } = req.body;
+      console.log(req.body);
+      
 
       // Email format validation
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -19,13 +21,13 @@ export default {
       }
 
       // Password strength validation (Min 8 chars, at least 1 letter & 1 number)
-      const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/;
-      if (!passwordRegex.test(password)) {
-        return res.status(400).json({
-          message:
-            "Password must be at least 8 characters long and include at least one letter and one number",
-        });
-      }
+      // const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/;
+      // if (!passwordRegex.test(password)) {
+      //   return res.status(400).json({
+      //     message:
+      //       "Password must be at least 8 characters long and include at least one letter and one number",
+      //   });
+      // }
 
       // Check if email already exists
       const existingUser = await User.findOne({ email });
