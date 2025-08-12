@@ -18,7 +18,7 @@ app.use(express.urlencoded({ extended: true }));
 
 //middleware
 app.use("/api",routes)
-app.use("/api/auth",routes)
+//app.use("/api/auth",routes)
 app.use("/api", profileRoutes);  
 app.use("/api", passwordRoutes);
 app.use("/api", socialLinksRoutes);
@@ -29,7 +29,7 @@ app.use("/api", areaExpensesRoutes);
 
 
 
-const PORT=process.env.PORT || 5001;
+const PORT=process.env.PORT || 5000;
 
 
 app.listen(PORT,async()=>{
