@@ -7,10 +7,10 @@ import Role from "./Role.models.js";
  
  
 
-import LeadGroup from "./leadGroup.models.js";
-import Organization from "./organization.models.js";
+// import LeadGroup from "./leadGroup.models.js";
+// import Organization from "./organization.models.js";
 
-import owner from "./Owner.js"
+// import owner from "./Owner.js"
 import deal from "./Deal.js";
 import Invoice from "./invoiceModel.js";
 import lastreason from "./LastreasonsModels.js"
@@ -20,7 +20,7 @@ import Activity from "./activity.models.js";
 import Meeting from './meeting.models.js'
 
 
-export {User,LeadGroup,Organization,Role,Admin,AllDeals,Activity,owner,deal,Invoice,lastreason,Meeting };
+export {User,Role,Admin,AllDeals,Activity,deal,Invoice,lastreason,Meeting };
 
 
 

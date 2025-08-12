@@ -19,10 +19,11 @@ app.use(express.urlencoded({ extended: true }));
 //middleware
 app.use("/api",routes)
 app.use("/api/auth",routes)
-app.use("/api", profileRoutes);  
-app.use("/api", passwordRoutes);
-app.use("/api", socialLinksRoutes);
-app.use("/api", expenseRoutes);
+// app.use("/api", profileRoutes);  
+// app.use("/api", passwordRoutes);
+// app.use("/api", socialLinksRoutes);
+// app.use("/api", expenseRoutes);
+
 app.use("/uploads", express.static("uploads"));
 app.use("/api", areaExpensesRoutes);
 
