@@ -7,8 +7,11 @@ dotenv.config();
 
 export default {
     login: async (req, res) => {
+        
         try {
             const { email, password } = req.body;
+            
+            
             // Find admin in the correct model
             const admin = await Admin.findOne({ email });
 
@@ -32,7 +35,7 @@ export default {
                 process.env.SECRET_KEY,
                 { expiresIn: "1h" }
             );
-
+console.log("req.body iss => ",req.body);
             res.json({ message: "Admin Login Successful", token });
         } catch (error) {
             res.status(500).json({ message: "Login failed", error: error.message });
