@@ -33,7 +33,15 @@ app.use("/api", areaExpensesRoutes);
 const PORT=process.env.PORT || 5000;
 
 
-app.listen(PORT,async()=>{
-    console.log(`Server Running on ${PORT}`)
-    await connectDB();
-})
+// app.listen(PORT,async()=>{
+//     console.log(`Server Running on ${PORT}`)
+//     await connectDB();
+// })
+
+
+
+app.listen(PORT, '0.0.0.0', async () => {
+  console.log(`Server Running on is ${PORT}`);
+  await connectDB();
+});
+

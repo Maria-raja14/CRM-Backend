@@ -7,7 +7,7 @@ dotenv.config();
 
 export default {
     login: async (req, res) => {
-        
+        console.log('req issst',req.body);
         try {
             const { email, password } = req.body;
             
