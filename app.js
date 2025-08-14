@@ -8,6 +8,10 @@ import passwordRoutes from "./routes/PasswordChange.route.js";
 import socialLinksRoutes from "./routes/SocialLinks.route.js";
 import expenseRoutes from "./routes/Expenses.routes.js"; 
 import areaExpensesRoutes from "./routes/AreaExpenses.route.js";
+import leadsRoutes from "./routes/leads.routes.js";
+
+
+
 dotenv.config();
 
 const app=express();
@@ -27,7 +31,7 @@ app.use("/api/auth",routes)
 app.use("/uploads", express.static("uploads"));
 app.use("/api", areaExpensesRoutes);
 
-
+app.use("/api/leads", leadsRoutes);
 
 
 const PORT=process.env.PORT || 5000;
