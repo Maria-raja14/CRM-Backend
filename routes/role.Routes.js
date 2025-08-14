@@ -1,14 +1,38 @@
+// import express from "express";
+// import indexControllers from "../controllers/index.controllers.js";
+// import { protect,adminOnly  } from "../middlewares/auth.middleware.js"
+
+// const router = express.Router();
+
+// router.post("/", protect, adminOnly, indexControllers.roleController.createRole);
+// router.get("/", protect, indexControllers.roleController.getRoles);
+
+// export default router;
+
 import express from "express";
+import indexControllers from "../controllers/index.controllers.js";
+import { protect, adminOnly } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
 
-import indexControllers from "../controllers/index.controllers.js";
-
-router.post("/createrole", indexControllers.roleController.createRole);
-router.get("/getrole", indexControllers.roleController.getRoles);
-router.get("/rolename", indexControllers.roleController.getUsersByRole);
-
-router.put("/update/:id", indexControllers.roleController.updateRole);
-router.delete("delete/:id", indexControllers.roleController.deleteRole);
+router.post(
+  "/",
+  protect,
+  adminOnly,
+  indexControllers.roleController.createRole
+);
+router.get("/", protect, indexControllers.roleController.getRoles);
+router.put(
+  "/:id",
+  protect,
+  adminOnly,
+  indexControllers.roleController.updateRole
+);
+router.delete(
+  "/:id",
+  protect,
+  adminOnly,
+  indexControllers.roleController.deleteRole
+);
 
 export default router;
