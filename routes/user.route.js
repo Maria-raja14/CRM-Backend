@@ -1,13 +1,13 @@
-import express from 'express'
-import indexController from "../controllers/index.controllers.js";
 
+import express from "express";
+import indexControllers from "../controllers/index.controllers.js";
+import { protect, adminOnly } from "../middlewares/auth.middleware.js";
+import upload from "../middlewares/upload.js";
 
-const router=express.Router();
+const router = express.Router();
 
-
-router.post("/login",indexController.users.login);
-router.post("/logout",indexController.users.logout);
-
-
+router.post("/create",upload.single("profileImage"), protect, adminOnly, indexControllers.usersController.createUser);
+router.get("/", protect, adminOnly, indexControllers.usersController.getUsers);
+router.post("/login", indexControllers.usersController.loginUser);
 
 export default router;

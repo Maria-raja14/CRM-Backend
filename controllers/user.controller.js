@@ -1,49 +1,146 @@
-import { Admin } from '../models/index.models.js';
-import jwt from 'jsonwebtoken';
-import bcrypt from 'bcrypt';
-import dotenv from 'dotenv';
+
+
+
+// import User from "../models/user.model.js";
+// import jwt from "jsonwebtoken";
+// import dotenv from "dotenv";
+
+// dotenv.config();
+// const SECRET_KEY = process.env.JWT_SECRET; // <-- load from .env
+
+// const generateToken = (id) => {
+//   return jwt.sign({ id }, SECRET_KEY, { expiresIn: "1d" });
+// };
+
+// export default {
+//   createUser: async (req, res) => {
+//     try {
+//       const user = await User.create(req.body);
+//       res.status(201).json(user);
+//     } catch (err) {
+//       res.status(500).json({ message: err.message });
+//     }
+//   },
+
+//   getUsers: async (req, res) => {
+//     try {
+//       const users = await User.find().populate("role");
+//       res.json(users);
+//     } catch (err) {
+//       res.status(500).json({ message: err.message });
+//     }
+//   },
+
+//   loginUser: async (req, res) => {
+//   try {
+//     const { email, password } = req.body;
+//     console.log(req.body);
+    
+//     const user = await User.findOne({ email }).populate("role");
+//     console.log("role",user);
+    
+
+//     if (!user || !(await user.matchPassword(password))) {
+//       return res.status(401).json({ message: "Invalid credentials" });
+//     }
+
+//     res.json({
+//       message: "Login successful",
+//       _id: user._id,
+//       name: `${user.firstName} ${user.lastName}`,
+//       email: user.email,
+//       role: user.role.name,
+//       token: generateToken(user._id),
+//     });
+//   } catch (err) {
+//     res.status(500).json({ message: err.message });
+//   }
+// }
+// ,
+// };
+
+
+
+import User from "../models/user.model.js";
+import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
 
 dotenv.config();
+// const SECRET_KEY = process.env.SECRET_KEY; // make sure .env has JWT_SECRET=yourSecret
+
+const generateToken = (id) => jwt.sign({ id }, process.env.SECRET_KEY, { expiresIn: "1d" });
 
 export default {
-    login: async (req, res) => {
-        try {
-            const { email, password } = req.body;
-            // Find admin in the correct model
-            const admin = await Admin.findOne({ email });
 
-            if (!admin) {
-                return res.status(400).json({ message: "Admin not found" });
-            }
+ createUser: async (req, res) => {
+  try {
+    const {
+      firstName,
+      lastName,
+      email,
+      password,
+      mobileNumber,
+      role,
+      status,
+      gender,
+      address,
+      dateOfBirth
+    } = req.body;
 
-            if (admin.role !== "Admin") {
-                return res.status(403).json({ message: "Access denied. Only Admin can log in." });
-            }
+    // Handle file upload for profileImage (if using multer)
+    const profileImage = req.file ? req.file.path : null;
 
-            // Compare hashed password
-            const isMatch = await bcrypt.compare(password, admin.password);
-            if (!isMatch) {
-                return res.status(400).json({ message: "Invalid credentials" });
-            }
+    const user = await User.create({
+      firstName,
+      lastName,
+      email,
+      password,
+      mobileNumber,
+      role,
+      status,
+      gender,
+      address,
+      dateOfBirth,
+      profileImage
+    });
 
-            // Generate JWT token
-            const token = jwt.sign(
-                { id: admin._id, role: admin.role },
-                process.env.SECRET_KEY,
-                { expiresIn: "1h" }
-            );
+    res.status(201).json(user);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+}
+,
 
-            res.json({ message: "Admin Login Successful", token });
-        } catch (error) {
-            res.status(500).json({ message: "Login failed", error: error.message });
-        }
-    },
+  getUsers: async (req, res) => {
+    try {
+      const users = await User.find().populate("role");
+      res.json(users);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  },
 
-    logout: async (req, res) => {
-        try {
-            res.json({ message: "Logout successfully" });
-        } catch (error) {
-            res.status(500).json({ message: "Logout failed", error: error.message });
-        }
-    },
+  loginUser: async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      const user = await User.findOne({ email }).populate("role");
+
+      // ✅ use matchPassword (as defined in your model)
+      if (!user || !(await user.matchPassword(password))) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      res.json({
+        message: "Login successful",
+        _id: user._id,
+        name: `${user.firstName} ${user.lastName}`,
+        email: user.email,
+        role: user.role?.name || null,
+        token: generateToken(user._id),
+      });
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  },
 };

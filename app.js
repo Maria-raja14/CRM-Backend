@@ -2,12 +2,13 @@ import express from 'express'
 import dotenv from 'dotenv'
 import  connectDB  from './config/db.js';
 import routes from './routes/index.routes.js'
-import profileRoutes from "./routes/Myprofileform.route.js";
+
 import cors from 'cors'
-import passwordRoutes from "./routes/PasswordChange.route.js";
-import socialLinksRoutes from "./routes/SocialLinks.route.js";
-import expenseRoutes from "./routes/Expenses.routes.js"; 
-import areaExpensesRoutes from "./routes/AreaExpenses.route.js";
+
+import userRoutes from "./routes/user.route.js";
+import roleRoutes from "./routes/role.routes.js";
+
+
 dotenv.config();
 
 const app=express();
@@ -18,14 +19,14 @@ app.use(express.urlencoded({ extended: true }));
 
 //middleware
 app.use("/api",routes)
-app.use("/api/auth",routes)
+app.use("/api/users", userRoutes);
+app.use("/api/roles", roleRoutes);
 // app.use("/api", profileRoutes);  
 // app.use("/api", passwordRoutes);
 // app.use("/api", socialLinksRoutes);
 // app.use("/api", expenseRoutes);
 
 app.use("/uploads", express.static("uploads"));
-app.use("/api", areaExpensesRoutes);
 
 
 

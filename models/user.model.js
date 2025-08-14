@@ -1,35 +1,72 @@
+
+
+
+
+// import mongoose from "mongoose";
+// import bcrypt from "bcryptjs";
+
+// const userSchema = new mongoose.Schema({
+//     firstName: { type: String, required: true },
+//     lastName: { type: String, required: true },
+//     email: { type: String, required: true, unique: true },
+//     password: { type: String, required: true, minlength: 6 },
+//     role: { type: mongoose.Schema.Types.ObjectId, ref: "Role", required: true },
+//     status: { type: Boolean, default: true }
+// }, { timestamps: true });
+
+// userSchema.pre("save", async function (next) {
+//     if (!this.isModified("password")) return next();
+//     const salt = await bcrypt.genSalt(10);
+//     this.password = await bcrypt.hash(this.password, salt);
+//     next();
+// });
+
+// userSchema.methods.matchPassword = async function (enteredPassword) {
+//     return await bcrypt.compare(enteredPassword, this.password);
+// };
+
+// export default mongoose.model("User", userSchema);
+
+
+
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
-const UserSchema = new mongoose.Schema(
-  {
-    firstName: { type: String, requir     : true },
+const userSchema = new mongoose.Schema({
+    firstName: { type: String, required: true },
     lastName: { type: String, required: true },
-    gender: { type: String, required: true },
-    DateOB: { type: String },
-    profilePhoto: { type: String },
-    mobileNumber: { type: String, required: true, unique: true },
-    address: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true, minlength: 6 },
-    roleId: { type: mongoose.Schema.Types.ObjectId, ref: "Role" },
+    mobileNumber: { type: String, unique: true, sparse: true },
+
+    role: { type: mongoose.Schema.Types.ObjectId, ref: "Role", required: true },
     status: { type: Boolean, default: true },
-  },
-  { timestamps: true }
-);
 
-// ✅ Hash password before saving (Keep this, remove hashing from signup)
-UserSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
+    // 🆕 Extra fields
+    gender: {
+        type: String,
+        enum: ["Male", "Female", "Other"], // restricts to these values
+        default: "Other"
+    },
+    address: {
+      type: String 
+      
+    },
+    dateOfBirth: { type: Date },
+    profileImage: { type: String } // store image URL or file path
+}, { timestamps: true });
 
-  try {
+// Hash password before saving
+userSchema.pre("save", async function (next) {
+    if (!this.isModified("password")) return next();
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
     next();
-  } catch (error) {
-    next(error);
-  }
 });
 
-const User = mongoose.model("User", UserSchema);
-export default User;
+// Compare entered password with hashed password
+userSchema.methods.matchPassword = async function (enteredPassword) {
+    return await bcrypt.compare(enteredPassword, this.password);
+};
+
+export default mongoose.model("User", userSchema);
