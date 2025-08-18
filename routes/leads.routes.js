@@ -11,9 +11,6 @@
 
 // export default router;
 
-
-
-
 import express from "express";
 import indexControllers from "../controllers/index.controllers.js";
 
@@ -26,6 +23,9 @@ router.put("/updateLead/:id", indexControllers.leadsController.updateLead);
 router.delete("/deleteLead/:id", indexControllers.leadsController.deleteLead);
 
 // Optional: update only follow up date
-router.patch("/:id/followup", indexControllers.leadsController.updateFollowUpDate);
+router.patch(
+  "/:id/followup",
+  indexControllers.leadsController.updateFollowUpDate
+);
 
 export default router;
