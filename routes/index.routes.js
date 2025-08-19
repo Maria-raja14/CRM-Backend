@@ -12,7 +12,6 @@ import activityRoutes from "./activity.routes.js";
 import templateRoutes from "./templateRoutes.js";
 import proposalRoutes from "./proposalRoutes.js";
 import stageRoutes from "./stageRoutes.js";
-import meetingRoutes from "./meeting.routes.js";
 
 const router = express.Router();
 
@@ -31,6 +30,5 @@ router.use("/lastname", last);
 router.use("/template", templateRoutes);
 router.use("/proposal", proposalRoutes);
 router.use("/stage", stageRoutes);
-router.use("/meeting", meetingRoutes);
 
 export default router;

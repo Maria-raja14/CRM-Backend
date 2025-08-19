@@ -8,7 +8,7 @@ import activityController from "./activity.controller.js";
 import templateController from "./templateController.js";
 import proposalController from "./proposalController.js";
 import stageController from "./stageController.js";
-import meetingController from "./meeting.controller.js";
+
 
 export default {
   usersController,
@@ -24,5 +24,5 @@ export default {
   templateController,
   proposalController,
   stageController,
-  meetingController,
+
 };

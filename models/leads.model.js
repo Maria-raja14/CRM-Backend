@@ -5,28 +5,31 @@
 //     leadName: { type: String, required: true },
 //     phoneNumber: { type: String, required: true },
 //     email: { type: String },
-//     source: { type: String }, // Instagram, Referral, Website...
+//     source: { type: String },
 //     companyName: { type: String },
 //     industry: { type: String },
 //     requirement: { type: String },
-//     status: {
-//       type: String,
-//       enum: ["New", "Follow-up", "Converted", "Closed"],
-//       default: "New",
-//     },
+
 //     assignTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 //     address: { type: String },
-//     priorityLevel: {
+//     status: {
 //       type: String,
 //       enum: ["Hot", "Warm", "Cold", "Junk"],
 //       default: "Cold",
 //     },
+//     // use this as "next follow-up"
 //     followUpDate: { type: Date },
-//     leadStatus: { type: String, default: "Lead" }, // "Lead" or "Deal"
+
+//     // NEW: last reminder timestamp
+//     lastReminderAt: { type: Date },
 //     notes: { type: String },
+//     // ✅ New custom field
 //   },
-//   { timestamps: true } // createdAt & updatedAt
+//   { timestamps: true }
 // );
+
+// // Optional: index for scanning upcoming reminders faster
+// leadSchema.index({ followUpDate: 1 });
 
 // const Lead = mongoose.model("Lead", leadSchema);
 // export default Lead;
@@ -42,34 +45,32 @@ const leadSchema = new mongoose.Schema(
     phoneNumber: { type: String, required: true },
     email: { type: String },
     source: { type: String },
-    companyName: { type: String },
+    companyName: { type: String, required: true },
     industry: { type: String },
     requirement: { type: String },
+
+    assignTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+
+    address: { type: String },
+
     status: {
       type: String,
-      enum: ["New", "Follow-up", "Converted", "Closed"],
-      default: "New",
-    },
-    assignTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    address: { type: String },
-    priorityLevel: {
-      type: String,
-      enum: ["Hot", "Warm", "Cold", "Junk"],
+      enum: ["Hot", "Warm", "Cold", "Junk", "Converted"],
       default: "Cold",
     },
-    // use this as "next follow-up"
+
+    // next follow-up trigger
     followUpDate: { type: Date },
 
-    // NEW: last reminder timestamp
+    // last time we reminded (to avoid duplicate sends)
     lastReminderAt: { type: Date },
 
-    leadStatus: { type: String, default: "Lead" },
     notes: { type: String },
   },
   { timestamps: true }
 );
 
-// Optional: index for scanning upcoming reminders faster
+// For scanning follow-ups quickly
 leadSchema.index({ followUpDate: 1 });
 
 const Lead = mongoose.model("Lead", leadSchema);
