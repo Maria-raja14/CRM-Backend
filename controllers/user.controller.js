@@ -205,6 +205,7 @@ export default {
         name: `${user.firstName} ${user.lastName}`,
         email: user.email,
         role: user.role?.name || null,
+         permissions: user.role.permissions, // 🔹 Include permissions
         token: generateToken(user._id),
       });
     } catch (err) {
