@@ -24,14 +24,27 @@
 import Role from "../models/role.model.js";
 
 export default {
-  createRole: async (req, res) => {
-    try {
-      const role = await Role.create(req.body);
-      res.status(201).json(role);
-    } catch (err) {
-      res.status(500).json({ message: err.message });
-    }
-  },
+
+
+createRole: async (req, res) => {
+  try {
+    const { name, description, permissions } = req.body;
+
+    // Create role with structured fields
+    const role = await Role.create({
+      name,
+      description,
+      permissions, // Save permissions
+    });
+
+    console.log(req.body); // Keep logging for debugging
+
+    res.status(201).json(role);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+},
+
 
   getRoles: async (req, res) => {
     try {

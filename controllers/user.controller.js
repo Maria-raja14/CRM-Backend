@@ -190,26 +190,55 @@ export default {
     }
   },
 
-  loginUser: async (req, res) => {
-    try {
-      const { email, password } = req.body;
-      const user = await User.findOne({ email }).populate("role");
+  // loginUser: async (req, res) => {
+  //   try {
+  //     const { email, password } = req.body;
+  //     const user = await User.findOne({ email }).populate("role");
 
-      if (!user || !(await user.matchPassword(password))) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
+  //     if (!user || !(await user.matchPassword(password))) {
+  //       return res.status(401).json({ message: "Invalid credentials" });
+  //     }
 
-      res.json({
-        message: "Login successful",
-        _id: user._id,
-        name: `${user.firstName} ${user.lastName}`,
-        email: user.email,
-        role: user.role?.name || null,
-         permissions: user.role.permissions, // 🔹 Include permissions
-        token: generateToken(user._id),
-      });
-    } catch (err) {
-      res.status(500).json({ message: err.message });
+  //     res.json({
+  //       message: "Login successful",
+  //       _id: user._id,
+  //       name: `${user.firstName} ${user.lastName}`,
+  //       email: user.email,
+  //       role: user.role?.name || null,
+  //       token: generateToken(user._id),
+  //     });
+  //   } catch (err) {
+  //     res.status(500).json({ message: err.message });
+  //   }
+  // },
+
+loginUser: async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email })
+      .populate("role")
+      .select("+password");
+
+    if (!user || !(await user.matchPassword(password))) {
+      return res.status(401).json({ message: "Invalid credentials" });
     }
-  },
+
+    res.json({
+      message: "Login successful",
+      _id: user._id,
+      name: `${user.firstName} ${user.lastName}`,
+      email: user.email,
+      role: {
+        _id: user.role._id,
+        name: user.role.name,
+        permissions: user.role.permissions
+      }, // Send the full role object with name and permissions
+      token: generateToken(user._id),
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+},
+
+
 };
