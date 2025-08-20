@@ -12,6 +12,7 @@ import activityRoutes from "./activity.routes.js";
 import templateRoutes from "./templateRoutes.js";
 import proposalRoutes from "./proposalRoutes.js";
 import stageRoutes from "./stageRoutes.js";
+import dealsRoutes from "./deals.route.js";
 
 const router = express.Router();
 
@@ -19,7 +20,7 @@ router.use("/users", userRoutes);
 router.use("/leads", leadRoutes);
 
 // router.use("/adduser", addUser);
-router.use("/alldeals", allDealsRoutes);
+router.use("/deals", dealsRoutes);
 
 router.use("/roles", roles);
 router.use("/activity", activityRoutes);

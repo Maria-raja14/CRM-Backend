@@ -1,10 +1,8 @@
-
 // import Lead from "../models/leads.model.js";
 // import userModel from "../models/user.model.js";
 // import dayjs from "dayjs";
 // import { notifyUser } from "../realtime/socket.js";   // (step 4-la create panrom)
 // import { sendEmail } from "../services/email.js";      // (step 5-la create panrom)
-
 
 // export default {
 //   createLead: async (req, res) => {
@@ -119,15 +117,13 @@
 //   },
 // };
 
-
-
-
 import dayjs from "dayjs";
 import Lead from "../models/leads.model.js";
 import userModel from "../models/user.model.js";
 import { STATUS_DAYS } from "../utils/statusDays.js";
 import sendEmail from "../services/email.js";
 import { notifyUser } from "../realtime/socket.js";
+import Deal from "../models/deals.model.js";
 
 const computeFollowUp = (status) => {
   const addDays = STATUS_DAYS[status];
@@ -270,6 +266,55 @@ export default {
       res.status(200).json(lead);
     } catch (error) {
       res.status(400).json({ message: error.message });
+    }
+  },
+  // -------------------------------
+  convertLeadToDeal: async (req, res) => {
+    console.log(req.body);
+    
+    try {
+      const lead = await Lead.findById(req.params.id).populate("assignTo");
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+      if (lead.status === "Converted")
+        return res.status(400).json({ message: "Lead already converted" });
+
+      // 1️⃣ Update lead
+      lead.status = "Converted";
+      lead.followUpDate = null;
+      lead.lastReminderAt = null;
+      await lead.save();
+   const { value, notes } = req.body;
+      // 2️⃣ Create a new Deal
+      const deal = new Deal({
+        leadId: lead._id,
+        value,
+        notes,
+
+        dealName: lead.leadName,
+        assignedTo: lead.assignTo?._id,
+        stage: "Qualification",
+      });
+      await deal.save();
+
+      // 3️⃣ Notify & Email assignee
+      const userId = lead.assignTo?._id?.toString();
+      if (userId) {
+        notifyUser(userId, "deal:created", {
+          dealId: deal._id,
+          dealName: deal.dealName,
+        });
+      }
+      if (lead.assignTo?.email) {
+        await sendEmail({
+          to: lead.assignTo.email,
+          subject: `New Deal Created: ${deal.dealName}`,
+          text: `Deal created for lead ${lead.leadName}. Stage: Qualification`,
+        });
+      }
+
+      res.status(200).json({ message: "Lead converted to deal", deal });
+    } catch (err) {
+      res.status(500).json({ message: err.message });
     }
   },
 };
