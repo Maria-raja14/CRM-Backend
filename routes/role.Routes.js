@@ -13,6 +13,10 @@ router.post(
   indexControllers.roleController.createRole
 );
 router.get("/", protect, indexControllers.roleController.getRoles);
+
+router.put("/update-role/:id", protect, adminOnly, indexControllers.roleController.updateRole);
+router.delete("/delete-role/:id", protect, adminOnly, indexControllers.roleController.deleteRole);
+
 router.put(
   "/:id",
   protect,
@@ -25,6 +29,7 @@ router.delete(
   adminOnly,
   indexControllers.roleController.deleteRole
 );
+
 
 export default router;
 
