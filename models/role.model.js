@@ -1,24 +1,10 @@
-// import mongoose from "mongoose";
-
-// const roleSchema = new mongoose.Schema(
-//   {
-//     name: { type: String, required: true, unique: true },
-//     description: { type: String }
-//   },
-//   { timestamps: true }
-// );
-
-// // ✅ Prevent OverwriteModelError
-// export default mongoose.models.Role || mongoose.model("Role", roleSchema);
-
-
-
 import mongoose from "mongoose";
 
 const roleSchema = new mongoose.Schema(
   {
 
     name: { type: String, required: true, unique: true },
+
     description: { type: String },
     permissions: {
       dashboard: { type: Boolean, default: true },
@@ -48,7 +34,8 @@ const roleSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-
-// Remove unique constraint to allow duplicate names
+// ✅ Prevent OverwriteModelError
 export default mongoose.models.Role || mongoose.model("Role", roleSchema);
+
+
 

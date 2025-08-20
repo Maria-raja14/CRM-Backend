@@ -1,84 +1,84 @@
-// import { Server } from "socket.io";
-
-// let io;
-// export const connectedUsers = {}; // userId => socket
-
-// export const initSocket = (server) => {
-//   io = new Server(server, {
-//     cors: { origin: "*" },
-//   });
-
-//   io.on("connection", (socket) => {
-//      const { userId } = socket.handshake.query;
-//   console.log("User connected:", userId);
-
-//   socket.on("user_connected", (uid) => {
-//     console.log("User registered for notifications:", uid);
-//   });
-
-//   // Example: emit a follow-up notification to this user
-//   setTimeout(() => {
-//     socket.emit("followup:due", { message: "Follow-up is due!" });
-//   }, 5000);
-//     socket.on("disconnect", () => {
-//       console.log("User disconnected:", userId);
-//       delete connectedUsers[userId];
-//     });
-//   });
-// };
-
-// export const notifyUser = (userId, event, payload) => {
-//   console.log("Sending notification to", userId, payload); // check payload
-//   const userSocket = connectedUsers[userId];
-//   if (userSocket) {
-//     userSocket.emit(event, payload);
-//   }
-// };
-
 
 
 import { Server } from "socket.io";
 
 let io;
-export const connectedUsers = {}; // { userId: socket }
+export const connectedUsers = {}; // { userId: [socket1, socket2...] }
 
 export const initSocket = (server) => {
   io = new Server(server, { cors: { origin: "*" } });
 
   io.on("connection", (socket) => {
     const { userId } = socket.handshake.auth;
+
+    // Handshake la userId iruntha add pannu
     if (userId) {
-      connectedUsers[userId] = socket;
-      console.log("✅ User connected:", userId);
+      addUserSocket(userId, socket);
     }
 
+    // ✅ Explicit user_connected emit from client
     socket.on("user_connected", (uid) => {
       if (uid) {
-        connectedUsers[uid] = socket;
-        console.log("User registered for notifications:", uid);
+        addUserSocket(uid, socket);
+        console.log("✅ User registered:", uid);
       }
     });
 
-    socket.on("disconnect", () => {
-      // remove any mapping that matches this socket
-      for (const [uid, s] of Object.entries(connectedUsers)) {
-        if (s.id === socket.id) delete connectedUsers[uid];
+    // ✅ Explicit logout emit from client
+    socket.on("user_logout", (uid) => {
+      if (uid) {
+        removeUserSocket(uid, socket.id);
+        console.log("🚪 User logged out:", uid);
       }
+      socket.disconnect(true); // force disconnect socket
+    });
+
+    // ✅ Auto cleanup when browser/tab closes
+    socket.on("disconnect", () => {
+      for (const [uid, sockets] of Object.entries(connectedUsers)) {
+        removeUserSocket(uid, socket.id);
+      }
+      console.log("⚠️ Socket disconnected:", socket.id);
     });
   });
 };
 
-// export const notifyUser = (userId, event, payload) => {
-//   const s = connectedUsers[userId];
-//   if (s) s.emit(event, payload);
-// };
+// 👉 Helper: Add user socket safely
+const addUserSocket = (userId, socket) => {
+  if (!connectedUsers[userId]) {
+    connectedUsers[userId] = [];
+  }
+  // prevent duplicate push
+  if (!connectedUsers[userId].some((s) => s.id === socket.id)) {
+    connectedUsers[userId].push(socket);
+  }
+  console.log("✅ User connected:", userId, "| sockets:", connectedUsers[userId].length);
+};
 
+// 👉 Helper: Remove socket from user
+const removeUserSocket = (userId, socketId) => {
+  if (!connectedUsers[userId]) return;
+
+  connectedUsers[userId] = connectedUsers[userId].filter((s) => s.id !== socketId);
+
+  if (connectedUsers[userId].length === 0) {
+    delete connectedUsers[userId];
+    console.log("🗑️ User removed completely:", userId);
+  }
+};
+
+// 👉 Notify single user (all sockets of that user)
 export const notifyUser = (userId, event, payload) => {
-  const s = connectedUsers[userId];
-  if (!s) {
-    console.log("❌ Socket for userId not found:", userId);
+  const sockets = connectedUsers[userId];
+  if (!sockets || sockets.length === 0) {
+    console.log("❌ No active socket for user:", userId);
     return;
   }
-  console.log("✅ Emitting event to user:", userId, payload);
-  s.emit(event, payload);
+  sockets.forEach((s) => s.emit(event, payload));
+  console.log("📩 Event sent:", event, "-> User:", userId);
+};
+
+// 👉 Broadcast to multiple admins
+export const notifyAdmins = (adminIds, event, payload) => {
+  adminIds.forEach((id) => notifyUser(id, event, payload));
 };
