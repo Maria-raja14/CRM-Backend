@@ -17,5 +17,7 @@ router.post("/createManual", indexControllers.dealsController.createManualDeal);
 // Update deal (assignTo, stage, value, notes)
 router.patch("/:id", indexControllers.dealsController.updateDeal);
 
+router.delete("/delete-deal/:id", indexControllers.dealsController.deleteDeal);
+
 
 export default router;

@@ -154,4 +154,22 @@ updateDeal: async (req, res) => {
 },
 
 
+// In your dealsController.js
+deleteDeal : async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const deal = await Deal.findByIdAndDelete(id);
+    
+    if (!deal) {
+      return res.status(404).json({ message: "Deal not found" });
+    }
+    
+    res.status(200).json({ message: "Deal deleted successfully" });
+  } catch (error) {
+    console.error("Delete deal error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+},
+
 };
