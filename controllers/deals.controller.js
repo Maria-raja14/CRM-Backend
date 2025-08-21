@@ -108,49 +108,6 @@ export default {
       res.status(500).json({ message: err.message });
     }
   },
-  // 4️⃣ Update Deal (assignedTo, stage, value, notes)
-// updateDeal: async (req, res) => {
-//   try {
-//     const { assignedTo, stage, value, notes } = req.body;
-
-//     // Allowed stages list
-//     const allowedStages = ["Qualification", "Negotiation", "Proposal Sent", "Closed Won", "Closed Lost"];
-//     if (stage && !allowedStages.includes(stage)) {
-//       return res.status(400).json({ message: "Invalid stage" });
-//     }
-
-//     // Update only editable fields
-//     const updateFields = {};
-//     if (assignedTo) updateFields.assignedTo = assignedTo;
-//     if (stage) updateFields.stage = stage;
-//     if (value !== undefined) updateFields.value = value;
-//     if (notes !== undefined) updateFields.notes = notes;
-
-//     const deal = await Deal.findByIdAndUpdate(
-//       req.params.id,
-//       updateFields,
-//       { new: true }
-//     ).populate("assignedTo", "firstName lastName email");
-
-//     if (!deal) return res.status(404).json({ message: "Deal not found" });
-
-//     // 🔔 Notify + Email
-//     if (assignedTo) {
-//       notifyUser(assignedTo.toString(), "deal:updated", { dealId: deal._id, dealName: deal.dealName });
-//     }
-//     if (deal.assignedTo?.email) {
-//       await sendEmail({
-//         to: deal.assignedTo.email,
-//         subject: `Deal Updated: ${deal.dealName}`,
-//         text: `Deal ${deal.dealName} details have been updated. Current Stage: ${deal.stage}`,
-//       });
-//     }
-
-//     res.status(200).json({ message: "Deal updated successfully", deal });
-//   } catch (err) {
-//     res.status(500).json({ message: err.message });
-//   }
-// },
 
 updateDeal: async (req, res) => {
   try {
@@ -195,6 +152,6 @@ updateDeal: async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 },
-  
+
 
 };
