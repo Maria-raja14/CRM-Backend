@@ -268,53 +268,72 @@ export default {
       res.status(400).json({ message: error.message });
     }
   },
-  // -------------------------------
-  convertLeadToDeal: async (req, res) => {
-    console.log(req.body);
-    
-    try {
-      const lead = await Lead.findById(req.params.id).populate("assignTo");
-      if (!lead) return res.status(404).json({ message: "Lead not found" });
-      if (lead.status === "Converted")
-        return res.status(400).json({ message: "Lead already converted" });
+  
 
-      // 1️⃣ Update lead
-      lead.status = "Converted";
-      lead.followUpDate = null;
-      lead.lastReminderAt = null;
-      await lead.save();
-   const { value, notes } = req.body;
-      // 2️⃣ Create a new Deal
-      const deal = new Deal({
-        leadId: lead._id,
-        value,
-        notes,
 
-        dealName: lead.leadName,
-        assignedTo: lead.assignTo?._id,
-        stage: "Qualification",
+convertLeadToDeal: async (req, res) => {
+  try {
+    const lead = await Lead.findById(req.params.id).populate("assignTo");
+    if (!lead) return res.status(404).json({ message: "Lead not found" });
+    if (lead.status === "Converted")
+      return res.status(400).json({ message: "Lead already converted" });
+
+    const { value, notes } = req.body;
+
+    // 🔹 Store follow-up data before clearing
+    const followUpDate = lead.followUpDate;
+    const reminderSentAt = lead.lastReminderAt;
+    const followUpStatus = lead.followUpStatus || "Pending";
+    const followUpFrequencyDays = lead.followUpFrequencyDays || null;
+
+    // 1️⃣ Update lead status to Converted
+    lead.status = "Converted";
+    lead.followUpDate = null;
+    lead.lastReminderAt = null;
+    await lead.save();
+
+    // 2️⃣ Create Deal and carry follow-up fields from lead
+    const deal = new Deal({
+      leadId: lead._id,
+      dealName: lead.leadName,
+      assignedTo: lead.assignTo?._id,
+      value,
+      notes,
+      stage: "Qualification",
+
+      followUpDate,
+      reminderSentAt,
+      followUpStatus,
+      followUpFrequencyDays,
+    });
+
+    await deal.save();
+
+    // 3️⃣ Notify & Email assignee
+    const userId = lead.assignTo?._id?.toString();
+    if (userId) {
+      notifyUser(userId, "deal:created", {
+        dealId: deal._id,
+        dealName: deal.dealName,
       });
-      await deal.save();
-
-      // 3️⃣ Notify & Email assignee
-      const userId = lead.assignTo?._id?.toString();
-      if (userId) {
-        notifyUser(userId, "deal:created", {
-          dealId: deal._id,
-          dealName: deal.dealName,
-        });
-      }
-      if (lead.assignTo?.email) {
-        await sendEmail({
-          to: lead.assignTo.email,
-          subject: `New Deal Created: ${deal.dealName}`,
-          text: `Deal created for lead ${lead.leadName}. Stage: Qualification`,
-        });
-      }
-
-      res.status(200).json({ message: "Lead converted to deal", deal });
-    } catch (err) {
-      res.status(500).json({ message: err.message });
     }
-  },
+
+    if (lead.assignTo?.email) {
+      await sendEmail({
+        to: lead.assignTo.email,
+        subject: `New Deal Created: ${deal.dealName}`,
+        text: `Deal created for lead ${lead.leadName}. Stage: Qualification`,
+      });
+    }
+
+    res.status(200).json({ message: "Lead converted to deal", deal });
+  } catch (err) {
+    console.error("Error converting lead to deal:", err);
+    res.status(500).json({ message: err.message });
+  }
+},
+
+
 };
+
+
