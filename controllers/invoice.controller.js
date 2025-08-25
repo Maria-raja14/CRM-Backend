@@ -1,0 +1,241 @@
+import Invoice from "../models/invoice.model.js";
+import mongoose from "mongoose";
+import path from "path";
+import ejs from "ejs";
+import fs from "fs";
+import puppeteer from "puppeteer";
+import nodemailer from "nodemailer";  
+
+export default {  
+  // ✅ Create Invoice
+  createInvoice: async (req, res) => {
+    try {
+      let { items, tax = 0, discount = 0, ...rest } = req.body;
+
+      if (!items || items.length === 0) {
+        return res.status(400).json({ error: "Invoice must contain at least one item" });
+      }
+
+      // Calculate amounts
+      items = items.map((item) => {
+        const price = item.price || 0;
+        const quantity = item.quantity || 1;
+        return {
+          ...item,
+          amount: price * quantity,
+        };
+      });
+
+      const subtotal = items.reduce((sum, item) => sum + item.amount, 0);
+      const total = subtotal + tax - discount;
+
+      const invoice = new Invoice({
+        ...rest,
+        items,
+        tax,
+        discount,
+        total,
+      });
+
+      await invoice.save();
+
+      // Populate before returning
+      const populatedInvoice = await Invoice.findById(invoice._id)
+        .populate("assignTo", "firstName lastName email")
+        .populate("items.deal", "dealName value stage");
+
+      res.status(201).json(populatedInvoice);
+    } catch (error) {
+      console.error("Error creating invoice:", error);
+      res.status(400).json({ error: error.message });
+    }
+  },
+
+  // ✅ Get All Invoices
+  getAllInvoices: async (req, res) => {
+    try {
+      const invoices = await Invoice.find()
+        .populate("assignTo", "firstName lastName email")
+        .populate("items.deal", "dealName value stage");
+
+      res.status(200).json(invoices);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  // ✅ Get Invoice by ID
+  getInvoiceById: async (req, res) => {
+    try {
+      const invoice = await Invoice.findById(req.params.id)
+        .populate("assignTo", "firstName lastName email")
+        .populate("items.deal", "dealName value stage");
+
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      res.status(200).json(invoice);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  // ✅ Update Invoice
+  updateInvoice: async (req, res) => {
+    try {
+      let { items, tax = 0, discount = 0, ...rest } = req.body;
+
+      if (items && items.length > 0) {
+        items = items.map((item) => {
+          const price = item.price || 0;
+          const quantity = item.quantity || 1;
+          return {
+            ...item,
+            amount: price * quantity,
+          };
+        });
+
+        const subtotal = items.reduce((sum, item) => sum + item.amount, 0);
+        rest.total = subtotal + tax - discount;
+        rest.items = items;
+        rest.tax = tax;
+        rest.discount = discount;
+      }
+
+      const updatedInvoice = await Invoice.findByIdAndUpdate(
+        req.params.id,
+        rest,
+        { new: true, runValidators: true }
+      )
+        .populate("assignTo", "firstName lastName email")
+        .populate("items.deal", "dealName value stage");
+
+      if (!updatedInvoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      res.status(200).json(updatedInvoice);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+  },
+
+  // ✅ Delete Invoice
+  deleteInvoice: async (req, res) => {
+    try {
+      const deletedInvoice = await Invoice.findByIdAndDelete(req.params.id);
+      if (!deletedInvoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      res.status(200).json({ message: "Invoice deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  // ✅ Generate Invoice PDF
+  generateInvoicePDF: async (req, res) => {
+    try {
+      const invoiceId = req.params.id;
+
+      if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
+        return res.status(400).json({ error: "Invalid invoice ID format" });
+      }
+
+      const invoice = await Invoice.findById(invoiceId)
+        .populate("assignTo", "firstName lastName email")
+        .populate("items.deal", "dealName value stage");
+
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      const templatePath = path.join(process.cwd(), "views", "invoiceTemplate.ejs");
+
+      if (!fs.existsSync(templatePath)) {
+        return res.status(500).json({ error: "Template file not found" });
+      }
+
+      const templateData = await ejs.renderFile(templatePath, { invoice });
+
+      const browser = await puppeteer.launch({
+        headless: "new",
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      });
+
+      const page = await browser.newPage();
+      await page.setContent(templateData, { waitUntil: "networkidle0" });
+
+      const pdfBuffer = await page.pdf({ format: "A4" });
+
+      await browser.close();
+
+      res.set({
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename=Invoice_${invoice.invoicenumber}.pdf`,
+      });
+
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      res.status(500).json({ error: "Internal Server Error", details: error.message });
+    }
+  },
+  sendInvoiceEmail: async (req, res) => {
+    try {
+      const { id } = req.params;
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ error: "Invalid invoice ID" });
+      }
+
+      const invoice = await Invoice.findById(id)
+        .populate("assignTo", "firstName lastName email")
+        .populate("items.deal", "dealName value stage");
+
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      // Load invoice template (EJS -> HTML)
+      const templatePath = path.join(process.cwd(), "views", "invoiceTemplate.ejs");
+      const templateData = await ejs.renderFile(templatePath, { invoice });
+
+      // Generate PDF using Puppeteer
+      const browser = await puppeteer.launch({ headless: "new", args: ["--no-sandbox"] });
+      const page = await browser.newPage();
+      await page.setContent(templateData, { waitUntil: "networkidle0" });
+      const pdfBuffer = await page.pdf({ format: "A4" });
+      await browser.close();
+
+      // Setup Nodemailer
+      const transporter = nodemailer.createTransport({
+        service: "gmail", // or use SMTP settings
+        auth: {
+          user: process.env.EMAIL_USER, // your email
+          pass: process.env.EMAIL_PASS, // your app password
+        },
+      });
+
+      // Send Email
+      const mailOptions = {
+        from: `"Your Company" <${process.env.EMAIL_USER}>`,
+        to: invoice.assignTo?.email || "default@email.com", // ✅ customer email
+        subject: `Invoice #${invoice.invoicenumber}`,
+        text: "Please find attached your invoice.",
+        attachments: [
+          {
+            filename: `Invoice_${invoice.invoicenumber}.pdf`,
+            content: pdfBuffer,
+          },
+        ],
+      };
+
+      await transporter.sendMail(mailOptions);
+
+      res.status(200).json({ message: "Invoice sent successfully!" });
+    } catch (error) {
+      console.error("Error sending invoice email:", error);
+      res.status(500).json({ error: "Failed to send invoice email" });
+    }
+  },
+};

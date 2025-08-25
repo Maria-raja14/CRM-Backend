@@ -3,9 +3,8 @@ import userRoutes from "./user.route.js";
 import leadRoutes from "./leads.routes.js";
 // import addUser from "./adduser.routes.js";
 import roles from "./role.Routes.js";
-import invoice from "./invoiceRoutes.js";
+import invoice from "./invoice.routes.js";
 import last from "./nameRoutes.js";
-import allDealsRoutes from "./allDeals.routes.js";
 
 import activityRoutes from "./activity.routes.js";
 

@@ -1,9 +1,9 @@
 import leadsController from "./leads.controller.js";
 import usersController from "./user.controller.js";
 import roleController from "./role.controller.js";
-import invoiceController from "./invoiceController.js";
+import invoiceController from "./invoice.controller.js";
 import nameController from "./nameController.js";
-import allDealsController from "./allDeals.controller.js";
+
 import activityController from "./activity.controller.js";
 import templateController from "./templateController.js";
 import proposalController from "./proposalController.js";
@@ -17,7 +17,7 @@ export default {
 
   leadsController,
   dealsController,
-  allDealsController,
+
   activityController,
   invoiceController,
   nameController,

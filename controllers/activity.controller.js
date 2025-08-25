@@ -1,8 +1,7 @@
 import mongoose from "mongoose";
 import Activity from "../models/activity.models.js";
-import AllDeals from "../models/alldeals.models.js";
-// import Person from "../models/person.models.js";
-// import Organization from "../models/organization.models.js";
+// import AllDeals from "../models/alldeals.models.js";
+
 
 export default {
   getActivities: async (req, res) => {
