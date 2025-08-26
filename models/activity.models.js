@@ -11,29 +11,36 @@ const activitySchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    startDate: { type: Date, required: true }, // ⬅️ Start date added
-    endDate: { type: Date, required: true }, // ⬅️ End date added
-    startTime: { type: String, required: true, match: /^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/ },
-    endTime: { type: String, required: true, match: /^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/ },
+    startDate: { type: Date, required: true },
+    endDate: { type: Date, required: true },
+    startTime: {
+      type: String,
+      required: true,
+      match: /^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/,
+    },
+    endTime: {
+      type: String,
+      required: true,
+      match: /^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/,
+    },
     activityCategory: {
       type: String,
       required: true,
-      enum: ["Call", "Meeting", "Email", "Task", "Deadline", "Other"], 
+      enum: ["Call", "Meeting", "Email", "Task", "Deadline", "Other"],
     },
-    activityType: {
-      type: mongoose.Schema.Types.ObjectId, 
-      refPath: "activityModel", 
-      required: function () { return !!this.activityModel; },  // Only required if activityModel exists
-    },
-    
-    activityModel: {
-      type: String,
-      required: true,
-      enum: ["Deals", "Person", "Organization"], 
-    },
-    collaborators: [{ type: mongoose.Schema.Types.ObjectId, ref: "Person" }],
     reminder: {
       type: Date,
+    },
+
+    // 🔗 Reference to Deal
+    deal: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Deal", // This should match your Deal model name
+      required: true, // optional: make required if every activity must belong to a deal
+    },
+    assignedTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User", // Your user model
     },
   },
   { timestamps: true }
