@@ -39,7 +39,7 @@ const ProposalSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: ["draft", "sent", "no reply", "rejection", "success"],
-      default: "draft",
+      default: "sent",
     },
   },
   { timestamps: true }
