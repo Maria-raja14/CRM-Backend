@@ -186,6 +186,9 @@
 
 
 
+
+
+
 import Proposal from "../models/proposal.js";
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
@@ -250,22 +253,33 @@ export default {
         from: `"Your Company Name" <${process.env.EMAIL_USER}>`,
         to: email,
         subject: `Proposal: ${title}`,
-        html: `<h2>${title}</h2><p>${content}</p>`,
+        html: content, // Use the full HTML content from the editor
       };
 
       // ✅ Send Email
       let info = await transporter.sendMail(mailOptions);
-      console.log(" Email sent successfully:", info.response);
+      console.log("✅ Email sent successfully:", info.response);
 
-      // ✅ Update Proposal status to "sent"
       let updatedProposal;
+      
       if (id) {
-        // Update existing proposal
+        // Update existing proposal status to "sent"
         updatedProposal = await Proposal.findByIdAndUpdate(
           id,
-          { status: "sent" },
+          { 
+            title,
+            dealTitle,
+            email,
+            content,
+            image,
+            status: "sent" 
+          },
           { new: true }
         );
+        
+        if (!updatedProposal) {
+          return res.status(404).json({ error: "Proposal not found" });
+        }
       } else {
         // Create new proposal with "sent" status
         updatedProposal = new Proposal({
