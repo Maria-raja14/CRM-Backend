@@ -13,6 +13,7 @@ import connectDB from "./config/db.js";
 import routes from "./routes/index.routes.js";
 import { initSocket } from "./realtime/socket.js";
 import { startFollowUpCron } from "./controllers/followups.cron.js";
+import { startActivityReminderCron } from "./controllers/activityReminder.cron.js";
 
 
 dotenv.config();
@@ -36,7 +37,8 @@ app.use((err, _req, res, _next) => {
 
 const server = http.createServer(app);
 initSocket(server);          // Socket.IO
-startFollowUpCron();         // Cron jobs
+startFollowUpCron();   
+startActivityReminderCron(); // ✅ for activities      // Cron jobs
 
 const PORT = process.env.PORT || 5000;
 

@@ -9,6 +9,7 @@ import templateController from "./templateController.js";
 import proposalController from "./proposalController.js";
 import stageController from "./stageController.js";
 import dealsController from "./deals.controller.js";
+import adminDashboardController from "./adminDashboard.controller.js";
 
 export default {
   usersController,
@@ -20,5 +21,6 @@ export default {
   templateController,
   proposalController,
   stageController,
+  adminDashboardController
 
 };

@@ -18,7 +18,7 @@ const invoiceSchema = new mongoose.Schema({
         ref: "Deal", // Reference to Deal table
         required: true 
       },
-      quantity: { type: Number, required: true },
+      // quantity: { type: Number, required: true },
       price: { type: Number },
       amount: { type: Number },
     },

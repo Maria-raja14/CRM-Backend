@@ -11,6 +11,9 @@ router.delete("/delete/:id",indexController.invoiceController. deleteInvoice); /
 router.get("/invoice/download/:id",indexController.invoiceController.generateInvoicePDF)
 router.post("/sendEmail/:id", indexController.invoiceController.sendInvoiceEmail);
 
+router.get("/recent", indexController.invoiceController.getRecentInvoices);
+router.get("/pending",indexController.invoiceController.getPendingInvoices);
+
 export default router;
 
 

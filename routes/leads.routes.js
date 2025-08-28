@@ -19,4 +19,8 @@ router.patch(
 
 router.patch("/:id/convert", indexControllers.leadsController.convertLeadToDeal);
 
+
+// Extra
+router.get("/recent", indexControllers.leadsController.getRecentLeads);
+router.get("/pending", indexControllers.leadsController.getPendingLeads);
 export default router;

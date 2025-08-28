@@ -42,6 +42,7 @@ const activitySchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User", // Your user model
     },
+    
   },
   { timestamps: true }
 );

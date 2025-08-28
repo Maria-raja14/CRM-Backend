@@ -37,7 +37,8 @@ const addUserSocket = (userId, socket) => {
   if (!connectedUsers[userId].some((s) => s.id === socket.id)) {
     connectedUsers[userId].push(socket);
   }
-  console.log(`✅ User connected: ${userId} | sockets: ${connectedUsers[userId].length}`);
+   console.log(`✅ User connected: ${userId} | sockets: ${connectedUsers[userId].length}`);
+  console.log("👥 All connected users now:", Object.keys(connectedUsers));
 };
 
 // Remove socket
@@ -54,7 +55,7 @@ const removeUserSocket = (userId, socketId) => {
 export const notifyUser = (userId, event, payload) => {
   const sockets = connectedUsers[userId];
   if (!sockets?.length) {
-    console.log("❌ No active socket for user:", userId);
+     console.log("❌ No active socket for user:", userId, "| Currently online:", Object.keys(connectedUsers));
     return;
   }
   sockets.forEach((s) => s.emit(event, payload));
