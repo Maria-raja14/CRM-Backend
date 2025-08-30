@@ -29,11 +29,9 @@
 
 import express from "express";
 import indexControllers from "../controllers/index.controllers.js";
-<<<<<<< HEAD
-;
-=======
+
 import upload from "../middlewares/upload.js";
->>>>>>> 87a788d9d15f33ef4a1b48e36f1977ebe6597260
+
 
 const router = express.Router();
 
