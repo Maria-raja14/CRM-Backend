@@ -10,6 +10,7 @@ import proposalRoutes from "./proposalRoutes.js";
 import stageRoutes from "./stageRoutes.js";
 import dealsRoutes from "./deals.route.js";
 import adminDashboard from "./adminDashboard.routes.js"
+import notificationRoutes from "./notification.routes.js"
 
 const router = express.Router();
 
@@ -27,5 +28,6 @@ router.use("/template", templateRoutes);
 router.use("/proposal", proposalRoutes);
 router.use("/stage", stageRoutes);
 router.use("/dashboard", adminDashboard);
+router.use("/notification", notificationRoutes);
 
 export default router;

@@ -15,39 +15,61 @@ const computeFollowUp = (status) => {
 };
 
 export default {
+  // createLead: async (req, res) => {
+  //   try {
+  //     const { leadName, companyName, assignTo, status } = req.body;
+
+  //     if (!leadName || !companyName) {
+  //       return res
+  //         .status(400)
+  //         .json({ message: "Lead name and company name are required" });
+  //     }
+
+  //     if (assignTo) {
+  //       const userExists = await userModel.findById(assignTo);
+  //       if (!userExists) {
+  //         return res.status(400).json({ message: "Assigned user not found" });
+  //       }
+  //     }
+
+  //     const data = { ...req.body };
+
+  //     // If followUpDate not provided, set from status
+  //     if (!data.followUpDate && data.status) {
+  //       const computed = computeFollowUp(data.status);
+  //       if (computed) data.followUpDate = computed;
+  //     }
+
+  //     const lead = new Lead(data);
+  //     const savedLead = await lead.save();
+  //     res.status(201).json(savedLead);
+  //   } catch (error) {
+  //     res.status(400).json({ message: error.message });
+  //   }
+  // },
+
   createLead: async (req, res) => {
-    try {
-      const { leadName, companyName, assignTo, status } = req.body;
+  try {
+    const { leadName, companyName, assignTo, status } = req.body;
 
-      if (!leadName || !companyName) {
-        return res
-          .status(400)
-          .json({ message: "Lead name and company name are required" });
-      }
-
-      if (assignTo) {
-        const userExists = await userModel.findById(assignTo);
-        if (!userExists) {
-          return res.status(400).json({ message: "Assigned user not found" });
-        }
-      }
-
-      const data = { ...req.body };
-
-      // If followUpDate not provided, set from status
-      if (!data.followUpDate && data.status) {
-        const computed = computeFollowUp(data.status);
-        if (computed) data.followUpDate = computed;
-      }
-
-      const lead = new Lead(data);
-      const savedLead = await lead.save();
-      res.status(201).json(savedLead);
-    } catch (error) {
-      res.status(400).json({ message: error.message });
+    if (!leadName || !companyName) {
+      return res.status(400).json({ message: "Lead name and company name are required" });
     }
-  },
 
+    const data = { ...req.body };
+
+    // Handle uploaded files
+    if (req.files && req.files.length > 0) {
+      data.attachments = req.files.map(file => file.path);
+    }
+
+    const lead = new Lead(data);
+    const savedLead = await lead.save();
+    res.status(201).json(savedLead);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+},
   getLeads: async (_req, res) => {
     try {
       const leads = await Lead.find().populate(

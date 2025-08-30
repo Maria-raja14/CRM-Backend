@@ -1,4 +1,3 @@
-
 import mongoose from "mongoose";
 
 const leadSchema = new mongoose.Schema(
@@ -14,6 +13,7 @@ const leadSchema = new mongoose.Schema(
     assignTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 
     address: { type: String },
+    country: { type: String }, // 🔹 Added field
 
     status: {
       type: String,
@@ -24,10 +24,11 @@ const leadSchema = new mongoose.Schema(
     // next follow-up trigger
     followUpDate: { type: Date },
 
-    // last time we reminded (to avoid duplicate sends)
-    lastReminderAt: { type: Date },
+    emailSentAt: { type: Date, default: null }, // Track email send time
+    lastReminderAt: { type: Date, default: null }, // Already exists
 
     notes: { type: String },
+    attachments: [{ type: String }],
   },
   { timestamps: true }
 );
