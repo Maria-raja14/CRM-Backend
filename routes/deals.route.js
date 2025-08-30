@@ -20,4 +20,6 @@ router.patch("/update-deal/:id", indexControllers.dealsController.updateDeal);
 router.delete("/delete-deal/:id", indexControllers.dealsController.deleteDeal);
 
 
-export default router;
+export default router;//original
+
+

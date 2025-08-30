@@ -15,6 +15,8 @@ const leadSchema = new mongoose.Schema(
 
     address: { type: String },
 
+
+    
     status: {
       type: String,
       enum: ["Hot", "Warm", "Cold", "Junk", "Converted"],

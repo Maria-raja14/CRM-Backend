@@ -153,7 +153,6 @@ updateDeal: async (req, res) => {
   }
 },
 
-
 // In your dealsController.js
 deleteDeal : async (req, res) => {
   try {
@@ -173,3 +172,4 @@ deleteDeal : async (req, res) => {
 },
 
 };
+
