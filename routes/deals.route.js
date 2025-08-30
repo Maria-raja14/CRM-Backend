@@ -18,6 +18,7 @@ router.post("/createManual", indexControllers.dealsController.createManualDeal);
 router.patch("/update-deal/:id", indexControllers.dealsController.updateDeal);
 
 router.delete("/delete-deal/:id", indexControllers.dealsController.deleteDeal);
+router.get("/pending", indexControllers.dealsController.pendingDeals);
 
 
 export default router;//original

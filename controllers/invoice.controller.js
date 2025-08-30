@@ -8,48 +8,65 @@ import nodemailer from "nodemailer";
 
 export default {  
   // ✅ Create Invoice
-  createInvoice: async (req, res) => {
-    try {
-      let { items, tax = 0, discount = 0, ...rest } = req.body;
+createInvoice: async (req, res) => {
+  try {
+    let { items, tax = 0, discount = 0, ...rest } = req.body;
 
-      if (!items || items.length === 0) {
-        return res.status(400).json({ error: "Invoice must contain at least one item" });
-      }
-
-      // Calculate amounts
-      items = items.map((item) => {
-        const price = item.price || 0;
-        const quantity = item.quantity || 1;
-        return {
-          ...item,
-          amount: price * quantity,
-        };
-      });
-
-      const subtotal = items.reduce((sum, item) => sum + item.amount, 0);
-      const total = subtotal + tax - discount;
-
-      const invoice = new Invoice({
-        ...rest,
-        items,
-        tax,
-        discount,
-        total,
-      });
-
-      await invoice.save();
-
-      // Populate before returning
-      const populatedInvoice = await Invoice.findById(invoice._id)
-        .populate("assignTo", "firstName lastName email")
-        .populate("items.deal", "dealName value stage");
-
-      res.status(201).json(populatedInvoice);
-    } catch (error) {
-      console.error("Error creating invoice:", error);
-      res.status(400).json({ error: error.message });
+    if (!items || items.length === 0) {
+      return res
+        .status(400)
+        .json({ error: "Invoice must contain at least one item" });
     }
-  },
+
+    // Ensure numeric values and calculate amount
+    items = items.map((item) => {
+      const price = Number(item.price) || 0;
+      const quantity = Number(item.quantity) || 1;
+      const amount = price * quantity;
+      return {
+        ...item,
+        amount: amount.toFixed(2), // store as string if you want, or Number(amount)
+      };
+    });
+
+    const subtotal = items.reduce((sum, item) => sum + Number(item.amount), 0);
+
+    // Ensure tax and discount are numbers
+    const taxValue = Number(tax) || 0; // e.g., 5 for 5%
+    const discountValue = Number(discount) || 0;
+
+    // Apply discount first
+    const discountedSubtotal = subtotal - discountValue;
+
+    // Apply tax (% of discounted subtotal)
+    const taxAmount = (discountedSubtotal * taxValue) / 100;
+
+    const total = discountedSubtotal + taxAmount;
+
+    const invoice = new Invoice({
+      ...rest,
+      items,
+      tax: taxValue,
+      discount: discountValue,
+      subtotal,
+      total: Number(total.toFixed(2)),
+    });
+
+    await invoice.save();
+
+    // Populate before returning
+    const populatedInvoice = await Invoice.findById(invoice._id)
+      .populate("assignTo", "firstName lastName email")
+      .populate("items.deal", "dealName value stage");
+
+    res.status(201).json(populatedInvoice);
+  } catch (error) {
+    console.error("Error creating invoice:", error);
+    res.status(400).json({ error: error.message });
+  }
+},
+
+
 
   // ✅ Get All Invoices
   getAllInvoices: async (req, res) => {
@@ -81,44 +98,51 @@ export default {
   },
 
   // ✅ Update Invoice
-  updateInvoice: async (req, res) => {
-    try {
-      let { items, tax = 0, discount = 0, ...rest } = req.body;
+updateInvoice: async (req, res) => {
+  try {
+    let { items, tax = 0, discount = 0, ...rest } = req.body;
 
-      if (items && items.length > 0) {
-        items = items.map((item) => {
-          const price = item.price || 0;
-          const quantity = item.quantity || 1;
-          return {
-            ...item,
-            amount: price * quantity,
-          };
-        });
+    if (items && items.length > 0) {
+      items = items.map((item) => {
+        const price = Number(item.price) || 0;
+        return {
+          ...item,
+          amount: price, // no quantity
+        };
+      });
 
-        const subtotal = items.reduce((sum, item) => sum + item.amount, 0);
-        rest.total = subtotal + tax - discount;
-        rest.items = items;
-        rest.tax = tax;
-        rest.discount = discount;
-      }
+      const subtotal = items.reduce((sum, item) => sum + Number(item.amount), 0);
 
-      const updatedInvoice = await Invoice.findByIdAndUpdate(
-        req.params.id,
-        rest,
-        { new: true, runValidators: true }
-      )
-        .populate("assignTo", "firstName lastName email")
-        .populate("items.deal", "dealName value stage");
+      const taxValue = Number(tax) || 0;
+      const discountValue = Number(discount) || 0;
 
-      if (!updatedInvoice) {
-        return res.status(404).json({ message: "Invoice not found" });
-      }
+      const discountedSubtotal = subtotal - discountValue;
+      const taxAmount = (discountedSubtotal * taxValue) / 100;
+      const total = discountedSubtotal + taxAmount;
 
-      res.status(200).json(updatedInvoice);
-    } catch (error) {
-      res.status(400).json({ error: error.message });
+      rest.items = items;
+      rest.tax = taxValue;
+      rest.discount = discountValue;
+      rest.total = Number(total.toFixed(2));
     }
-  },
+
+    const updatedInvoice = await Invoice.findByIdAndUpdate(
+      req.params.id,
+      rest,
+      { new: true, runValidators: true }
+    )
+      .populate("assignTo", "firstName lastName email")
+      .populate("items.deal", "dealName value stage");
+
+    if (!updatedInvoice) {
+      return res.status(404).json({ message: "Invoice not found" });
+    }
+
+    res.status(200).json(updatedInvoice);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+},
 
   // ✅ Delete Invoice
   deleteInvoice: async (req, res) => {
@@ -236,6 +260,29 @@ export default {
     } catch (error) {
       console.error("Error sending invoice email:", error);
       res.status(500).json({ error: "Failed to send invoice email" });
+    }
+  },
+   // ➡️ Get Recent Invoices (last 5)
+  getRecentInvoices: async (_req, res) => {
+    try {
+      const invoices = await Invoice.find().sort({ createdAt: -1 }).limit(5)
+        .populate("assignTo", "firstName lastName email");
+      res.status(200).json(invoices);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  // ➡️ Get Pending Invoices (status = Unpaid / Pending)
+  getPendingInvoices: async (_req, res) => {
+    try {
+      const invoices = await Invoice.find({ status: { $in: ["Unpaid", "Pending"] } })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .populate("assignTo", "firstName lastName email");
+      res.status(200).json(invoices);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
     }
   },
 };
