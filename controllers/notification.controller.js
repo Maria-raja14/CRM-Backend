@@ -3,17 +3,27 @@ import Notification from "../models/notification.model.js";
 
 export default {
   // Get notifications for a user
-  getUserNotifications: async (req, res) => {
-    try {
-      const { userId } = req.params;
-      const notifications = await Notification.find({ userId })
-        .sort({ createdAt: -1 })
-        .limit(50); // latest 50
-      res.status(200).json(notifications);
-    } catch (err) {
-      res.status(500).json({ message: err.message });
-    }
-  },
+ getUserNotifications: async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const now = new Date();
+
+    const notifications = await Notification.find({
+      userId,
+      $or: [
+        { expiresAt: { $exists: false } },
+        { expiresAt: { $gte: now } }, // ✅ Only non-expired
+      ],
+    })
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    res.status(200).json(notifications);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+},
+
 
   // Mark notification as read
   markAsRead: async (req, res) => {
