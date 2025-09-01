@@ -1,5 +1,3 @@
-
-
 import jwt from "jsonwebtoken";
 import User from "../models/user.model.js";
 import dotenv from "dotenv"
@@ -39,4 +37,6 @@ export const adminOnly = (req, res, next) => {
     return res.status(403).json({ message: "Access denied: Admins only" });
   }
   next();
-};
+};//original
+
+

@@ -21,4 +21,6 @@ router.delete("/delete-deal/:id", indexControllers.dealsController.deleteDeal);
 router.get("/pending", indexControllers.dealsController.pendingDeals);
 
 
-export default router;
+export default router;//original
+
+
