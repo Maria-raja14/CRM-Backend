@@ -47,7 +47,7 @@ router.post(
 
 router.get("/getAllLead", indexControllers.leadsController.getLeads);
 router.get("/getLead/:id", adminOrAssigned, indexControllers.leadsController.getLeadById);
-router.put("/updateLead/:id", adminOrAssigned, indexControllers.leadsController.updateLead);
+router.put("/updateLead/:id", upload.array("attachments"), adminOrAssigned, indexControllers.leadsController.updateLead);
 router.delete("/deleteLead/:id", adminOrAssigned, indexControllers.leadsController.deleteLead);
 
 router.patch("/:id/followup", adminOrAssigned, indexControllers.leadsController.updateFollowUpDate);
