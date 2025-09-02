@@ -1,26 +1,55 @@
+// import express from "express";
+// import indexControllers from "../controllers/index.controllers.js";
+
+// const router = express.Router();
+
+// // Convert lead → deal
+// router.post("/fromLead/:leadId", indexControllers.dealsController.createDealFromLead);
+
+// // Get all deals
+// router.get("/getAll", indexControllers.dealsController.getAllDeals);
+
+// // Update deal stage
+// router.patch("/:id/stage", indexControllers.dealsController.updateStage);
+
+// router.post("/createManual", indexControllers.dealsController.createManualDeal);
+
+// // Update deal (assignTo, stage, value, notes)
+// router.patch("/update-deal/:id", indexControllers.dealsController.updateDeal);
+
+// router.delete("/delete-deal/:id", indexControllers.dealsController.deleteDeal);
+// router.get("/pending", indexControllers.dealsController.pendingDeals);
+
+
+// export default router;//original
+
+
 import express from "express";
 import indexControllers from "../controllers/index.controllers.js";
+import { protect, adminOnly, adminOrAssignedToDeal } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
+
+// All routes are protected
+router.use(protect);
 
 // Convert lead → deal
 router.post("/fromLead/:leadId", indexControllers.dealsController.createDealFromLead);
 
-// Get all deals
+// Get all deals - accessible to all authenticated users but filtered by role
 router.get("/getAll", indexControllers.dealsController.getAllDeals);
 
-// Update deal stage
-router.patch("/:id/stage", indexControllers.dealsController.updateStage);
+// Update deal stage - only admin or assigned user can update
+router.patch("/:id/stage", adminOrAssignedToDeal, indexControllers.dealsController.updateStage);
 
-router.post("/createManual", indexControllers.dealsController.createManualDeal);
+// Create manual deal - only admin can create manual deals
+router.post("/createManual", adminOnly, indexControllers.dealsController.createManualDeal);
 
-// Update deal (assignTo, stage, value, notes)
-router.patch("/update-deal/:id", indexControllers.dealsController.updateDeal);
+// Update deal (assignTo, stage, value, notes) - only admin or assigned user can update
+router.patch("/update-deal/:id", adminOrAssignedToDeal, indexControllers.dealsController.updateDeal);
 
-router.delete("/delete-deal/:id", indexControllers.dealsController.deleteDeal);
+// Delete deal - only admin or assigned user can delete
+router.delete("/delete-deal/:id", adminOrAssignedToDeal, indexControllers.dealsController.deleteDeal);
 router.get("/pending", indexControllers.dealsController.pendingDeals);
 
-
-export default router;//original
-
-
+export default router;  //sales and admin working funtionality code..
