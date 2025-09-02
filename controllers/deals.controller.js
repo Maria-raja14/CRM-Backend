@@ -83,93 +83,91 @@ export default {
   //   }
   // },
 
-createManualDeal: async (req, res) => {
-  try {
-    const {
-      dealName,
-      assignTo,   // frontend sends assignTo
-      dealValue,  // frontend sends dealValue
-      stage,
-      notes,
-      phoneNumber,
-      email,
-      source,
-      companyName,
-      industry,
-      requirement,
-      address,
-      country,
-    } = req.body;
+  createManualDeal: async (req, res) => {
+    try {
+      const {
+        dealName,
+        assignTo, // frontend sends assignTo
+        dealValue, // frontend sends dealValue
+        stage,
+        notes,
+        phoneNumber,
+        email,
+        source,
+        companyName,
+        industry,
+        requirement,
+        address,
+        country,
+      } = req.body;
 
-    // Validation
-    if (!dealName || !phoneNumber || !companyName) {
-      return res.status(400).json({
-        message: "dealName, phoneNumber & companyName are required",
+      // Validation
+      if (!dealName || !phoneNumber || !companyName) {
+        return res.status(400).json({
+          message: "dealName, phoneNumber & companyName are required",
+        });
+      }
+
+      const allowedStages = [
+        "Qualification",
+        "Negotiation",
+        "Proposal Sent",
+        "Closed Won",
+        "Closed Lost",
+      ];
+
+      const dealStage =
+        stage && allowedStages.includes(stage) ? stage : "Qualification";
+
+      // Store attachments as array of paths
+      const attachments = req.files ? req.files.map((file) => file.path) : [];
+
+      // Map frontend fields to backend schema
+      const deal = new Deal({
+        dealName,
+        assignedTo: assignTo || null, // map assignTo to assignedTo
+        value: Number(dealValue) || 0, // map dealValue to value
+        stage: dealStage,
+        notes: notes || "",
+        phoneNumber,
+        email,
+        source,
+        companyName,
+        industry,
+        requirement,
+        address,
+        country,
+        attachments,
       });
+
+      await deal.save();
+      res.status(201).json({ message: "Manual deal created", deal });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: err.message });
     }
-
-    const allowedStages = [
-      "Qualification",
-      "Negotiation",
-      "Proposal",
-      "Closed Won",
-      "Closed Lost",
-    ];
-
-    const dealStage = stage && allowedStages.includes(stage) ? stage : "Qualification";
-
-    // Store attachments as array of paths
-    const attachments = req.files ? req.files.map((file) => file.path) : [];
-
-    // Map frontend fields to backend schema
-    const deal = new Deal({
-      dealName,
-      assignedTo: assignTo || null,       // map assignTo to assignedTo
-      value: Number(dealValue) || 0,      // map dealValue to value
-      stage: dealStage,
-      notes: notes || "",
-      phoneNumber,
-      email,
-      source,
-      companyName,
-      industry,
-      requirement,
-      address,
-      country,
-      attachments,
-    });
-
-    await deal.save();
-    res.status(201).json({ message: "Manual deal created", deal });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: err.message });
-  }
-},
-
-
+  },
 
   // 2️⃣ Get all deals - Updated to filter by user role
- getAllDeals: async (req, res) => {
-  try {
-    let query = {};
+  getAllDeals: async (req, res) => {
+    try {
+      let query = {};
 
-    // If user is not admin, only show deals assigned to them
-    if (req.user.role.name !== "Admin") {
-      query.assignedTo = req.user._id;
+      // If user is not admin, only show deals assigned to them
+      if (req.user.role.name !== "Admin") {
+        query.assignedTo = req.user._id;
+      }
+
+      const deals = await Deal.find(query)
+        .populate("assignedTo", "firstName lastName email")
+        .sort({ createdAt: -1 }); // optional: newest deals first
+
+      res.status(200).json(deals);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: err.message });
     }
-
-    const deals = await Deal.find(query)
-      .populate("assignedTo", "firstName lastName email")
-      .sort({ createdAt: -1 }); // optional: newest deals first
-
-    res.status(200).json(deals);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: err.message });
-  }
-},
-
+  },
 
   // 3️⃣ Update deal stage
   updateStage: async (req, res) => {
@@ -196,11 +194,9 @@ createManualDeal: async (req, res) => {
         req.user.role.name !== "Admin" &&
         deal.assignedTo._id.toString() !== req.user._id.toString()
       ) {
-        return res
-          .status(403)
-          .json({
-            message: "Access denied: You can only update deals assigned to you",
-          });
+        return res.status(403).json({
+          message: "Access denied: You can only update deals assigned to you",
+        });
       }
 
       deal.stage = stage;
@@ -239,11 +235,9 @@ createManualDeal: async (req, res) => {
         req.user.role.name !== "Admin" &&
         deal.assignedTo.toString() !== req.user._id.toString()
       ) {
-        return res
-          .status(403)
-          .json({
-            message: "Access denied: You can only update deals assigned to you",
-          });
+        return res.status(403).json({
+          message: "Access denied: You can only update deals assigned to you",
+        });
       }
 
       // Allowed stages list
@@ -310,11 +304,9 @@ createManualDeal: async (req, res) => {
         req.user.role.name !== "Admin" &&
         deal.assignedTo.toString() !== req.user._id.toString()
       ) {
-        return res
-          .status(403)
-          .json({
-            message: "Access denied: You can only delete deals assigned to you",
-          });
+        return res.status(403).json({
+          message: "Access denied: You can only delete deals assigned to you",
+        });
       }
 
       await Deal.findByIdAndDelete(id);

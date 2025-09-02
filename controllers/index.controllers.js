@@ -5,9 +5,7 @@ import invoiceController from "./invoice.controller.js";
 
 
 import activityController from "./activity.controller.js";
-import templateController from "./templateController.js";
-import proposalController from "./proposalController.js";
-import stageController from "./stageController.js";
+import proposalController from "./proposal.controller.js";
 import dealsController from "./deals.controller.js";
 import adminDashboardController from "./adminDashboard.controller.js";
 
@@ -18,9 +16,7 @@ export default {
   dealsController,
   activityController,
   invoiceController,
-  templateController,
   proposalController,
-  stageController,
   adminDashboardController
 
 };
