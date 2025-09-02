@@ -139,7 +139,7 @@ import moment from "moment"; // ✅ keep only moment
 import { sendNotification } from "../services/notificationService.js";
 
 // Avoid duplicate reminders within the same gap
-const SHOULD_REMIND_EVERY_MINUTES = 120;
+const SHOULD_REMIND_EVERY_MINUTES = 1;
 
 // ✅ Get Admin UserIds
 const getAdminUserIds = async () => {
