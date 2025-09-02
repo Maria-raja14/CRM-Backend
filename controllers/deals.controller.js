@@ -81,6 +81,9 @@ export default {
   },
 
   // 2️⃣ Get all deals - Updated to filter by user role
+
+
+
   getAllDeals: async (req, res) => {
     try {
       let query = {};
@@ -96,6 +99,9 @@ export default {
       res.status(500).json({ message: err.message });
     }
   },
+
+ 
+
 
   // 3️⃣ Update deal stage
   updateStage: async (req, res) => {

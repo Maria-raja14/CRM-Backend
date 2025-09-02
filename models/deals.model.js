@@ -27,3 +27,5 @@ dealSchema.pre("save", function (next) {
 
 const Deal = mongoose.model("Deal", dealSchema);
 export default Deal;
+
+
