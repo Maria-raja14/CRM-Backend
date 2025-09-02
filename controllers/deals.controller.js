@@ -169,6 +169,30 @@ export default {
     }
   },
 
+  // 2️⃣ Get all deals - Updated to filter by user role
+
+
+
+  getAllDeals: async (req, res) => {
+    try {
+      let query = {};
+      
+      // If user is not admin, only show deals assigned to them
+      if (req.user.role.name !== "Admin") {
+        query.assignedTo = req.user._id;
+      }
+      
+      const deals = await Deal.find(query).populate("assignedTo", "firstName lastName email");
+      res.status(200).json(deals);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  },
+
+
+ 
+
+
   // 3️⃣ Update deal stage
   updateStage: async (req, res) => {
     try {
