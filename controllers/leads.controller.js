@@ -247,6 +247,7 @@ const computeFollowUp = (status) => {
 };
 
 export default {
+
   createLead: async (req, res) => {
     try {
       const { leadName, companyName, assignTo, status } = req.body;
