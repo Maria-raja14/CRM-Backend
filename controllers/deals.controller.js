@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 import Deal from "../models/deals.model.js";
 import Lead from "../models/leads.model.js";
 import sendEmail from "../services/email.js";
@@ -16,7 +9,8 @@ export default {
     try {
       const lead = await Lead.findById(req.params.leadId).populate("assignTo");
       if (!lead) return res.status(404).json({ message: "Lead not found" });
-      if (lead.status === "Converted") return res.status(400).json({ message: "Lead already converted" });
+      if (lead.status === "Converted")
+        return res.status(400).json({ message: "Lead already converted" });
 
       // Update lead status
       lead.status = "Converted";
@@ -35,7 +29,11 @@ export default {
 
       // Notify + Email
       const userId = lead.assignTo?._id?.toString();
-      if (userId) notifyUser(userId, "deal:created", { dealId: deal._id, dealName: deal.dealName });
+      if (userId)
+        notifyUser(userId, "deal:created", {
+          dealId: deal._id,
+          dealName: deal.dealName,
+        });
       if (lead.assignTo?.email) {
         await sendEmail({
           to: lead.assignTo.email,
@@ -49,74 +47,171 @@ export default {
       res.status(500).json({ message: err.message });
     }
   },
+  // createManualDeal: async (req, res) => {
+  //   try {
+  //     const { leadId, assignedTo, value, stage, notes } = req.body;
 
-  createManualDeal: async (req, res) => {
-    try {
-      const { dealName, assignedTo, value, stage, notes } = req.body;
+  //     if (!leadId)
+  //       return res.status(400).json({ message: "leadId is required" });
 
-      if (!dealName) return res.status(400).json({ message: "dealName is required" });
+  //     const lead = await Lead.findById(leadId);
+  //     if (!lead) return res.status(404).json({ message: "Lead not found" });
 
-      const allowedStages = ["Qualification", "Negotiation", "Proposal Sent", "Closed Won", "Closed Lost"];
-      const dealStage = stage && allowedStages.includes(stage) ? stage : "Qualification";
+  //     const allowedStages = [
+  //       "Qualification",
+  //       "Negotiation",
+  //       "Proposal",
+  //       "Closed Won",
+  //       "Closed Lost",
+  //     ];
+  //     const dealStage =
+  //       stage && allowedStages.includes(stage) ? stage : "Qualification";
 
-      const deal = new Deal({
-        dealName,
-        assignedTo,
-        value: value || 0,
-        stage: dealStage,
-        notes: notes || "",
+  //     const deal = new Deal({
+  //       leadId,
+  //       dealName: lead.leadName,
+  //       assignedTo,
+  //       value: value || 0,
+  //       stage: dealStage,
+  //       notes: notes || "",
+  //     });
+  //     await deal.save();
+
+  //     res.status(201).json({ message: "Manual deal created", deal });
+  //   } catch (err) {
+  //     res.status(500).json({ message: err.message });
+  //   }
+  // },
+
+createManualDeal: async (req, res) => {
+  try {
+    const {
+      dealName,
+      assignTo,   // frontend sends assignTo
+      dealValue,  // frontend sends dealValue
+      stage,
+      notes,
+      phoneNumber,
+      email,
+      source,
+      companyName,
+      industry,
+      requirement,
+      address,
+      country,
+    } = req.body;
+
+    // Validation
+    if (!dealName || !phoneNumber || !companyName) {
+      return res.status(400).json({
+        message: "dealName, phoneNumber & companyName are required",
       });
-
-      await deal.save();
-
-      // Notify + email if assigned
-      if (assignedTo) {
-        notifyUser(assignedTo.toString(), "deal:created", { dealId: deal._id, dealName: deal.dealName });
-      }
-
-      res.status(201).json({ message: "Manual deal created", deal });
-    } catch (err) {
-      res.status(500).json({ message: err.message });
     }
-  },
+
+    const allowedStages = [
+      "Qualification",
+      "Negotiation",
+      "Proposal",
+      "Closed Won",
+      "Closed Lost",
+    ];
+
+    const dealStage = stage && allowedStages.includes(stage) ? stage : "Qualification";
+
+    // Store attachments as array of paths
+    const attachments = req.files ? req.files.map((file) => file.path) : [];
+
+    // Map frontend fields to backend schema
+    const deal = new Deal({
+      dealName,
+      assignedTo: assignTo || null,       // map assignTo to assignedTo
+      value: Number(dealValue) || 0,      // map dealValue to value
+      stage: dealStage,
+      notes: notes || "",
+      phoneNumber,
+      email,
+      source,
+      companyName,
+      industry,
+      requirement,
+      address,
+      country,
+      attachments,
+    });
+
+    await deal.save();
+    res.status(201).json({ message: "Manual deal created", deal });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: err.message });
+  }
+},
+
+
 
   // 2️⃣ Get all deals - Updated to filter by user role
-  getAllDeals: async (req, res) => {
-    try {
-      let query = {};
-      
-      // If user is not admin, only show deals assigned to them
-      if (req.user.role.name !== "Admin") {
-        query.assignedTo = req.user._id;
-      }
-      
-      const deals = await Deal.find(query).populate("assignedTo", "firstName lastName email");
-      res.status(200).json(deals);
-    } catch (err) {
-      res.status(500).json({ message: err.message });
+ getAllDeals: async (req, res) => {
+  try {
+    let query = {};
+
+    // If user is not admin, only show deals assigned to them
+    if (req.user.role.name !== "Admin") {
+      query.assignedTo = req.user._id;
     }
-  },
+
+    const deals = await Deal.find(query)
+      .populate("assignedTo", "firstName lastName email")
+      .sort({ createdAt: -1 }); // optional: newest deals first
+
+    res.status(200).json(deals);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: err.message });
+  }
+},
+
 
   // 3️⃣ Update deal stage
   updateStage: async (req, res) => {
     try {
       const { stage } = req.body;
-      const allowedStages = ["Qualification", "Negotiation", "Proposal Sent", "Closed Won", "Closed Lost"];
-      if (!allowedStages.includes(stage)) return res.status(400).json({ message: "Invalid stage" });
+      const allowedStages = [
+        "Qualification",
+        "Negotiation",
+        "Proposal Sent",
+        "Closed Won",
+        "Closed Lost",
+      ];
+      if (!allowedStages.includes(stage))
+        return res.status(400).json({ message: "Invalid stage" });
 
-      const deal = await Deal.findById(req.params.id).populate("assignedTo", "email");
+      const deal = await Deal.findById(req.params.id).populate(
+        "assignedTo",
+        "email"
+      );
       if (!deal) return res.status(404).json({ message: "Deal not found" });
-      
+
       // Check if user has permission to update this deal
-      if (req.user.role.name !== "Admin" && deal.assignedTo._id.toString() !== req.user._id.toString()) {
-        return res.status(403).json({ message: "Access denied: You can only update deals assigned to you" });
+      if (
+        req.user.role.name !== "Admin" &&
+        deal.assignedTo._id.toString() !== req.user._id.toString()
+      ) {
+        return res
+          .status(403)
+          .json({
+            message: "Access denied: You can only update deals assigned to you",
+          });
       }
 
       deal.stage = stage;
       await deal.save();
 
       // Notify + Email
-      if (deal.assignedTo?._id) notifyUser(deal.assignedTo._id.toString(), "deal:stageUpdated", { dealId: deal._id, newStage: stage });
+      if (deal.assignedTo?._id)
+        notifyUser(deal.assignedTo._id.toString(), "deal:stageUpdated", {
+          dealId: deal._id,
+          newStage: stage,
+        });
       if (deal.assignedTo?.email) {
         await sendEmail({
           to: deal.assignedTo.email,
@@ -138,14 +233,27 @@ export default {
       // Find the deal first to check permissions
       const deal = await Deal.findById(req.params.id);
       if (!deal) return res.status(404).json({ message: "Deal not found" });
-      
+
       // Check if user has permission to update this deal
-      if (req.user.role.name !== "Admin" && deal.assignedTo.toString() !== req.user._id.toString()) {
-        return res.status(403).json({ message: "Access denied: You can only update deals assigned to you" });
+      if (
+        req.user.role.name !== "Admin" &&
+        deal.assignedTo.toString() !== req.user._id.toString()
+      ) {
+        return res
+          .status(403)
+          .json({
+            message: "Access denied: You can only update deals assigned to you",
+          });
       }
 
       // Allowed stages list
-      const allowedStages = ["Qualification", "Negotiation", "Proposal Sent", "Closed Won", "Closed Lost"];
+      const allowedStages = [
+        "Qualification",
+        "Negotiation",
+        "Proposal Sent",
+        "Closed Won",
+        "Closed Lost",
+      ];
       if (stage && !allowedStages.includes(stage)) {
         return res.status(400).json({ message: "Invalid stage" });
       }
@@ -166,7 +274,10 @@ export default {
 
       // 🔔 Notify + Email
       if (assignedTo) {
-        notifyUser(assignedTo.toString(), "deal:updated", { dealId: updatedDeal._id, dealName: updatedDeal.dealName });
+        notifyUser(assignedTo.toString(), "deal:updated", {
+          dealId: updatedDeal._id,
+          dealName: updatedDeal.dealName,
+        });
       }
       if (updatedDeal.assignedTo?.email) {
         await sendEmail({
@@ -176,7 +287,9 @@ export default {
         });
       }
 
-      res.status(200).json({ message: "Deal updated successfully", deal: updatedDeal });
+      res
+        .status(200)
+        .json({ message: "Deal updated successfully", deal: updatedDeal });
     } catch (err) {
       res.status(500).json({ message: err.message });
     }
@@ -185,20 +298,27 @@ export default {
   deleteDeal: async (req, res) => {
     try {
       const { id } = req.params;
-      
+
       // Find the deal first to check permissions
       const deal = await Deal.findById(id);
       if (!deal) {
         return res.status(404).json({ message: "Deal not found" });
       }
-      
+
       // Check if user has permission to delete this deal
-      if (req.user.role.name !== "Admin" && deal.assignedTo.toString() !== req.user._id.toString()) {
-        return res.status(403).json({ message: "Access denied: You can only delete deals assigned to you" });
+      if (
+        req.user.role.name !== "Admin" &&
+        deal.assignedTo.toString() !== req.user._id.toString()
+      ) {
+        return res
+          .status(403)
+          .json({
+            message: "Access denied: You can only delete deals assigned to you",
+          });
       }
-      
+
       await Deal.findByIdAndDelete(id);
-      
+
       res.status(200).json({ message: "Deal deleted successfully" });
     } catch (error) {
       console.error("Delete deal error:", error);
@@ -210,12 +330,12 @@ export default {
       let query = {
         stage: { $nin: ["Closed Won", "Closed Lost"] },
       };
-      
+
       // If user is not admin, only show deals assigned to them
       if (req.user.role.name !== "Admin") {
         query.assignedTo = req.user._id;
       }
-      
+
       // Fetch deals which are not yet closed
       const deals = await Deal.find(query)
         .populate("assignedTo", "firstName lastName email")
@@ -228,6 +348,4 @@ export default {
       res.status(500).json({ message: "Server error" });
     }
   },
-
-
-};//with sales perimission
+}; //with sales perimission

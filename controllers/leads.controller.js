@@ -1,5 +1,3 @@
-
-
 // import dayjs from "dayjs";
 // import Lead from "../models/leads.model.js";
 // import userModel from "../models/user.model.js";
@@ -15,7 +13,7 @@
 // };
 
 // export default {
-  
+
 //   createLead: async (req, res) => {
 //   try {
 //     const { leadName, companyName, assignTo, status } = req.body;
@@ -141,8 +139,6 @@
 //       res.status(400).json({ message: error.message });
 //     }
 //   },
-  
-
 
 // convertLeadToDeal: async (req, res) => {
 //   try {
@@ -231,7 +227,6 @@
 
 // };//original
 
-
 import dayjs from "dayjs";
 import Lead from "../models/leads.model.js";
 import userModel from "../models/user.model.js";
@@ -247,44 +242,43 @@ const computeFollowUp = (status) => {
 };
 
 export default {
-
+  // ➡️ Create Lead
   createLead: async (req, res) => {
     try {
-      const { leadName, companyName, assignTo, status } = req.body;
-
+      const { leadName, companyName } = req.body;
       if (!leadName || !companyName) {
-        return res.status(400).json({ message: "Lead name and company name are required" });
+        return res
+          .status(400)
+          .json({ message: "Lead name and company name are required" });
       }
 
       const data = { ...req.body };
 
-      // Handle uploaded files
-      if (req.files && req.files.length > 0) {
-        data.attachments = req.files.map(file => file.path);
+      // Handle file uploads
+      if (req.files?.length > 0) {
+        data.attachments = req.files.map((file) => file.path);
       }
 
-      // If user is not admin, force assign to themselves
+      // Sales users can only assign to themselves
       if (req.user.role.name !== "Admin") {
         data.assignTo = req.user._id;
       }
 
       const lead = new Lead(data);
       const savedLead = await lead.save();
+
       res.status(201).json(savedLead);
     } catch (error) {
       res.status(400).json({ message: error.message });
     }
   },
 
+  // ➡️ Get All Leads
   getLeads: async (req, res) => {
     try {
-      let query = {};
-      
-      // If user is not admin, only show leads assigned to them
-      if (req.user.role.name !== "Admin") {
-        query.assignTo = req.user._id;
-      }
-      
+      const query =
+        req.user.role.name === "Admin" ? {} : { assignTo: req.user._id };
+
       const leads = await Lead.find(query).populate(
         "assignTo",
         "firstName lastName email role"
@@ -295,6 +289,7 @@ export default {
     }
   },
 
+  // ➡️ Get Lead by ID
   getLeadById: async (req, res) => {
     try {
       const lead = await Lead.findById(req.params.id).populate(
@@ -302,27 +297,41 @@ export default {
         "firstName lastName email role"
       );
       if (!lead) return res.status(404).json({ message: "Lead not found" });
+
       res.status(200).json(lead);
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
   },
 
+  // ➡️ Update Lead
   updateLead: async (req, res) => {
     try {
       const before = await Lead.findById(req.params.id).select(
-        "status assignTo leadName followUpDate"
+        "status assignTo leadName followUpDate attachments"
       );
       if (!before) return res.status(404).json({ message: "Lead not found" });
 
       const patch = { ...req.body };
 
-      // If user is not admin, they can't change assignment
-      if (req.user.role.name !== "Admin" && patch.assignTo) {
-        delete patch.assignTo;
+      // Handle existing + new attachments
+      let existingAttachments = [];
+      if (req.body.existingAttachments) {
+        try {
+          existingAttachments = JSON.parse(req.body.existingAttachments);
+        } catch {
+          existingAttachments = [];
+        }
       }
 
-      // If status changing → recompute followUpDate & clear reminder stamp
+      let newFiles = [];
+      if (req.files && req.files.length > 0) {
+        newFiles = req.files.map((file) => file.path);
+      }
+
+      patch.attachments = [...existingAttachments, ...newFiles];
+
+      // Recompute followUpDate if status changes
       if (patch.status && patch.status !== before.status) {
         const computed = computeFollowUp(patch.status);
         patch.followUpDate = computed || null;
@@ -333,7 +342,7 @@ export default {
         new: true,
       }).populate("assignTo", "firstName lastName email");
 
-      // If status becomes Converted → notify + mail assignee
+      // Notify if converted
       if (before.status !== "Converted" && updated.status === "Converted") {
         const userId = updated.assignTo?._id?.toString();
         const fullName = `${updated.assignTo?.firstName || ""} ${
@@ -363,21 +372,25 @@ export default {
     }
   },
 
+  // ➡️ Delete Lead
   deleteLead: async (req, res) => {
     try {
       const lead = await Lead.findByIdAndDelete(req.params.id);
       if (!lead) return res.status(404).json({ message: "Lead not found" });
+
       res.status(200).json({ message: "Lead deleted successfully" });
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
   },
 
+  // ➡️ Update Follow-Up Date
   updateFollowUpDate: async (req, res) => {
     try {
       const { followUpDate } = req.body;
-      if (!followUpDate)
+      if (!followUpDate) {
         return res.status(400).json({ message: "followUpDate required" });
+      }
 
       const lead = await Lead.findByIdAndUpdate(
         req.params.id,
@@ -392,28 +405,85 @@ export default {
     }
   },
 
+  // ➡️ Convert Lead to Deal
+  // convertLeadToDeal: async (req, res) => {
+  //   try {
+  //     const lead = await Lead.findById(req.params.id).populate("assignTo");
+  //     if (!lead) return res.status(404).json({ message: "Lead not found" });
+  //     if (lead.status === "Converted") {
+  //       return res.status(400).json({ message: "Lead already converted" });
+  //     }
+
+  //     const { value, notes } = req.body;
+
+  //     // Save follow-up fields
+  //     const followUpDate = lead.followUpDate;
+  //     const reminderSentAt = lead.lastReminderAt;
+  //     const followUpStatus = lead.followUpStatus || "Pending";
+  //     const followUpFrequencyDays = lead.followUpFrequencyDays || null;
+
+  //     // Mark lead as converted
+  //     lead.status = "Converted";
+  //     lead.followUpDate = null;
+  //     lead.lastReminderAt = null;
+  //     await lead.save();
+
+  //     // Create deal
+  //     const deal = new Deal({
+  //       leadId: lead._id,
+  //       dealName: lead.leadName,
+  //       assignedTo: lead.assignTo?._id,
+  //       value,
+  //       notes,
+  //       stage: "Qualification",
+  //       followUpDate,
+  //       reminderSentAt,
+  //       followUpStatus,
+  //       followUpFrequencyDays,
+  //     });
+  //     await deal.save();
+
+  //     // Notify & email assignee
+  //     const userId = lead.assignTo?._id?.toString();
+  //     if (userId) {
+  //       notifyUser(userId, "deal:created", {
+  //         dealId: deal._id,
+  //         dealName: deal.dealName,
+  //       });
+  //     }
+
+  //     if (lead.assignTo?.email) {
+  //       await sendEmail({
+  //         to: lead.assignTo.email,
+  //         subject: `New Deal Created: ${deal.dealName}`,
+  //         text: `Deal created for lead ${lead.leadName}. Stage: Qualification`,
+  //       });
+  //     }
+
+  //     res.status(200).json({ message: "Lead converted to deal", deal });
+  //   } catch (error) {
+  //     console.error("Error converting lead to deal:", error);
+  //     res.status(500).json({ message: error.message });
+  //   }
+  // },
+  // ➡️ Convert Lead to Deal
   convertLeadToDeal: async (req, res) => {
     try {
       const lead = await Lead.findById(req.params.id).populate("assignTo");
       if (!lead) return res.status(404).json({ message: "Lead not found" });
-      if (lead.status === "Converted")
+      if (lead.status === "Converted") {
         return res.status(400).json({ message: "Lead already converted" });
+      }
 
       const { value, notes } = req.body;
 
-      // 🔹 Store follow-up data before clearing
+      // Save follow-up fields
       const followUpDate = lead.followUpDate;
       const reminderSentAt = lead.lastReminderAt;
       const followUpStatus = lead.followUpStatus || "Pending";
       const followUpFrequencyDays = lead.followUpFrequencyDays || null;
 
-      // 1️⃣ Update lead status to Converted
-      lead.status = "Converted";
-      lead.followUpDate = null;
-      lead.lastReminderAt = null;
-      await lead.save();
-
-      // 2️⃣ Create Deal and carry follow-up fields from lead
+      // Create deal first
       const deal = new Deal({
         leadId: lead._id,
         dealName: lead.leadName,
@@ -421,16 +491,17 @@ export default {
         value,
         notes,
         stage: "Qualification",
-
         followUpDate,
         reminderSentAt,
         followUpStatus,
         followUpFrequencyDays,
       });
-
       await deal.save();
 
-      // 3️⃣ Notify & Email assignee
+      // ❌ Remove the lead instead of keeping it as Converted
+      await Lead.findByIdAndDelete(req.params.id);
+
+      // Notify & email assignee
       const userId = lead.assignTo?._id?.toString();
       if (userId) {
         notifyUser(userId, "deal:created", {
@@ -448,48 +519,45 @@ export default {
       }
 
       res.status(200).json({ message: "Lead converted to deal", deal });
-    } catch (err) {
-      console.error("Error converting lead to deal:", err);
-      res.status(500).json({ message: err.message });
+    } catch (error) {
+      console.error("Error converting lead to deal:", error);
+      res.status(500).json({ message: error.message });
     }
   },
 
   // ➡️ Get Recent Leads (last 5)
   getRecentLeads: async (req, res) => {
     try {
-      let query = {};
-      
-      // If user is not admin, only show leads assigned to them
-      if (req.user.role.name !== "Admin") {
-        query.assignTo = req.user._id;
-      }
-      
-      const leads = await Lead.find(query).sort({ createdAt: -1 }).limit(5)
+      const query =
+        req.user.role.name === "Admin" ? {} : { assignTo: req.user._id };
+
+      const leads = await Lead.find(query)
+        .sort({ createdAt: -1 })
+        .limit(5)
         .populate("assignTo", "firstName lastName email");
+
       res.status(200).json(leads);
-    } catch (err) {
-      res.status(500).json({ message: err.message });
+    } catch (error) {
+      res.status(500).json({ message: error.message });
     }
   },
 
   // ➡️ Get Pending Leads (not converted)
   getPendingLeads: async (req, res) => {
     try {
-      let query = { status: { $ne: "Converted" } };
-      
-      // If user is not admin, only show leads assigned to them
-      if (req.user.role.name !== "Admin") {
-        query.assignTo = req.user._id;
-      }
-      
+      const query =
+        req.user.role.name === "Admin"
+          ? { status: { $ne: "Converted" } }
+          : { status: { $ne: "Converted" }, assignTo: req.user._id };
+
       const leads = await Lead.find(query)
         .sort({ createdAt: -1 })
         .limit(5)
         .populate("assignTo", "firstName lastName email");
+
       res.status(200).json(leads);
-    } catch (err) {
-      res.status(500).json({ message: err.message });
+    } catch (error) {
+      res.status(500).json({ message: error.message });
     }
   },
-};//sales and admin
-
+};

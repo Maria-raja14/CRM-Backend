@@ -27,6 +27,7 @@
 import express from "express";
 import indexControllers from "../controllers/index.controllers.js";
 import { protect, adminOnly, adminOrAssignedToDeal } from "../middlewares/auth.middleware.js";
+import upload from "../middlewares/upload.js";
 
 const router = express.Router();
 
@@ -43,7 +44,12 @@ router.get("/getAll", indexControllers.dealsController.getAllDeals);
 router.patch("/:id/stage", adminOrAssignedToDeal, indexControllers.dealsController.updateStage);
 
 // Create manual deal - only admin can create manual deals
-router.post("/createManual", adminOnly, indexControllers.dealsController.createManualDeal);
+router.post(
+  "/createManual",
+  adminOnly,
+  upload.array("attachments", 10), // multer middleware
+  indexControllers.dealsController.createManualDeal
+);
 
 // Update deal (assignTo, stage, value, notes) - only admin or assigned user can update
 router.patch("/update-deal/:id", adminOrAssignedToDeal, indexControllers.dealsController.updateDeal);
