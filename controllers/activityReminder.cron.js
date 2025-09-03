@@ -16,11 +16,17 @@ const getAdminUserIds = async () => {
   const adminRole = await Role.findOne({ name: "Admin" });
   if (!adminRole) return [];
   const admins = await User.find({ role: adminRole._id }, "_id");
-  return admins.map(a => a._id.toString());
+  return admins.map((a) => a._id.toString());
 };
 
 // Send & save notification helper
-const sendNotification = async (userId, title, text, type = "activity", meta = {}) => {
+const sendNotification = async (
+  userId,
+  title,
+  text,
+  type = "activity",
+  meta = {}
+) => {
   const notif = await Notification.create({
     userId,
     type,
@@ -30,7 +36,11 @@ const sendNotification = async (userId, title, text, type = "activity", meta = {
     expiresAt: dayjs().add(24, "hour").toDate(),
   });
 
-  notifyUser(userId, type === "activity" ? "activity_reminder" : "admin_reminder", notif);
+  notifyUser(
+    userId,
+    type === "activity" ? "activity_reminder" : "admin_reminder",
+    notif
+  );
   return notif;
 };
 
@@ -54,8 +64,6 @@ export function startActivityReminderCron() {
         ],
       }).populate("assignedTo", "firstName lastName email _id");
 
-      console.log("Due Activity Found:", dueActivities.length);
-
       for (const act of dueActivities) {
         const reminderTime = dayjs(act.reminder).utc();
 
@@ -72,7 +80,6 @@ export function startActivityReminderCron() {
               "activity",
               { activityId: act._id.toString(), startAt: act.startDate }
             );
-        
           }
 
           // Notify admins
@@ -81,7 +88,9 @@ export function startActivityReminderCron() {
             await sendNotification(
               adminId,
               "⏰ Activity ",
-              ` ${act.assignedTo?.firstName || "Unknown"} has activity "${act.title}" at ${dayjs(act.startDate).utc().format("HH:mm")}.`,
+              ` ${act.assignedTo?.firstName || "Unknown"} has activity "${
+                act.title
+              }" at ${dayjs(act.startDate).utc().format("HH:mm")}.`,
               "admin",
               { activityId: act._id.toString(), startAt: act.startDate }
             );

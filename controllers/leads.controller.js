@@ -55,6 +55,7 @@ export default {
         "assignTo",
         "firstName lastName email role"
       );
+
       res.status(200).json(leads);
     } catch (error) {
       res.status(500).json({ message: error.message });
@@ -178,6 +179,7 @@ export default {
   },
 
   // ➡️ Convert Lead to Deal
+
   convertLeadToDeal: async (req, res) => {
     try {
       const lead = await Lead.findById(req.params.id).populate("assignTo");
@@ -202,6 +204,15 @@ export default {
         value,
         notes,
         stage: "Qualification",
+        email: lead.email || "", // store email from lead
+        phoneNumber: lead.phoneNumber,
+        source: lead.source,
+        companyName: lead.companyName,
+        industry: lead.industry,
+        requirement: lead.requirement,
+        country: lead.country,
+        address: lead.address,
+        attachments: lead.attachments,
         followUpDate,
         reminderSentAt,
         followUpStatus,
