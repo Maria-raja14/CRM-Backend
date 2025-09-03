@@ -47,41 +47,6 @@ export default {
       res.status(500).json({ message: err.message });
     }
   },
-  // createManualDeal: async (req, res) => {
-  //   try {
-  //     const { leadId, assignedTo, value, stage, notes } = req.body;
-
-  //     if (!leadId)
-  //       return res.status(400).json({ message: "leadId is required" });
-
-  //     const lead = await Lead.findById(leadId);
-  //     if (!lead) return res.status(404).json({ message: "Lead not found" });
-
-  //     const allowedStages = [
-  //       "Qualification",
-  //       "Negotiation",
-  //       "Proposal",
-  //       "Closed Won",
-  //       "Closed Lost",
-  //     ];
-  //     const dealStage =
-  //       stage && allowedStages.includes(stage) ? stage : "Qualification";
-
-  //     const deal = new Deal({
-  //       leadId,
-  //       dealName: lead.leadName,
-  //       assignedTo,
-  //       value: value || 0,
-  //       stage: dealStage,
-  //       notes: notes || "",
-  //     });
-  //     await deal.save();
-
-  //     res.status(201).json({ message: "Manual deal created", deal });
-  //   } catch (err) {
-  //     res.status(500).json({ message: err.message });
-  //   }
-  // },
 
   createManualDeal: async (req, res) => {
     try {
@@ -160,6 +125,7 @@ export default {
 
       const deals = await Deal.find(query)
         .populate("assignedTo", "firstName lastName email")
+
         .sort({ createdAt: -1 }); // optional: newest deals first
 
       res.status(200).json(deals);
@@ -168,30 +134,6 @@ export default {
       res.status(500).json({ message: err.message });
     }
   },
-
-  // 2️⃣ Get all deals - Updated to filter by user role
-
-
-
-  getAllDeals: async (req, res) => {
-    try {
-      let query = {};
-      
-      // If user is not admin, only show deals assigned to them
-      if (req.user.role.name !== "Admin") {
-        query.assignedTo = req.user._id;
-      }
-      
-      const deals = await Deal.find(query).populate("assignedTo", "firstName lastName email");
-      res.status(200).json(deals);
-    } catch (err) {
-      res.status(500).json({ message: err.message });
-    }
-  },
-
-
- 
-
 
   // 3️⃣ Update deal stage
   updateStage: async (req, res) => {

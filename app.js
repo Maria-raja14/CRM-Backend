@@ -10,6 +10,7 @@ import routes from "./routes/index.routes.js";
 import { initSocket } from "./realtime/socket.js";
 import { startFollowUpCron } from "./controllers/followups.cron.js";
 import { startActivityReminderCron } from "./controllers/activityReminder.cron.js";
+import { startProposalFollowUpCron } from "./controllers/proposalFollowUpCron.controller.js";
 
 
 dotenv.config();
@@ -35,6 +36,7 @@ const server = http.createServer(app);
 initSocket(server);          // Socket.IO
 startFollowUpCron();   
 startActivityReminderCron(); // ✅ for activities      // Cron jobs
+startProposalFollowUpCron();
 
 const PORT = process.env.PORT || 5000;
 

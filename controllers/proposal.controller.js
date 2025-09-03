@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 import Proposal from "../models/proposal.model.js";
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
@@ -13,47 +6,154 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export default {
-  // 📌 1️⃣ Create Proposal and Save to Database
-  createProposal: async (req, res) => {
-    const { title, dealTitle, email, content, image, status } = req.body;
+  // sendProposal: async (req, res) => {
+  //   console.log("REQ BODY:", req.body);
+  //   console.log("REQ FILES:", req.files);
 
-    if (!title || !dealTitle || !email || !content) {
-      return res.status(400).json({ error: "All fields are required" });
-    }
+  //   const { emails, title, dealTitle, selectedDealId, content, image, id, cc } =
+  //     req.body;
 
-    try {
-      const newProposal = new Proposal({
-        title,
-        dealTitle,
-        email,
-        content,
-        image,
-        status: status || "draft",
-      });
-      await newProposal.save();
-      res.json({
-        message: "Proposal saved successfully",
-        proposal: newProposal,
-      });
-    } catch (error) {
-      console.error("Database Error:", error);
-      res.status(500).json({ error: "Server error" });
-    }
-  },
+  //   if (!emails || !title || !dealTitle || !content) {
+  //     return res
+  //       .status(400)
+  //       .json({ error: "Title, dealTitle, emails and content are required" });
+  //   }
 
-sendProposal: async (req, res) => {
-  const { emails, title, deal, content, image, id } = req.body;
+  //   try {
+  //     const recipients = emails
+  //       .split(",")
+  //       .map((e) => e.trim())
+  //       .filter(Boolean);
 
-  // Validate required fields
-  if (!emails || !title || !deal || !content) {
-    return res.status(400).json({ error: "All fields are required" });
+  //     const attachments = (req.files || []).map((file) => ({
+  //       filename: file.originalname,
+  //       content: file.buffer,
+  //     }));
+
+  //     // Save or update proposal
+  //     let proposal;
+  //     if (id) {
+  //       proposal = await Proposal.findByIdAndUpdate(
+  //         id,
+  //         {
+  //           title,
+  //           deal: selectedDealId || null,
+  //           dealTitle,
+  //           email: recipients.join(","),
+  //           cc,
+  //           content,
+  //           image,
+  //           status: "sent",
+  //         },
+  //         { new: true }
+  //       );
+  //       if (!proposal)
+  //         return res.status(404).json({ error: "Proposal not found" });
+  //     } else {
+  //       proposal = new Proposal({
+  //         title,
+  //         deal: selectedDealId || null,
+  //         dealTitle,
+  //         email: recipients.join(","),
+  //         cc,
+  //         content,
+  //         image,
+  //         status: "sent",
+  //       });
+  //       await proposal.save();
+  //     }
+
+  //     const transporter = nodemailer.createTransport({
+  //       service: "gmail",
+  //       host: "smtp.gmail.com",
+  //       port: 587,
+  //       secure: false,
+  //       auth: {
+  //         user: process.env.EMAIL_USER,
+  //         pass: process.env.EMAIL_PASS,
+  //       },
+  //     });
+
+  //     await transporter.sendMail({
+  //       from: `"Your Company" <${process.env.EMAIL_USER}>`,
+  //       to: recipients.join(","),
+  //       cc: [process.env.OWNER_EMAIL, cc].filter(Boolean).join(","),
+  //       subject: `Proposal: ${title}`,
+  //       html: content,
+  //       attachments,
+  //     });
+
+  //     res.json({ message: "Proposal sent successfully!", proposal });
+  //   } catch (error) {
+  //     console.error("❌ Proposal Error:", error);
+  //     res.status(500).json({ error: error.message });
+  //   }
+  // },
+
+  sendProposal : async (req, res) => {
+  console.log("REQ BODY:", req.body);
+  console.log("REQ FILES:", req.files);
+
+  const { emails, title, dealTitle, selectedDealId, content, image, id, cc } =
+    req.body;
+
+  if (!emails || !title || !dealTitle || !content) {
+    return res
+      .status(400)
+      .json({ error: "Title, dealTitle, emails and content are required" });
   }
 
   try {
-    console.log("🟢 Sending email to:", emails);
+    // format emails
+    const recipients = emails
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean);
 
-    // ✅ Configure Nodemailer Transporter
-    let transporter = nodemailer.createTransport({
+    // ✅ save files for DB + nodemailer
+    const attachments = (req.files || []).map((file) => ({
+      filename: file.originalname,
+      path: file.path, // multer saves file on disk
+      mimetype: file.mimetype,
+    }));
+
+    // ✅ Save or update proposal
+    let proposal;
+    if (id) {
+      proposal = await Proposal.findByIdAndUpdate(
+        id,
+        {
+          title,
+          deal: selectedDealId || null,
+          dealTitle,
+          email: recipients.join(","),
+          cc,
+          content,
+          image,
+          status: "sent",
+          attachments, // save attachments in DB
+        },
+        { new: true }
+      );
+      if (!proposal)
+        return res.status(404).json({ error: "Proposal not found" });
+    } else {
+      proposal = new Proposal({
+        title,
+        deal: selectedDealId || null,
+        dealTitle,
+        email: recipients.join(","),
+        cc,
+        content,
+        image,
+        status: "sent",
+        attachments, // save attachments in DB
+      });
+      await proposal.save();
+    }
+
+    // ✅ Email sending
+    const transporter = nodemailer.createTransport({
       service: "gmail",
       host: "smtp.gmail.com",
       port: 587,
@@ -64,50 +164,47 @@ sendProposal: async (req, res) => {
       },
     });
 
-    // Ensure emails is an array
-    const recipients = Array.isArray(emails) ? emails.join(",") : emails;
-
-    // ✅ Email Content
-    let mailOptions = {
-      from: `"Your Company Name" <${process.env.EMAIL_USER}>`,
-      to: recipients,                     // multiple recipients
-      cc: process.env.OWNER_EMAIL,        // CC to your owner
+    await transporter.sendMail({
+      from: `"Your Company" <${process.env.EMAIL_USER}>`,
+      to: recipients.join(","),
+      cc: [process.env.OWNER_EMAIL, cc].filter(Boolean).join(","),
       subject: `Proposal: ${title}`,
-      html: content,                      // HTML content
-    };
+      html: content,
+      attachments: attachments.map((file) => ({
+        filename: file.filename,
+        path: file.path, // use path for nodemailer too
+      })),
+    });
 
-    // ✅ Send Email
-    let info = await transporter.sendMail(mailOptions);
-    console.log("✅ Email sent successfully:", info.response);
+    res.json({ message: "Proposal sent successfully!", proposal });
+  } catch (error) {
+    console.error("❌ Proposal Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+},
+  updateFollowUp: async (req, res) => {
+  const { id } = req.params;
+  const { followUpDate, followUpComment } = req.body;
 
-    // Save or update proposal
-    let proposal;
-    if (id) {
-      proposal = await Proposal.findByIdAndUpdate(
-        id,
-        { title, deal, email: recipients, content, image, status: "sent" },
-        { new: true }
-      );
-      if (!proposal) return res.status(404).json({ error: "Proposal not found" });
-    } else {
-      proposal = new Proposal({
-        title,
-        deal,
-        email: recipients,
-        content,
-        image,
-        status: "sent",
-      });
-      await proposal.save();
+  try {
+    const updated = await Proposal.findByIdAndUpdate(
+      id,
+      {
+        followUpDate,
+        followUpComment,
+        lastReminderAt: null // reset so cron will send again
+      },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ error: "Proposal not found" });
     }
 
-    res.json({
-      message: "Proposal sent and stored successfully",
-      proposal,
-    });
-  } catch (error) {
-    console.error("Email Error:", error);
-    res.status(500).json({ error: error.message });
+    res.json({ message: "Follow-up updated", proposal: updated });
+  } catch (err) {
+    console.error("❌ FollowUp Update Error:", err);
+    res.status(500).json({ error: err.message });
   }
 },
 
@@ -134,11 +231,11 @@ sendProposal: async (req, res) => {
         { status },
         { new: true }
       );
-      
+
       if (!updatedProposal) {
         return res.status(404).json({ error: "Proposal not found" });
       }
-      
+
       res.json({ message: "Status updated", proposal: updatedProposal });
     } catch (error) {
       console.error("Status Update Error:", error);
