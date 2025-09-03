@@ -263,24 +263,36 @@ updateInvoice: async (req, res) => {
     }
   },
    // ➡️ Get Recent Invoices (last 5)
-  getRecentInvoices: async (_req, res) => {
-    try {
-      const invoices = await Invoice.find().sort({ createdAt: -1 }).limit(5)
-        .populate("assignTo", "firstName lastName email");
-      res.status(200).json(invoices);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  },
+ getRecentInvoices: async (_req, res) => {
+  try {
+    const now = new Date();
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(now.getMonth() - 1);
+
+    const invoices = await Invoice.find({
+      createdAt: { $gte: oneMonthAgo, $lte: now },  // last 1 month filter
+    })
+      .sort({ createdAt: -1 }) // recent first
+      .populate("assignTo", "firstName lastName email");
+
+    res.status(200).json(invoices);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+},
+
+
 
   // ➡️ Get Pending Invoices (status = Unpaid / Pending)
   getPendingInvoices: async (_req, res) => {
     try {
-      const invoices = await Invoice.find({ status: { $in: ["Unpaid", "Pending"] } })
+      const invoices = await Invoice.find({ status: { $in: ["unpaid"] } })
         .sort({ createdAt: -1 })
         .limit(5)
         .populate("assignTo", "firstName lastName email");
+        
       res.status(200).json(invoices);
+      
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

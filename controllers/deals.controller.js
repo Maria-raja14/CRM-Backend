@@ -114,19 +114,47 @@ export default {
   },
 
   // 2️⃣ Get all deals - Updated to filter by user role
+  // getAllDeals: async (req, res) => {
+  //   try {
+  //     let query = {};
+
+  //     // If user is not admin, only show deals assigned to them
+  //     if (req.user.role.name !== "Admin") {
+  //       query.assignedTo = req.user._id;
+  //     }
+
+  //     const deals = await Deal.find(query)
+  //       .populate("assignedTo", "firstName lastName email")
+
+  //       .sort({ createdAt: -1 }); // optional: newest deals first
+
+  //     res.status(200).json(deals);
+  //   } catch (err) {
+  //     console.error(err);
+  //     res.status(500).json({ message: err.message });
+  //   }
+  // },
   getAllDeals: async (req, res) => {
     try {
       let query = {};
 
-      // If user is not admin, only show deals assigned to them
+      // Role-based filter
       if (req.user.role.name !== "Admin") {
         query.assignedTo = req.user._id;
       }
 
+      // Date range filter
+      const { start, end } = req.query;
+      if (start && end) {
+        query.createdAt = {
+          $gte: new Date(start),
+          $lte: new Date(end + "T23:59:59.999Z"),
+        };
+      }
+
       const deals = await Deal.find(query)
         .populate("assignedTo", "firstName lastName email")
-
-        .sort({ createdAt: -1 }); // optional: newest deals first
+        .sort({ createdAt: -1 });
 
       res.status(200).json(deals);
     } catch (err) {
