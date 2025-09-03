@@ -47,42 +47,7 @@ export default {
       res.status(500).json({ message: err.message });
     }
   },
-  // createManualDeal: async (req, res) => {
-  //   try {
-  //     const { leadId, assignedTo, value, stage, notes } = req.body;
-
-  //     if (!leadId)
-  //       return res.status(400).json({ message: "leadId is required" });
-
-  //     const lead = await Lead.findById(leadId);
-  //     if (!lead) return res.status(404).json({ message: "Lead not found" });
-
-  //     const allowedStages = [
-  //       "Qualification",
-  //       "Negotiation",
-  //       "Proposal",
-  //       "Closed Won",
-  //       "Closed Lost",
-  //     ];
-  //     const dealStage =
-  //       stage && allowedStages.includes(stage) ? stage : "Qualification";
-
-  //     const deal = new Deal({
-  //       leadId,
-  //       dealName: lead.leadName,
-  //       assignedTo,
-  //       value: value || 0,
-  //       stage: dealStage,
-  //       notes: notes || "",
-  //     });
-  //     await deal.save();
-
-  //     res.status(201).json({ message: "Manual deal created", deal });
-  //   } catch (err) {
-  //     res.status(500).json({ message: err.message });
-  //   }
-  // },
-
+  
 createManualDeal: async (req, res) => {
   try {
     const {
@@ -111,7 +76,7 @@ createManualDeal: async (req, res) => {
     const allowedStages = [
       "Qualification",
       "Negotiation",
-      "Proposal",
+      "Proposal Sent",
       "Closed Won",
       "Closed Lost",
     ];
@@ -171,27 +136,166 @@ createManualDeal: async (req, res) => {
 },
 
 
-  // 2️⃣ Get all deals - Updated to filter by user role
+// getDealById: async (req, res) => {
+//   try {
+//     const dealId = req.params.id;
+    
+//     const deal = await Deal.findById(dealId)
+//       .populate("assignedTo", "firstName lastName email")
+//       .populate({
+//         path: "leadId",
+//         populate: {
+//           path: "assignTo",
+//           select: "firstName lastName email"
+//         }
+//       });
+    
+//     if (!deal) {
+//       return res.status(404).json({ message: "Deal not found" });
+//     }
+    
+//     // Check if user has permission to view this deal
+//     if (req.user.role.name !== "Admin" && deal.assignedTo._id.toString() !== req.user._id.toString()) {
+//       return res.status(403).json({ message: "Access denied: You can only view deals assigned to you" });
+//     }
+    
+//     // Format response with all required data
+//     const dealData = {
+//       _id: deal._id,
+//       dealName: deal.dealName,
+//       dealTitle: deal.dealTitle,
+//       value: deal.value,
+//       stage: deal.stage,
+//       notes: deal.notes,
+//       createdAt: deal.createdAt,
+//       updatedAt: deal.updatedAt,
+//       assignedTo: deal.assignedTo ? {
+//         _id: deal.assignedTo._id,
+//         firstName: deal.assignedTo.firstName,
+//         lastName: deal.assignedTo.lastName,
+//         email: deal.assignedTo.email
+//       } : null,
+//       lead: deal.leadId ? {
+//         _id: deal.leadId._id,
+//         leadName: deal.leadId.leadName,
+//         companyName: deal.leadId.companyName,
+//         email: deal.leadId.email,
+//         phone: deal.leadId.phone,
+//         status: deal.leadId.status,
+//         source: deal.leadId.source,
+//         country: deal.leadId.country,
+//         contactPerson: deal.leadId.contactPerson,
+//         assignTo: deal.leadId.assignTo ? {
+//           _id: deal.leadId.assignTo._id,
+//           firstName: deal.leadId.assignTo.firstName,
+//           lastName: deal.leadId.assignTo.lastName,
+//           email: deal.leadId.assignTo.email
+//         } : null
+//       } : null
+//     };
+    
+//     res.status(200).json(dealData);
+//   } catch (err) {
+//     console.error("Get deal by ID error:", err);
+//     res.status(500).json({ message: err.message });
+//   }
+// },
 
-
-
-  getAllDeals: async (req, res) => {
-    try {
-      let query = {};
-      
-      // If user is not admin, only show deals assigned to them
-      if (req.user.role.name !== "Admin") {
-        query.assignedTo = req.user._id;
-      }
-      
-      const deals = await Deal.find(query).populate("assignedTo", "firstName lastName email");
-      res.status(200).json(deals);
-    } catch (err) {
-      res.status(500).json({ message: err.message });
+getDealById: async (req, res) => {
+  try {
+    const dealId = req.params.id;
+    
+    const deal = await Deal.findById(dealId)
+      .populate("assignedTo", "firstName lastName email")
+      .populate({
+        path: "leadId",
+        populate: {
+          path: "assignTo",
+          select: "firstName lastName email"
+        }
+      });
+    
+    if (!deal) {
+      return res.status(404).json({ message: "Deal not found" });
     }
-  },
-
-
+    
+    // Check if user has permission to view this deal
+    if (req.user.role.name !== "Admin" && deal.assignedTo._id.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Access denied: You can only view deals assigned to you" });
+    }
+    
+    // Get lead attachments if deal was created from a lead
+    let leadAttachments = [];
+    if (deal.leadId && deal.leadId.attachments) {
+      leadAttachments = deal.leadId.attachments;
+    }
+    
+    // Combine lead attachments and deal attachments
+    const allAttachments = [
+      ...leadAttachments.map(attachment => ({
+        name: attachment.split('/').pop(),
+        path: attachment,
+        type: 'lead'
+      })),
+      ...(deal.attachments || []).map(attachment => ({
+        name: attachment.split('/').pop(),
+        path: attachment,
+        type: 'deal'
+      }))
+    ];
+    
+    // Format response with all required data
+    const dealData = {
+      _id: deal._id,
+      dealName: deal.dealName,
+      dealTitle: deal.dealTitle,
+      value: deal.value,
+      stage: deal.stage,
+      notes: deal.notes,
+      phoneNumber: deal.phoneNumber,
+      email: deal.email,
+      source: deal.source,
+      companyName: deal.companyName,
+      industry: deal.industry,
+      requirement: deal.requirement,
+      address: deal.address,
+      country: deal.country,
+      followUpDate: deal.followUpDate,
+      followUpStatus: deal.followUpStatus,
+      attachments: allAttachments,
+      createdAt: deal.createdAt,
+      updatedAt: deal.updatedAt,
+      assignedTo: deal.assignedTo ? {
+        _id: deal.assignedTo._id,
+        firstName: deal.assignedTo.firstName,
+        lastName: deal.assignedTo.lastName,
+        email: deal.assignedTo.email
+      } : null,
+      lead: deal.leadId ? {
+        _id: deal.leadId._id,
+        leadName: deal.leadId.leadName,
+        companyName: deal.leadId.companyName,
+        email: deal.leadId.email,
+        phone: deal.leadId.phone,
+        status: deal.leadId.status,
+        source: deal.leadId.source,
+        country: deal.leadId.country,
+        contactPerson: deal.leadId.contactPerson,
+        assignTo: deal.leadId.assignTo ? {
+          _id: deal.leadId.assignTo._id,
+          firstName: deal.leadId.assignTo.firstName,
+          lastName: deal.leadId.assignTo.lastName,
+          email: deal.leadId.assignTo.email
+        } : null
+      } : null
+    };
+    
+    res.status(200).json(dealData);
+  } catch (err) {
+    console.error("Get deal by ID error:", err);
+    res.status(500).json({ message: err.message });
+  }
+  },//ok
  
 
 
