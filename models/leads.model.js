@@ -31,10 +31,12 @@ const leadSchema = new mongoose.Schema(
     attachments: [{ type: String }],
   },
   { timestamps: true }
+
+  
 );
 
 // For scanning follow-ups quickly
 leadSchema.index({ followUpDate: 1 });
 
 const Lead = mongoose.model("Lead", leadSchema);
-export default Lead;
+export default Lead;//ori

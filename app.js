@@ -7,6 +7,7 @@ import http from "http";
 
 import connectDB from "./config/db.js";
 import routes from "./routes/index.routes.js";
+import fileRoutes from "./routes/files.routes.js";
 import { initSocket } from "./realtime/socket.js";
 import { startFollowUpCron } from "./controllers/followups.cron.js";
 import { startActivityReminderCron } from "./controllers/activityReminder.cron.js";
@@ -25,6 +26,7 @@ app.use(cors());
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/api", routes);
+app.use("/api/files", fileRoutes);
 
 app.use((req, res) => res.status(404).json({ message: "Route not found" }));
 app.use((err, _req, res, _next) => {

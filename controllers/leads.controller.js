@@ -1,3 +1,4 @@
+
 import dayjs from "dayjs";
 import Lead from "../models/leads.model.js";
 import userModel from "../models/user.model.js";
@@ -177,6 +178,8 @@ export default {
     }
   },
 
+  // ➡️ Convert Lead to Deal
+
   convertLeadToDeal: async (req, res) => {
     try {
       const lead = await Lead.findById(req.params.id).populate("assignTo");
@@ -243,6 +246,8 @@ export default {
       res.status(500).json({ message: error.message });
     }
   },
+
+
 
   // ➡️ Get Recent Leads (last 5)
   getRecentLeads: async (req, res) => {
