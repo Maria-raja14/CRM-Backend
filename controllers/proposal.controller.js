@@ -284,19 +284,42 @@ export default {
   },
 
   // 📌 7️⃣ Get Single Proposal
-  getProposal: async (req, res) => {
-    const { id } = req.params;
+  // getProposal: async (req, res) => {
+  //   const { id } = req.params;
 
-    try {
-      const proposal = await Proposal.findById(id);
-      if (!proposal) {
-        return res.status(404).json({ error: "Proposal not found" });
-      }
+  //   try {
+  //     const proposal = await Proposal.findById(id);
+  //     if (!proposal) {
+  //       return res.status(404).json({ error: "Proposal not found" });
+  //     }
 
-      res.json(proposal);
-    } catch (error) {
-      console.error("Fetch Error:", error);
-      res.status(500).json({ error: error.message });
+  //     res.json(proposal);
+  //   } catch (error) {
+  //     console.error("Fetch Error:", error);
+  //     res.status(500).json({ error: error.message });
+  //   }
+  // },
+getProposal: async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Use the correct field name 'deal' (not 'Deal')
+    const proposal = await Proposal.findById(id).populate("deal");
+    console.log(proposal);
+
+    if (!proposal) {
+      return res.status(404).json({ error: "Proposal not found" });
     }
-  },
+
+    res.json(proposal);
+  } catch (error) {
+    console.error("Fetch Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+},
+
+
+
 };
+
+
