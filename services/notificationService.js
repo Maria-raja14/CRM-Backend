@@ -26,7 +26,7 @@ export const sendNotification = async (userId, text, type = "followup", meta = {
     meta,
     expiresAt: moment().add(24, "hours").toDate(), // ✅ Auto expire after 24 hours
   });
-console.log("Notification",notif)
+
   notifyUser(userId, "new_notification", {
     id: notif._id,
     text: notif.text,
