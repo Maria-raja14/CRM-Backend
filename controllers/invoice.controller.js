@@ -57,7 +57,7 @@ createInvoice: async (req, res) => {
     // Populate before returning
     const populatedInvoice = await Invoice.findById(invoice._id)
       .populate("assignTo", "firstName lastName email")
-      .populate("items.deal", "dealName value stage");
+      .populate("items.deal", "dealName requirement value stage");
 
     res.status(201).json(populatedInvoice);
   } catch (error) {
