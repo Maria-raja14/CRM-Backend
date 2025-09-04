@@ -6,98 +6,111 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export default {
-  // sendProposal: async (req, res) => {
-  //   console.log("REQ BODY:", req.body);
-  //   console.log("REQ FILES:", req.files);
+  
 
-  //   const { emails, title, dealTitle, selectedDealId, content, image, id, cc } =
-  //     req.body;
+  //   sendProposal : async (req, res) => {
+  
+//   console.log("REQ BODY:", req.body);
+//   console.log("REQ FILES:", req.files);
 
-  //   if (!emails || !title || !dealTitle || !content) {
-  //     return res
-  //       .status(400)
-  //       .json({ error: "Title, dealTitle, emails and content are required" });
-  //   }
+//   const { emails, title, dealTitle, selectedDealId, content, image, id, cc } =
+//     req.body;
 
-  //   try {
-  //     const recipients = emails
-  //       .split(",")
-  //       .map((e) => e.trim())
-  //       .filter(Boolean);
+//   if (!emails || !title || !dealTitle || !content) {
+//     return res
+//       .status(400)
+//       .json({ error: "Title, dealTitle, emails and content are required" });
+//   }
 
-  //     const attachments = (req.files || []).map((file) => ({
-  //       filename: file.originalname,
-  //       content: file.buffer,
-  //     }));
+//   try {
+//     // format emails
+//     const recipients = emails
+//       .split(",")
+//       .map((e) => e.trim())
+//       .filter(Boolean);
 
-  //     // Save or update proposal
-  //     let proposal;
-  //     if (id) {
-  //       proposal = await Proposal.findByIdAndUpdate(
-  //         id,
-  //         {
-  //           title,
-  //           deal: selectedDealId || null,
-  //           dealTitle,
-  //           email: recipients.join(","),
-  //           cc,
-  //           content,
-  //           image,
-  //           status: "sent",
-  //         },
-  //         { new: true }
-  //       );
-  //       if (!proposal)
-  //         return res.status(404).json({ error: "Proposal not found" });
-  //     } else {
-  //       proposal = new Proposal({
-  //         title,
-  //         deal: selectedDealId || null,
-  //         dealTitle,
-  //         email: recipients.join(","),
-  //         cc,
-  //         content,
-  //         image,
-  //         status: "sent",
-  //       });
-  //       await proposal.save();
-  //     }
+//     // ✅ save files for DB + nodemailer
+//     const attachments = (req.files || []).map((file) => ({
+//       filename: file.originalname,
+//       path: file.path, // multer saves file on disk
+//       mimetype: file.mimetype,
+//     }));
 
-  //     const transporter = nodemailer.createTransport({
-  //       service: "gmail",
-  //       host: "smtp.gmail.com",
-  //       port: 587,
-  //       secure: false,
-  //       auth: {
-  //         user: process.env.EMAIL_USER,
-  //         pass: process.env.EMAIL_PASS,
-  //       },
-  //     });
+//     // ✅ Save or update proposal
+//     let proposal;
+//     if (id) {
+//       proposal = await Proposal.findByIdAndUpdate(
+//         id,
+//         {
+//           title,
+//           deal: selectedDealId || null,
+//           dealTitle,
+//           email: recipients.join(","),
+//           cc,
+//           content,
+//           image,
+//           status: "sent",
+//           attachments, // save attachments in DB
+//         },
+//         { new: true }
+//       );
+//       if (!proposal)
+//         return res.status(404).json({ error: "Proposal not found" });
+//     } else {
+//       proposal = new Proposal({
+//         title,
+//         deal: selectedDealId || null,
+//         dealTitle,
+//         email: recipients.join(","),
+//         cc,
+//         content,
+//         image,
+//         status: "sent",
+//         attachments, // save attachments in DB
+//       });
+//       await proposal.save();
+//     }
 
-  //     await transporter.sendMail({
-  //       from: `"Your Company" <${process.env.EMAIL_USER}>`,
-  //       to: recipients.join(","),
-  //       cc: [process.env.OWNER_EMAIL, cc].filter(Boolean).join(","),
-  //       subject: `Proposal: ${title}`,
-  //       html: content,
-  //       attachments,
-  //     });
+//     // ✅ Email sending
+//     const transporter = nodemailer.createTransport({
+//       service: "gmail",
+//       host: "smtp.gmail.com",
+//       port: 587,
+//       secure: false,
+//       auth: {
+//         user: process.env.EMAIL_USER,
+//         pass: process.env.EMAIL_PASS,
+//       },
+//     });
 
-  //     res.json({ message: "Proposal sent successfully!", proposal });
-  //   } catch (error) {
-  //     console.error("❌ Proposal Error:", error);
-  //     res.status(500).json({ error: error.message });
-  //   }
-  // },
+//     await transporter.sendMail({
+//       from: `"Your Company" <${process.env.EMAIL_USER}>`,
+//       to: recipients.join(","),
+//       cc: [process.env.OWNER_EMAIL, cc].filter(Boolean).join(","),
+//       subject: `Proposal: ${title}`,
+//       html: content,
+//       attachments: attachments.map((file) => ({
+//         filename: file.filename,
+//         path: file.path, // use path for nodemailer too
+//       })),
+//     });
 
-  sendProposal : async (req, res) => {
+//     res.json({ message: "Proposal sent successfully!", proposal });
+//   } catch (error) {
+//     console.error("❌ Proposal Error:", error);
+//     res.status(500).json({ error: error.message });
+//   }
+// },
+  
+  sendProposal: async (req, res) => {
   console.log("REQ BODY:", req.body);
   console.log("REQ FILES:", req.files);
 
-  const { emails, title, dealTitle, selectedDealId, content, image, id, cc } =
+  const { emails, title, dealTitle, selectedDealId, content, image, id, cc, status } =
     req.body;
 
-  if (!emails || !title || !dealTitle || !content) {
+  // For drafts, only title is required
+  if (status !== "draft" && (!emails || !title || !dealTitle || !content)) {
     return res
       .status(400)
       .json({ error: "Title, dealTitle, emails and content are required" });
@@ -106,9 +119,8 @@ export default {
   try {
     // format emails
     const recipients = emails
-      .split(",")
-      .map((e) => e.trim())
-      .filter(Boolean);
+      ? emails.split(",").map((e) => e.trim()).filter(Boolean)
+      : [];
 
     // ✅ save files for DB + nodemailer
     const attachments = (req.files || []).map((file) => ({
@@ -130,7 +142,7 @@ export default {
           cc,
           content,
           image,
-          status: "sent",
+          status,
           attachments, // save attachments in DB
         },
         { new: true }
@@ -146,42 +158,49 @@ export default {
         cc,
         content,
         image,
-        status: "sent",
+        status,
         attachments, // save attachments in DB
       });
       await proposal.save();
     }
 
-    // ✅ Email sending
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
+    // Only send email if status is "sent"
+    if (status === "sent") {
+      // ✅ Email sending
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: false,
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
 
-    await transporter.sendMail({
-      from: `"Your Company" <${process.env.EMAIL_USER}>`,
-      to: recipients.join(","),
-      cc: [process.env.OWNER_EMAIL, cc].filter(Boolean).join(","),
-      subject: `Proposal: ${title}`,
-      html: content,
-      attachments: attachments.map((file) => ({
-        filename: file.filename,
-        path: file.path, // use path for nodemailer too
-      })),
-    });
+      await transporter.sendMail({
+        from: `"Your Company" <${process.env.EMAIL_USER}>`,
+        to: recipients.join(","),
+        cc: [process.env.OWNER_EMAIL, cc].filter(Boolean).join(","),
+        subject: `Proposal: ${title}`,
+        html: content,
+        attachments: attachments.map((file) => ({
+          filename: file.filename,
+          path: file.path, // use path for nodemailer too
+        })),
+      });
+    }
 
-    res.json({ message: "Proposal sent successfully!", proposal });
+    res.json({ 
+      message: status === "draft" ? "Draft saved successfully!" : "Proposal sent successfully!", 
+      proposal 
+    });
   } catch (error) {
     console.error("❌ Proposal Error:", error);
     res.status(500).json({ error: error.message });
   }
 },
+  
   updateFollowUp: async (req, res) => {
   const { id } = req.params;
   const { followUpDate, followUpComment } = req.body;
