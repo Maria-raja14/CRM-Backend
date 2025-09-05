@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 // Load environment variables from .env file
 dotenv.config();
 
+
 export default {
   sendProposal: async (req, res) => {
     const { emails, title, dealTitle, selectedDealId, content, image, id, cc } =
@@ -207,7 +208,6 @@ export default {
     }
   },
 
-  
   getProposal: async (req, res) => {
     const { id } = req.params;
 

@@ -5,12 +5,12 @@ const invoiceSchema = new mongoose.Schema({
     type: String,
     required: true,
     unique: true, // Ensure the invoice number is unique
-    default: () => `INV-${Math.floor(Math.random() * 1000000)}`,
+    default: () => `TZI-${Math.floor(Math.random() * 1000000)}`,
   },
   assignTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   issueDate: { type: Date, required: true },
   dueDate: { type: Date, required: true },
-  status: { type: String, enum: ["paid", "unpaid"], required: true },
+  status: { type: String, enum: ["paid", "unpaid","send"], required: true },
   items: [
     {
       deal: { 
@@ -18,7 +18,6 @@ const invoiceSchema = new mongoose.Schema({
         ref: "Deal", // Reference to Deal table
         required: true 
       },
-      // quantity: { type: Number, required: true },
       price: { type: Number },
       amount: { type: Number },
     },

@@ -27,20 +27,6 @@ export default {
       });
       await deal.save();
 
-      // Notify + Email
-      const userId = lead.assignTo?._id?.toString();
-      if (userId)
-        notifyUser(userId, "deal:created", {
-          dealId: deal._id,
-          dealName: deal.dealName,
-        });
-      if (lead.assignTo?.email) {
-        await sendEmail({
-          to: lead.assignTo.email,
-          subject: `New Deal Created: ${deal.dealName}`,
-          text: `Deal created for lead ${lead.leadName}. Stage: Qualification`,
-        });
-      }
 
       res.status(200).json({ message: "Lead converted to deal", deal });
     } catch (err) {
@@ -113,27 +99,7 @@ export default {
     }
   },
 
-  // 2️⃣ Get all deals - Updated to filter by user role
-  // getAllDeals: async (req, res) => {
-  //   try {
-  //     let query = {};
-
-  //     // If user is not admin, only show deals assigned to them
-  //     if (req.user.role.name !== "Admin") {
-  //       query.assignedTo = req.user._id;
-  //     }
-
-  //     const deals = await Deal.find(query)
-  //       .populate("assignedTo", "firstName lastName email")
-
-  //       .sort({ createdAt: -1 }); // optional: newest deals first
-
-  //     res.status(200).json(deals);
-  //   } catch (err) {
-  //     console.error(err);
-  //     res.status(500).json({ message: err.message });
-  //   }
-  // },
+  
   getAllDeals: async (req, res) => {
     try {
       let query = {};
@@ -292,19 +258,7 @@ export default {
       deal.stage = stage;
       await deal.save();
 
-      // Notify + Email
-      if (deal.assignedTo?._id)
-        notifyUser(deal.assignedTo._id.toString(), "deal:stageUpdated", {
-          dealId: deal._id,
-          newStage: stage,
-        });
-      if (deal.assignedTo?.email) {
-        await sendEmail({
-          to: deal.assignedTo.email,
-          subject: `Deal Stage Updated: ${deal.dealName}`,
-          text: `Deal ${deal.dealName} moved to stage: ${stage}`,
-        });
-      }
+     
 
       res.status(200).json(deal);
     } catch (err) {
@@ -356,21 +310,7 @@ export default {
         { new: true }
       ).populate("assignedTo", "firstName lastName email");
 
-      // 🔔 Notify + Email
-      if (assignedTo) {
-        notifyUser(assignedTo.toString(), "deal:updated", {
-          dealId: updatedDeal._id,
-          dealName: updatedDeal.dealName,
-        });
-      }
-      if (updatedDeal.assignedTo?.email) {
-        await sendEmail({
-          to: updatedDeal.assignedTo.email,
-          subject: `Deal Updated: ${updatedDeal.dealName}`,
-          text: `Deal ${updatedDeal.dealName} details have been updated. Current Stage: ${updatedDeal.stage}`,
-        });
-      }
-
+   
       res
         .status(200)
         .json({ message: "Deal updated successfully", deal: updatedDeal });
