@@ -140,7 +140,12 @@ export default {
         }
       }
 
-      res.status(200).json(updated);
+      // res.status(200).json(updated);
+  res.status(200).json({ 
+  message: "Lead updated successfully", 
+  lead: updated 
+});
+
     } catch (error) {
       res.status(400).json({ message: error.message });
     }
@@ -181,7 +186,7 @@ export default {
 
   // ➡️ Convert Lead to Deal
 
-  convertLeadToDeal: async (req, res) => {
+convertLeadToDeal: async (req, res) => {
     try {
       const lead = await Lead.findById(req.params.id).populate("assignTo");
       if (!lead) return res.status(404).json({ message: "Lead not found" });
