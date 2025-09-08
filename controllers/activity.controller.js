@@ -54,7 +54,6 @@ export default {
         reminder,
       } = req.body;
 
-      // validations ... (keep as you have)
 
       const newActivity = new Activity({
         title,
