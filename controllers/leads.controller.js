@@ -39,7 +39,8 @@ export default {
       const lead = new Lead(data);
       const savedLead = await lead.save();
 
-      res.status(201).json(savedLead);
+      // res.status(201).json(savedLead);
+      res.status(201).json({ message: "Lead created successfully", lead: savedLead });
     } catch (error) {
       res.status(400).json({ message: error.message });
     }
