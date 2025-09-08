@@ -203,6 +203,39 @@ loginUser: async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
+  },
+
+  // Add this to your existing user controller
+updatePassword: async (req, res) => {
+  try {
+    const { email, currentPassword, newPassword } = req.body;
+    const userId = req.user.id; // From auth middleware
+
+    // Find user
+    const user = await User.findById(userId).select("+password");
+    
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Verify email matches
+    if (user.email !== email) {
+      return res.status(400).json({ message: "Email does not match your account" });
+    }
+
+    // Verify current password
+    if (!(await user.matchPassword(currentPassword))) {
+      return res.status(401).json({ message: "Current password is incorrect" });
+    }
+
+    // Update password
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ message: "Password updated successfully" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 },
 
 

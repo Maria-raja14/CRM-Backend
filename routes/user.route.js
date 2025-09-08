@@ -25,5 +25,6 @@ router.get("/", protect, adminOnly, indexControllers.usersController.getUsers);
 router.put("/update-user/:id", upload.single("profileImage"), protect, adminOnly, indexControllers.usersController.updateUser);
 router.delete("/delete-user/:id", protect, adminOnly, indexControllers.usersController.deleteUser);
 router.post("/login", indexControllers.usersController.loginUser);
+router.put("/update-password", protect, indexControllers.usersController.updatePassword);
 
 export default router;
