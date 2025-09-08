@@ -8,7 +8,7 @@ router.get("/getInvoice",indexController.invoiceController. getAllInvoices); // 
 router.get("/getSingle/:id",indexController.invoiceController. getInvoiceById); // Get a single invoice by ID
 router.put("/updateInvoice/:id",indexController.invoiceController. updateInvoice); // Update an invoice
 router.delete("/delete/:id",indexController.invoiceController. deleteInvoice); // Delete an invoice
-router.get("/invoice/download/:id",indexController.invoiceController.generateInvoicePDF)
+router.get("/download/:id",indexController.invoiceController.generateInvoicePDF)
 router.post("/sendEmail/:id", indexController.invoiceController.sendInvoiceEmail);
 
 router.get("/recent", indexController.invoiceController.getRecentInvoices);
