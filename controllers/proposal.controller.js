@@ -8,105 +8,214 @@ dotenv.config();
 
 
 export default {
-  sendProposal: async (req, res) => {
-    const { emails, title, dealTitle, selectedDealId, content, image, id, cc } =
-      req.body;
+  // sendProposal: async (req, res) => {
+  //   const { emails, title, dealTitle, selectedDealId, content, image, id, cc } =
+  //     req.body;
 
-    if (!emails || !title || !dealTitle || !content) {
-      return res
-        .status(400)
-        .json({ error: "Title, dealTitle, emails and content are required" });
+  //   if (!emails || !title || !dealTitle || !content) {
+  //     return res
+  //       .status(400)
+  //       .json({ error: "Title, dealTitle, emails and content are required" });
+  //   }
+
+  //   try {
+  //     // format emails
+  //     const recipients = emails
+  //       .split(",")
+  //       .map((e) => e.trim())
+  //       .filter(Boolean);
+
+  //     // ✅ get deal info if selectedDealId exists
+  //     let dealInfo = null;
+  //     if (selectedDealId) {
+  //       dealInfo = await mongoose.model("Deal").findById(selectedDealId).lean();
+  //       if (!dealInfo) {
+  //         return res.status(404).json({ error: "Deal not found" });
+  //       }
+  //     }
+
+  //     // ✅ save files for DB
+  //     const attachments = (req.files || []).map((file) => ({
+  //       filename: file.originalname,
+  //       path: file.path,
+  //       mimetype: file.mimetype,
+  //     }));
+
+  //     // Proposal data to insert/update
+  //     const proposalData = {
+  //       title,
+  //       deal: selectedDealId || null,
+  //       dealTitle,
+  //       email: recipients.join(","),
+  //       cc,
+  //       content,
+  //       image,
+  //       status: "sent",
+  //       attachments,
+  //       companyName: dealInfo?.companyName || "",
+  //       value: dealInfo?.value || 0,
+  //     };
+
+  //     let proposal;
+  //     if (id) {
+  //       // Update
+  //       proposal = await Proposal.findByIdAndUpdate(id, proposalData, {
+  //         new: true,
+  //       });
+  //       if (!proposal)
+  //         return res.status(404).json({ error: "Proposal not found" });
+  //     } else {
+  //       // Create new
+  //       proposal = new Proposal(proposalData);
+  //       await proposal.save();
+  //     }
+
+  //     // ✅ Return response immediately (don't wait for email)
+  //     res.json({
+  //       message: "Proposal saved successfully! Email is sending in background.",
+  //       proposal,
+  //     });
+
+  //     // 🔄 Send mail in background
+  //     const transporter = nodemailer.createTransport({
+  //       service: "gmail",
+  //       host: "smtp.gmail.com",
+  //       port: 587,
+  //       secure: false,
+  //       auth: {
+  //         user: process.env.EMAIL_USER,
+  //         pass: process.env.EMAIL_PASS,
+  //       },
+  //     });
+
+  //     transporter
+  //       .sendMail({
+  //         from: `"Your Company" <${process.env.EMAIL_USER}>`,
+  //         to: recipients.join(","),
+  //         cc: [process.env.OWNER_EMAIL, cc].filter(Boolean).join(","),
+  //         subject: `Proposal: ${title}`,
+  //         html: content,
+  //         attachments: attachments.map((file) => ({
+  //           filename: file.filename,
+  //           path: file.path,
+  //         })),
+  //       })
+  //       .then(() => console.log("✅ Email sent successfully"))
+  //       .catch((err) => console.error("❌ Email send failed:", err));
+  //   } catch (error) {
+  //     console.error("❌ Proposal Error:", error);
+  //     res.status(500).json({ error: error.message });
+  //   }
+  // },
+sendProposal: async (req, res) => {
+  const { emails, title, dealTitle, selectedDealId, content, image, id, cc } =
+    req.body;
+
+  if (!emails || !title || !dealTitle || !content) {
+    return res
+      .status(400)
+      .json({ error: "Title, dealTitle, emails and content are required" });
+  }
+
+  try {
+    // format emails
+    const recipients = emails
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean);
+
+    // ✅ get deal info if selectedDealId exists
+    let dealInfo = null;
+    if (selectedDealId) {
+      dealInfo = await mongoose.model("Deal").findById(selectedDealId).lean();
+      if (!dealInfo) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
     }
 
-    try {
-      // format emails
-      const recipients = emails
-        .split(",")
-        .map((e) => e.trim())
-        .filter(Boolean);
+    // ✅ save files for DB
+    const attachments = (req.files || []).map((file) => ({
+      filename: file.originalname,
+      path: file.path,
+      mimetype: file.mimetype,
+    }));
 
-      // ✅ get deal info if selectedDealId exists
-      let dealInfo = null;
-      if (selectedDealId) {
-        dealInfo = await mongoose.model("Deal").findById(selectedDealId).lean();
-        if (!dealInfo) {
-          return res.status(404).json({ error: "Deal not found" });
-        }
-      }
+    // Proposal data to insert/update
+    const proposalData = {
+      title,
+      deal: selectedDealId || null,
+      dealTitle,
+      email: recipients.join(","),
+      cc,
+      content,
+      image,
+      status: "sent",
+      attachments,
+      companyName: dealInfo?.companyName || "",
+      value: dealInfo?.value || 0,
+    };
 
-      // ✅ save files for DB
-      const attachments = (req.files || []).map((file) => ({
-        filename: file.originalname,
+    let proposal;
+    if (id) {
+      // Update
+      proposal = await Proposal.findByIdAndUpdate(id, proposalData, {
+        new: true,
+      });
+      if (!proposal)
+        return res.status(404).json({ error: "Proposal not found" });
+    } else {
+      // Create new
+      proposal = new Proposal(proposalData);
+      await proposal.save();
+    }
+
+    // ✅ Return response immediately (don't wait for email)
+    res.json({
+      message: "Proposal saved successfully! Email is sending in background.",
+      proposal,
+    });
+
+    // 🔄 Send mail in background
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    // 👉 Client ku proposal mail
+    await transporter.sendMail({
+      from: `"Your Company" <${process.env.EMAIL_USER}>`,
+      to: recipients.join(","),
+      cc: cc || undefined, // Only include cc if user passed
+      subject: `Proposal: ${title}`,
+      html: content,
+      attachments: attachments.map((file) => ({
+        filename: file.filename,
         path: file.path,
-        mimetype: file.mimetype,
-      }));
+      })),
+    });
 
-      // Proposal data to insert/update
-      const proposalData = {
-        title,
-        deal: selectedDealId || null,
-        dealTitle,
-        email: recipients.join(","),
-        cc,
-        content,
-        image,
-        status: "sent",
-        attachments,
-        companyName: dealInfo?.companyName || "",
-        value: dealInfo?.value || 0,
-      };
-
-      let proposal;
-      if (id) {
-        // Update
-        proposal = await Proposal.findByIdAndUpdate(id, proposalData, {
-          new: true,
-        });
-        if (!proposal)
-          return res.status(404).json({ error: "Proposal not found" });
-      } else {
-        // Create new
-        proposal = new Proposal(proposalData);
-        await proposal.save();
-      }
-
-      // ✅ Return response immediately (don't wait for email)
-      res.json({
-        message: "Proposal saved successfully! Email is sending in background.",
-        proposal,
+    // 👉 Owner ku separate notification mail
+    if (process.env.OWNER_EMAIL) {
+      await transporter.sendMail({
+        from: `"CRM Notification" <${process.env.EMAIL_USER}>`,
+        to: process.env.OWNER_EMAIL,
+        subject: `📩 Proposal Sent: ${title}`,
+        text: `A new proposal has been sent to ${recipients.join(",")}.`,
       });
-
-      // 🔄 Send mail in background
-      const transporter = nodemailer.createTransport({
-        service: "gmail",
-        host: "smtp.gmail.com",
-        port: 587,
-        secure: false,
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS,
-        },
-      });
-
-      transporter
-        .sendMail({
-          from: `"Your Company" <${process.env.EMAIL_USER}>`,
-          to: recipients.join(","),
-          cc: [process.env.OWNER_EMAIL, cc].filter(Boolean).join(","),
-          subject: `Proposal: ${title}`,
-          html: content,
-          attachments: attachments.map((file) => ({
-            filename: file.filename,
-            path: file.path,
-          })),
-        })
-        .then(() => console.log("✅ Email sent successfully"))
-        .catch((err) => console.error("❌ Email send failed:", err));
-    } catch (error) {
-      console.error("❌ Proposal Error:", error);
-      res.status(500).json({ error: error.message });
     }
-  },
+
+    console.log("✅ Proposal email(s) sent successfully");
+  } catch (error) {
+    console.error("❌ Proposal Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+},
 
   updateFollowUp: async (req, res) => {
     const { id } = req.params;
