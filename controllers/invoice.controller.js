@@ -174,12 +174,149 @@ updateInvoice: async (req, res) => {
     }
   },
 
-  generateInvoicePDF: async (req, res) => {
+  // generateInvoicePDF: async (req, res) => {
+  //   try {
+  //     const invoiceId = req.params.id;
+
+  //     if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
+  //       return res.status(400).json({ error: "Invalid invoice ID format" });
+  //     }
+
+  //     const invoice = await Invoice.findById(invoiceId)
+  //       .populate("assignTo", "firstName lastName email")
+  //       .populate("items.deal", "dealName value stage");
+
+  //     if (!invoice) {
+  //       return res.status(404).json({ error: "Invoice not found" });
+  //     }
+
+  //     const templatePath = path.join(
+  //       process.cwd(),
+  //       "views",
+  //       "invoiceTemplate.ejs"
+  //     );
+
+  //     if (!fs.existsSync(templatePath)) {
+  //       return res.status(500).json({ error: "Template file not found" });
+  //     }
+
+  //     // ✅ renderFile with try/catch
+  //     const templateData = await ejs.renderFile(
+  //       templatePath,
+  //       { invoice },
+  //       { async: true }
+  //     );
+
+  //     const browser = await puppeteer.launch({
+  //       headless: "new",
+  //       args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  //     });
+
+  //     const page = await browser.newPage();
+
+  //     await page.setContent(templateData, { waitUntil: "networkidle0" });
+
+  //     // ✅ Add margin to avoid cut text
+  //     const pdfBuffer = await page.pdf({
+  //       format: "A4",
+  //       margin: { top: "20mm", right: "10mm", bottom: "20mm", left: "10mm" },
+  //       printBackground: true,
+  //     });
+
+  //     await browser.close();
+
+  //     // ✅ Proper headers
+  //     res.setHeader("Content-Type", "application/pdf");
+  //     res.setHeader(
+  //       "Content-Disposition",
+  //       `attachment; filename=Invoice_${invoice.invoicenumber}.pdf`
+  //     );
+  //     res.setHeader("Content-Length", pdfBuffer.length);
+
+  //     return res.end(pdfBuffer); // safer than res.send
+  //   } catch (error) {
+  //     console.error("Error generating PDF:", error);
+  //     res
+  //       .status(500)
+  //       .json({ error: "Internal Server Error", details: error.message });
+  //   }
+  // },
+
+  // sendInvoiceEmail: async (req, res) => {
+  //   try {
+  //     const { id } = req.params;
+  //     if (!mongoose.Types.ObjectId.isValid(id)) {
+  //       return res.status(400).json({ error: "Invalid invoice ID" });
+  //     }
+
+  //     const invoice = await Invoice.findById(id)
+  //       .populate("assignTo", "firstName lastName email")
+  //       .populate("items.deal", "dealName value stage");
+
+  //     if (!invoice) {
+  //       return res.status(404).json({ error: "Invoice not found" });
+  //     }
+
+  //     // Load invoice template (EJS -> HTML)
+  //     const templatePath = path.join(
+  //       process.cwd(),
+  //       "views",
+  //       "invoiceTemplate.ejs"
+  //     );
+  //     const templateData = await ejs.renderFile(templatePath, { invoice });
+
+  //     // Generate PDF using Puppeteer
+  //     const browser = await puppeteer.launch({
+  //       headless: "new",
+  //       args: ["--no-sandbox"],
+  //     });
+  //     const page = await browser.newPage();
+  //     await page.setContent(templateData, { waitUntil: "networkidle0" });
+  //     const pdfBuffer = await page.pdf({ format: "A4" });
+  //     await browser.close();
+
+  //     // Setup Nodemailer
+  //     const transporter = nodemailer.createTransport({
+  //       service: "gmail", // or use SMTP settings
+  //       auth: {
+  //         user: process.env.EMAIL_USER, // your email
+  //         pass: process.env.EMAIL_PASS, // your app password
+  //       },
+  //     });
+
+  //     // Send Email
+  //     const mailOptions = {
+  //       from: `"Your Company" <${process.env.EMAIL_USER}>`,
+  //       to: invoice.assignTo?.email || "default@email.com", // ✅ customer email
+  //       subject: `Invoice #${invoice.invoicenumber}`,
+  //       text: "Please find attached your invoice.",
+  //       attachments: [
+  //         {
+  //           filename: `Invoice_${invoice.invoicenumber}.pdf`,
+  //           content: pdfBuffer,
+  //         },
+  //       ],
+  //     };
+
+  //     await transporter.sendMail(mailOptions);
+
+  //     res.status(200).json({ message: "Invoice sent successfully!" });
+  //   } catch (error) {
+  //     console.error("Error sending invoice email:", error);
+  //     res.status(500).json({ error: "Failed to send invoice email" });
+  //   }
+  // },
+
+
+  // ➡️ Get Recent Invoices (last 5)
+
+
+   generateInvoicePDF: async (req, res) => {
     try {
       const invoiceId = req.params.id;
 
       if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
-        return res.status(400).json({ error: "Invalid invoice ID format" });
+        return res.status(400).json({ error: "Invalid invoice ID" });
       }
 
       const invoice = await Invoice.findById(invoiceId)
@@ -190,22 +327,14 @@ updateInvoice: async (req, res) => {
         return res.status(404).json({ error: "Invoice not found" });
       }
 
-      const templatePath = path.join(
-        process.cwd(),
-        "views",
-        "invoiceTemplate.ejs"
-      );
+      const templatePath = path.join(process.cwd(), "views", "invoiceTemplate.ejs");
 
       if (!fs.existsSync(templatePath)) {
+        console.error("Invoice template missing at:", templatePath);
         return res.status(500).json({ error: "Template file not found" });
       }
 
-      // ✅ renderFile with try/catch
-      const templateData = await ejs.renderFile(
-        templatePath,
-        { invoice },
-        { async: true }
-      );
+      const templateData = await ejs.renderFile(templatePath, { invoice }, { async: true });
 
       const browser = await puppeteer.launch({
         headless: "new",
@@ -213,10 +342,8 @@ updateInvoice: async (req, res) => {
       });
 
       const page = await browser.newPage();
-
       await page.setContent(templateData, { waitUntil: "networkidle0" });
 
-      // ✅ Add margin to avoid cut text
       const pdfBuffer = await page.pdf({
         format: "A4",
         margin: { top: "20mm", right: "10mm", bottom: "20mm", left: "10mm" },
@@ -225,26 +352,29 @@ updateInvoice: async (req, res) => {
 
       await browser.close();
 
-      // ✅ Proper headers
+      // ✅ Optional: Save temporarily to check PDF
+      const tempPath = path.join(process.cwd(), `Invoice_${invoice.invoicenumber || invoice._id}.pdf`);
+      fs.writeFileSync(tempPath, pdfBuffer);
+
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename=Invoice_${invoice.invoicenumber}.pdf`
+        `attachment; filename=Invoice_${invoice.invoicenumber || invoice._id}.pdf`
       );
       res.setHeader("Content-Length", pdfBuffer.length);
 
-      return res.end(pdfBuffer); // safer than res.send
+      return res.end(pdfBuffer);
     } catch (error) {
       console.error("Error generating PDF:", error);
-      res
-        .status(500)
-        .json({ error: "Internal Server Error", details: error.message });
+      res.status(500).json({ error: "Failed to generate PDF", details: error.message });
     }
   },
 
+  // ✅ Send invoice via email with PDF attachment
   sendInvoiceEmail: async (req, res) => {
     try {
       const { id } = req.params;
+
       if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({ error: "Invalid invoice ID" });
       }
@@ -257,42 +387,42 @@ updateInvoice: async (req, res) => {
         return res.status(404).json({ error: "Invoice not found" });
       }
 
-      // Load invoice template (EJS -> HTML)
-      const templatePath = path.join(
-        process.cwd(),
-        "views",
-        "invoiceTemplate.ejs"
-      );
-      const templateData = await ejs.renderFile(templatePath, { invoice });
+      const templatePath = path.join(process.cwd(), "views", "invoiceTemplate.ejs");
 
-      // Generate PDF using Puppeteer
+      if (!fs.existsSync(templatePath)) {
+        console.error("Invoice template missing at:", templatePath);
+        return res.status(500).json({ error: "Template file not found" });
+      }
+
+      const templateData = await ejs.renderFile(templatePath, { invoice }, { async: true });
+
       const browser = await puppeteer.launch({
         headless: "new",
-        args: ["--no-sandbox"],
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
       });
+
       const page = await browser.newPage();
       await page.setContent(templateData, { waitUntil: "networkidle0" });
       const pdfBuffer = await page.pdf({ format: "A4" });
       await browser.close();
 
-      // Setup Nodemailer
+      // Setup nodemailer
       const transporter = nodemailer.createTransport({
-        service: "gmail", // or use SMTP settings
+        service: "gmail",
         auth: {
-          user: process.env.EMAIL_USER, // your email
-          pass: process.env.EMAIL_PASS, // your app password
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS, // use App Password
         },
       });
 
-      // Send Email
       const mailOptions = {
         from: `"Your Company" <${process.env.EMAIL_USER}>`,
-        to: invoice.assignTo?.email || "default@email.com", // ✅ customer email
-        subject: `Invoice #${invoice.invoicenumber}`,
+        to: invoice.assignTo?.email || "default@email.com",
+        subject: `Invoice #${invoice.invoicenumber || invoice._id}`,
         text: "Please find attached your invoice.",
         attachments: [
           {
-            filename: `Invoice_${invoice.invoicenumber}.pdf`,
+            filename: `Invoice_${invoice.invoicenumber || invoice._id}.pdf`,
             content: pdfBuffer,
           },
         ],
@@ -303,10 +433,11 @@ updateInvoice: async (req, res) => {
       res.status(200).json({ message: "Invoice sent successfully!" });
     } catch (error) {
       console.error("Error sending invoice email:", error);
-      res.status(500).json({ error: "Failed to send invoice email" });
+      res.status(500).json({ error: "Failed to send invoice email", details: error.message });
     }
   },
-  // ➡️ Get Recent Invoices (last 5)
+
+  
   getRecentInvoices: async (_req, res) => {
     try {
       const now = new Date();
