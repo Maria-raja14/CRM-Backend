@@ -41,13 +41,13 @@ router.use(protect);
 router.post(
   "/create",
   adminOrSales, // Only admin or sales can create leads
-  upload.array("attachments", 10), // max 10 files, field name 'attachments'
+  upload.array("attachments", 5), // max 10 files, field name 'attachments'
   indexControllers.leadsController.createLead
 );
 
 router.get("/getAllLead", indexControllers.leadsController.getLeads);
 router.get("/getLead/:id", adminOrAssigned, indexControllers.leadsController.getLeadById);
-router.put("/updateLead/:id", upload.array("attachments"), adminOrAssigned, indexControllers.leadsController.updateLead);
+router.put("/updateLead/:id", upload.array("attachments", 5), adminOrAssigned, indexControllers.leadsController.updateLead);
 router.delete("/deleteLead/:id", adminOrAssigned, indexControllers.leadsController.deleteLead);
 
 router.patch("/:id/followup", adminOrAssigned, indexControllers.leadsController.updateFollowUpDate);

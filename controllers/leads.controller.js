@@ -17,45 +17,79 @@ export default {
   // ➡️ Create Lead
 
 
-createLead: async (req, res) => {
-  console.log(req.body);
+// createLead: async (req, res) => {
+//   console.log(req.body);
   
-  try {
-    const { leadName, companyName } = req.body;
-    if (!leadName || !companyName) {
-      return res
-        .status(400)
-        .json({ message: "Lead name and company name are required" });
+//   try {
+//     const { leadName, companyName } = req.body;
+//     if (!leadName || !companyName) {
+//       return res
+//         .status(400)
+//         .json({ message: "Lead name and company name are required" });
+//     }
+
+//     const data = { ...req.body };
+
+//     // Handle file uploads
+//     if (req.files?.length > 0) {
+//       data.attachments = req.files.map((file) => ({
+//         name: file.originalname,
+//         path: `/uploads/leads/${file.filename}`, // ✅ Correct path
+//         type: file.mimetype,
+//         size: file.size,
+//         uploadedAt: new Date(),
+//       }));
+//     }
+
+//     // Sales users can only assign to themselves
+//     if (req.user.role.name !== "Admin") {
+//       data.assignTo = req.user._id;
+//     }
+
+//     const lead = new Lead(data);
+//     const savedLead = await lead.save();
+
+//     res.status(201).json({ message: "Lead created successfully", lead: savedLead });
+//   } catch (error) {
+//     res.status(400).json({ message: error.message });
+//   }
+// },
+
+  createLead: async (req, res) => {
+    try {
+      const { leadName, companyName } = req.body;
+      if (!leadName || !companyName) {
+        return res
+          .status(400)
+          .json({ message: "Lead name and company name are required" });
+      }
+
+      const data = { ...req.body };
+
+      // Handle file uploads
+      if (req.files?.length > 0) {
+        data.attachments = req.files.map((file) => ({
+          name: file.originalname,
+          path: `/uploads/leads/${file.filename}`,
+          type: file.mimetype,
+          size: file.size,
+          uploadedAt: new Date(),
+        }));
+      }
+
+      // Sales users can only assign to themselves
+      if (req.user.role.name !== "Admin") {
+        data.assignTo = req.user._id;
+      }
+
+      const lead = new Lead(data);
+      const savedLead = await lead.save();
+
+      res.status(201).json({ message: "Lead created successfully", lead: savedLead });
+    } catch (error) {
+      res.status(400).json({ message: error.message });
     }
-
-    const data = { ...req.body };
-
-    // Handle file uploads
-    if (req.files?.length > 0) {
-      data.attachments = req.files.map((file) => ({
-        name: file.originalname,
-        path: `/uploads/leads/${file.filename}`, // ✅ Correct path
-        type: file.mimetype,
-        size: file.size,
-        uploadedAt: new Date(),
-      }));
-    }
-
-    // Sales users can only assign to themselves
-    if (req.user.role.name !== "Admin") {
-      data.assignTo = req.user._id;
-    }
-
-    const lead = new Lead(data);
-    const savedLead = await lead.save();
-
-    res.status(201).json({ message: "Lead created successfully", lead: savedLead });
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-},
-
-
+  },
 
   // ➡️ Get All Leads
   getLeads: async (req, res) => {
@@ -90,6 +124,84 @@ createLead: async (req, res) => {
   },
 
   // ➡️ Update Lead
+//   updateLead: async (req, res) => {
+//     try {
+//       const before = await Lead.findById(req.params.id).select(
+//         "status assignTo leadName followUpDate attachments"
+//       );
+//       if (!before) return res.status(404).json({ message: "Lead not found" });
+
+//       const patch = { ...req.body };
+
+//       // Handle existing + new attachments
+//       let existingAttachments = [];
+//       if (req.body.existingAttachments) {
+//         try {
+//           existingAttachments = JSON.parse(req.body.existingAttachments);
+//         } catch {
+//           existingAttachments = [];
+//         }
+//       }
+
+//       let newFiles = [];
+// if (req.files && req.files.length > 0) {
+//   newFiles = req.files.map((file) => ({
+//     name: file.originalname,
+//     path: `/uploads/${file.filename}`,
+//     type: file.mimetype,
+//     uploadedAt: new Date(),
+//   }));
+// }
+// patch.attachments = [...existingAttachments, ...newFiles];
+
+
+//       // Recompute followUpDate if status changes
+//       if (patch.status && patch.status !== before.status) {
+//         const computed = computeFollowUp(patch.status);
+//         patch.followUpDate = computed || null;
+//         patch.lastReminderAt = null;
+//       }
+
+//       const updated = await Lead.findByIdAndUpdate(req.params.id, patch, {
+//         new: true,
+//       }).populate("assignTo", "firstName lastName email");
+
+//       // Notify if converted
+//       if (before.status !== "Converted" && updated.status === "Converted") {
+//         const userId = updated.assignTo?._id?.toString();
+//         const fullName = `${updated.assignTo?.firstName || ""} ${
+//           updated.assignTo?.lastName || ""
+//         }`.trim();
+
+//         if (userId) {
+//           notifyUser(userId, "deal:converted", {
+//             leadId: updated._id,
+//             leadName: updated.leadName,
+//             when: new Date(),
+//           });
+//         }
+
+//         if (updated.assignTo?.email) {
+//           await sendEmail({
+//             to: updated.assignTo.email,
+//             subject: `🎉 Deal Converted: ${updated.leadName}`,
+//             text: `Deal converted for lead ${updated.leadName}. Congrats, ${fullName}!`,
+//           });
+//         }
+//       }
+
+//       // res.status(200).json(updated);
+//   res.status(200).json({
+//   message: "Lead updated successfully",
+//   lead: updated
+// });
+
+//     } catch (error) {
+//       res.status(400).json({ message: error.message });
+//     }
+//   },
+
+    // Update Lead
   updateLead: async (req, res) => {
     try {
       const before = await Lead.findById(req.params.id).select(
@@ -110,16 +222,17 @@ createLead: async (req, res) => {
       }
 
       let newFiles = [];
-if (req.files && req.files.length > 0) {
-  newFiles = req.files.map((file) => ({
-    name: file.originalname,
-    path: `/uploads/${file.filename}`,
-    type: file.mimetype,
-    uploadedAt: new Date(),
-  }));
-}
-patch.attachments = [...existingAttachments, ...newFiles];
-
+      if (req.files && req.files.length > 0) {
+        newFiles = req.files.map((file) => ({
+          name: file.originalname,
+          path: `/uploads/leads/${file.filename}`,
+          type: file.mimetype,
+          size: file.size,
+          uploadedAt: new Date(),
+        }));
+      }
+      
+      patch.attachments = [...existingAttachments, ...newFiles];
 
       // Recompute followUpDate if status changes
       if (patch.status && patch.status !== before.status) {
@@ -156,17 +269,15 @@ patch.attachments = [...existingAttachments, ...newFiles];
         }
       }
 
-      // res.status(200).json(updated);
-  res.status(200).json({ 
-  message: "Lead updated successfully", 
-  lead: updated 
-});
-
+      res.status(200).json({ 
+        message: "Lead updated successfully", 
+        lead: updated 
+      });
     } catch (error) {
       res.status(400).json({ message: error.message });
     }
   },
-
+  
   // ➡️ Delete Lead
   deleteLead: async (req, res) => {
     try {
