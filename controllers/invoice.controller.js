@@ -328,6 +328,8 @@ updateInvoice: async (req, res) => {
       }
 
       const templatePath = path.join(process.cwd(), "views", "invoiceTemplate.ejs");
+      console.log(templatePath);
+      
 
       if (!fs.existsSync(templatePath)) {
         console.error("Invoice template missing at:", templatePath);
