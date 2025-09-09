@@ -16,6 +16,8 @@ const computeFollowUp = (status) => {
 export default {
   // ➡️ Create Lead
   createLead: async (req, res) => {
+    console.log(req.body);
+    
     try {
       const { leadName, companyName } = req.body;
       if (!leadName || !companyName) {
@@ -27,9 +29,15 @@ export default {
       const data = { ...req.body };
 
       // Handle file uploads
-      if (req.files?.length > 0) {
-        data.attachments = req.files.map((file) => file.path);
-      }
+    if (req.files?.length > 0) {
+  data.attachments = req.files.map((file) => ({
+    name: file.originalname,
+    path: `/uploads/${file.filename}`, // ✅ public path
+    type: file.mimetype,
+    uploadedAt: new Date(),
+  }));
+}
+
 
       // Sales users can only assign to themselves
       if (req.user.role.name !== "Admin") {
@@ -99,11 +107,16 @@ export default {
       }
 
       let newFiles = [];
-      if (req.files && req.files.length > 0) {
-        newFiles = req.files.map((file) => file.path);
-      }
+if (req.files && req.files.length > 0) {
+  newFiles = req.files.map((file) => ({
+    name: file.originalname,
+    path: `/uploads/${file.filename}`,
+    type: file.mimetype,
+    uploadedAt: new Date(),
+  }));
+}
+patch.attachments = [...existingAttachments, ...newFiles];
 
-      patch.attachments = [...existingAttachments, ...newFiles];
 
       // Recompute followUpDate if status changes
       if (patch.status && patch.status !== before.status) {

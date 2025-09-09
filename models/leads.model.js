@@ -28,7 +28,15 @@ const leadSchema = new mongoose.Schema(
     lastReminderAt: { type: Date, default: null }, // Already exists
 
     notes: { type: String },
-    attachments: [{ type: String }],
+     attachments: [
+      {
+        name: { type: String, required: true },
+        path: { type: String, required: true },
+        type: { type: String },
+        size: { type: Number },
+        uploadedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true }
 
