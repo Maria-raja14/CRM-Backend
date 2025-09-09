@@ -242,70 +242,133 @@ updateInvoice: async (req, res) => {
     }
   },
 
-  sendInvoiceEmail: async (req, res) => {
-    try {
-      const { id } = req.params;
-      if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).json({ error: "Invalid invoice ID" });
-      }
 
-      const invoice = await Invoice.findById(id)
-        .populate("assignTo", "firstName lastName email")
-        .populate("items.deal", "dealName value stage");
 
-      if (!invoice) {
-        return res.status(404).json({ error: "Invoice not found" });
-      }
 
-      // Load invoice template (EJS -> HTML)
-      const templatePath = path.join(
-        process.cwd(),
-        "views",
-        "invoiceTemplate.ejs"
-      );
-      const templateData = await ejs.renderFile(templatePath, { invoice });
 
-      // Generate PDF using Puppeteer
-      const browser = await puppeteer.launch({
-        headless: "new",
-        args: ["--no-sandbox"],
-      });
-      const page = await browser.newPage();
-      await page.setContent(templateData, { waitUntil: "networkidle0" });
-      const pdfBuffer = await page.pdf({ format: "A4" });
-      await browser.close();
-
-      // Setup Nodemailer
-      const transporter = nodemailer.createTransport({
-        service: "gmail", // or use SMTP settings
-        auth: {
-          user: process.env.EMAIL_USER, // your email
-          pass: process.env.EMAIL_PASS, // your app password
-        },
-      });
-
-      // Send Email
-      const mailOptions = {
-        from: `"Your Company" <${process.env.EMAIL_USER}>`,
-        to: invoice.assignTo?.email || "default@email.com", // ✅ customer email
-        subject: `Invoice #${invoice.invoicenumber}`,
-        text: "Please find attached your invoice.",
-        attachments: [
-          {
-            filename: `Invoice_${invoice.invoicenumber}.pdf`,
-            content: pdfBuffer,
-          },
-        ],
-      };
-
-      await transporter.sendMail(mailOptions);
-
-      res.status(200).json({ message: "Invoice sent successfully!" });
-    } catch (error) {
-      console.error("Error sending invoice email:", error);
-      res.status(500).json({ error: "Failed to send invoice email" });
+sendInvoiceEmail: async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "Invalid invoice ID" });
     }
-  },
+
+    const invoice = await Invoice.findById(id)
+      .populate("assignTo", "firstName lastName email")
+      .populate("items.deal", "dealName value stage");
+
+    if (!invoice) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+
+    // Respond immediately and process in background
+    res.status(202).json({ message: "Invoice email is being processed" });
+
+    // Process email in background
+    setTimeout(async () => {
+      try {
+        // Generate PDF
+        const pdfBuffer = await generateInvoicePDF(invoice);
+
+        // Setup Nodemailer
+        const transporter = nodemailer.createTransport({
+          service: "gmail",
+          auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS,
+          },
+        });
+
+        // Send Email
+        const mailOptions = {
+          from: `"Your Company" <${process.env.EMAIL_USER}>`,
+          to: invoice.assignTo?.email || "default@email.com",
+          subject: `Invoice #${invoice.invoicenumber}`,
+          text: "Please find attached your invoice.",
+          attachments: [
+            {
+              filename: `Invoice_${invoice.invoicenumber}.pdf`,
+              content: pdfBuffer,
+            },
+          ],
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log(`Email sent for invoice ${invoice.invoicenumber}`);
+      } catch (error) {
+        console.error("Error processing email in background:", error);
+      }
+    }, 100); // Small delay to ensure response is sent first
+  } catch (error) {
+    console.error("Error in sendInvoiceEmail:", error);
+    res.status(500).json({ error: "Failed to process email request" });
+  }
+},//latest
+
+  // sendInvoiceEmail: async (req, res) => {
+  //   try {
+  //     const { id } = req.params;
+  //     if (!mongoose.Types.ObjectId.isValid(id)) {
+  //       return res.status(400).json({ error: "Invalid invoice ID" });
+  //     }
+
+  //     const invoice = await Invoice.findById(id)
+  //       .populate("assignTo", "firstName lastName email")
+  //       .populate("items.deal", "dealName value stage");
+
+  //     if (!invoice) {
+  //       return res.status(404).json({ error: "Invoice not found" });
+  //     }
+
+  //     // Load invoice template (EJS -> HTML)
+  //     const templatePath = path.join(
+  //       process.cwd(),
+  //       "views",
+  //       "invoiceTemplate.ejs"
+  //     );
+  //     const templateData = await ejs.renderFile(templatePath, { invoice });
+
+  //     // Generate PDF using Puppeteer
+  //     const browser = await puppeteer.launch({
+  //       headless: "new",
+  //       args: ["--no-sandbox"],
+  //     });
+  //     const page = await browser.newPage();
+  //     await page.setContent(templateData, { waitUntil: "networkidle0" });
+  //     const pdfBuffer = await page.pdf({ format: "A4" });
+  //     await browser.close();
+
+  //     // Setup Nodemailer
+  //     const transporter = nodemailer.createTransport({
+  //       service: "gmail", // or use SMTP settings
+  //       auth: {
+  //         user: process.env.EMAIL_USER, // your email
+  //         pass: process.env.EMAIL_PASS, // your app password
+  //       },
+  //     });
+
+  //     // Send Email
+  //     const mailOptions = {
+  //       from: `"Your Company" <${process.env.EMAIL_USER}>`,
+  //       to: invoice.assignTo?.email || "default@email.com", // ✅ customer email
+  //       subject: `Invoice #${invoice.invoicenumber}`,
+  //       text: "Please find attached your invoice.",
+  //       attachments: [
+  //         {
+  //           filename: `Invoice_${invoice.invoicenumber}.pdf`,
+  //           content: pdfBuffer,
+  //         },
+  //       ],
+  //     };
+
+  //     await transporter.sendMail(mailOptions);
+
+  //     res.status(200).json({ message: "Invoice sent successfully!" });
+  //   } catch (error) {
+  //     console.error("Error sending invoice email:", error);
+  //     res.status(500).json({ error: "Failed to send invoice email" });
+  //   }
+  // },//original
   // ➡️ Get Recent Invoices (last 5)
   getRecentInvoices: async (_req, res) => {
     try {
