@@ -69,8 +69,6 @@ export default {
     }
   },
 
-
-
   // ✅ Get Invoice by ID
   getInvoiceById: async (req, res) => {
     try {
@@ -87,79 +85,78 @@ export default {
     }
   },
 
- // ✅ Get All Invoices with Pagination
-getAllInvoices: async (req, res) => {
-  try {
-    let { page = 1, limit = 10 } = req.query;
-    page = Number(page);
-    limit = Number(limit);
+  // ✅ Get All Invoices with Pagination
+  getAllInvoices: async (req, res) => {
+    try {
+      let { page = 1, limit = 10 } = req.query;
+      page = Number(page);
+      limit = Number(limit);
 
-    const totalCount = await Invoice.countDocuments();
-    const invoices = await Invoice.find()
-      .populate("assignTo", "firstName lastName email")
-      .populate("items.deal", "dealName value stage")
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit);
+      const totalCount = await Invoice.countDocuments();
+      const invoices = await Invoice.find()
+        .populate("assignTo", "firstName lastName email")
+        .populate("items.deal", "dealName value stage")
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit);
 
-    res.status(200).json({ invoices, totalCount });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-},
-
-// ✅ Update Invoice (fixed quantity logic)
-updateInvoice: async (req, res) => {
-  try {
-    let { items, tax = 0, discount = 0, ...rest } = req.body;
-
-    if (items && items.length > 0) {
-      items = items.map((item) => {
-        const price = Number(item.price) || 0;
-        const quantity = Number(item.quantity) || 1;
-        const amount = price * quantity;
-        return {
-          ...item,
-          amount: amount.toFixed(2),
-        };
-      });
-
-      const subtotal = items.reduce(
-        (sum, item) => sum + Number(item.amount),
-        0
-      );
-
-      const taxValue = Number(tax) || 0;
-      const discountValue = Number(discount) || 0;
-      const discountedSubtotal = subtotal - discountValue;
-      const taxAmount = (discountedSubtotal * taxValue) / 100;
-      const total = discountedSubtotal + taxAmount;
-
-      rest.items = items;
-      rest.tax = taxValue;
-      rest.discount = discountValue;
-      rest.subtotal = subtotal;
-      rest.total = Number(total.toFixed(2));
+      res.status(200).json({ invoices, totalCount });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
     }
+  },
 
-    const updatedInvoice = await Invoice.findByIdAndUpdate(
-      req.params.id,
-      rest,
-      { new: true, runValidators: true }
-    )
-      .populate("assignTo", "firstName lastName email")
-      .populate("items.deal", "dealName value stage");
+  // ✅ Update Invoice (fixed quantity logic)
+  updateInvoice: async (req, res) => {
+    try {
+      let { items, tax = 0, discount = 0, ...rest } = req.body;
 
-    if (!updatedInvoice) {
-      return res.status(404).json({ message: "Invoice not found" });
+      if (items && items.length > 0) {
+        items = items.map((item) => {
+          const price = Number(item.price) || 0;
+          const quantity = Number(item.quantity) || 1;
+          const amount = price * quantity;
+          return {
+            ...item,
+            amount: amount.toFixed(2),
+          };
+        });
+
+        const subtotal = items.reduce(
+          (sum, item) => sum + Number(item.amount),
+          0
+        );
+
+        const taxValue = Number(tax) || 0;
+        const discountValue = Number(discount) || 0;
+        const discountedSubtotal = subtotal - discountValue;
+        const taxAmount = (discountedSubtotal * taxValue) / 100;
+        const total = discountedSubtotal + taxAmount;
+
+        rest.items = items;
+        rest.tax = taxValue;
+        rest.discount = discountValue;
+        rest.subtotal = subtotal;
+        rest.total = Number(total.toFixed(2));
+      }
+
+      const updatedInvoice = await Invoice.findByIdAndUpdate(
+        req.params.id,
+        rest,
+        { new: true, runValidators: true }
+      )
+        .populate("assignTo", "firstName lastName email")
+        .populate("items.deal", "dealName value stage");
+
+      if (!updatedInvoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      res.status(200).json(updatedInvoice);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
     }
-
-    res.status(200).json(updatedInvoice);
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-},
-
+  },
 
   // ✅ Delete Invoice
   deleteInvoice: async (req, res) => {
@@ -307,9 +304,7 @@ updateInvoice: async (req, res) => {
   //   }
   // },
 
-
   // ➡️ Get Recent Invoices (last 5)
-
 
   //  generateInvoicePDF: async (req, res) => {
   //   try {
@@ -329,7 +324,6 @@ updateInvoice: async (req, res) => {
 
   //     const templatePath = path.join(process.cwd(), "views", "invoiceTemplate.ejs");
   //     console.log(templatePath);
-      
 
   //     if (!fs.existsSync(templatePath)) {
   //       console.error("Invoice template missing at:", templatePath);
@@ -371,67 +365,79 @@ updateInvoice: async (req, res) => {
   //     res.status(500).json({ error: "Failed to generate PDF", details: error.message });
   //   }
   // },
-generateInvoicePDF: async (req, res) => {
-  try {
-    const invoiceId = req.params.id;
+  generateInvoicePDF: async (req, res) => {
+    try {
+      const invoiceId = req.params.id;
 
-    if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
-      return res.status(400).json({ error: "Invalid invoice ID" });
+      if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
+        return res.status(400).json({ error: "Invalid invoice ID" });
+      }
+
+      const invoice = await Invoice.findById(invoiceId)
+        .populate("assignTo", "firstName lastName email")
+        .populate("items.deal", "dealName value stage");
+
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      const templatePath = path.join(
+        process.cwd(),
+        "views",
+        "invoiceTemplate.ejs"
+      );
+      if (!fs.existsSync(templatePath)) {
+        console.error("Invoice template missing at:", templatePath);
+        return res.status(500).json({ error: "Template file not found" });
+      }
+
+      const templateData = await ejs.renderFile(
+        templatePath,
+        { invoice },
+        { async: true }
+      );
+
+      const browser = await puppeteer.launch({
+        headless: "new",
+        executablePath: "/stagingzar-crm/bin/chromium-browser",
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      });
+
+      const page = await browser.newPage();
+      await page.setContent(templateData, { waitUntil: "networkidle0" });
+
+      const pdfBuffer = await page.pdf({
+        format: "A4",
+        margin: { top: "20mm", right: "10mm", bottom: "20mm", left: "10mm" },
+        printBackground: true,
+      });
+
+      await browser.close();
+
+      // (Optional) Save temp file for debugging
+      // const tempPath = path.join(
+      //   process.cwd(),
+      //   Invoice_${invoice.invoicenumber || invoice._id}.pdf
+      // );
+      // fs.writeFileSync(tempPath, pdfBuffer);
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="Invoice_${
+          invoice.invoicenumber || invoice._id
+        }.pdf`
+      );
+      res.setHeader("Content-Length", pdfBuffer.length);
+
+      return res.end(pdfBuffer);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      res
+        .status(500)
+        .json({ error: "Failed to generate PDF", details: error.message });
     }
-
-    const invoice = await Invoice.findById(invoiceId)
-      .populate("assignTo", "firstName lastName email")
-      .populate("items.deal", "dealName value stage");
-
-    if (!invoice) {
-      return res.status(404).json({ error: "Invoice not found" });
-    }
-
-    const templatePath = path.join(process.cwd(), "views", "invoiceTemplate.ejs");
-    if (!fs.existsSync(templatePath)) {
-      console.error("Invoice template missing at:", templatePath);
-      return res.status(500).json({ error: "Template file not found" });
-    }
-
-    const templateData = await ejs.renderFile(templatePath, { invoice }, { async: true });
-
-   const browser = await puppeteer.launch({
-  headless: "new",
-  executablePath: "/usr/bin/chromium-browser",
-  args: ["--no-sandbox", "--disable-setuid-sandbox"],
-});
-
-    const page = await browser.newPage();
-    await page.setContent(templateData, { waitUntil: "networkidle0" });
-
-    const pdfBuffer = await page.pdf({
-      format: "A4",
-      margin: { top: "20mm", right: "10mm", bottom: "20mm", left: "10mm" },
-      printBackground: true,
-    });
-
-    await browser.close();
-
-    // (Optional) Save temp file for debugging
-    // const tempPath = path.join(
-    //   process.cwd(),
-    //   Invoice_${invoice.invoicenumber || invoice._id}.pdf
-    // );
-    // fs.writeFileSync(tempPath, pdfBuffer);
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="Invoice_${invoice.invoicenumber || invoice._id}.pdf`
-    );
-    res.setHeader("Content-Length", pdfBuffer.length);
-
-    return res.end(pdfBuffer);
-  } catch (error) {
-    console.error("Error generating PDF:", error);
-    res.status(500).json({ error: "Failed to generate PDF", details: error.message });
-  }
-},
+  },
   // ✅ Send invoice via email with PDF attachment
   sendInvoiceEmail: async (req, res) => {
     try {
@@ -449,14 +455,22 @@ generateInvoicePDF: async (req, res) => {
         return res.status(404).json({ error: "Invoice not found" });
       }
 
-      const templatePath = path.join(process.cwd(), "views", "invoiceTemplate.ejs");
+      const templatePath = path.join(
+        process.cwd(),
+        "views",
+        "invoiceTemplate.ejs"
+      );
 
       if (!fs.existsSync(templatePath)) {
         console.error("Invoice template missing at:", templatePath);
         return res.status(500).json({ error: "Template file not found" });
       }
 
-      const templateData = await ejs.renderFile(templatePath, { invoice }, { async: true });
+      const templateData = await ejs.renderFile(
+        templatePath,
+        { invoice },
+        { async: true }
+      );
 
       const browser = await puppeteer.launch({
         headless: "new",
@@ -495,11 +509,15 @@ generateInvoicePDF: async (req, res) => {
       res.status(200).json({ message: "Invoice sent successfully!" });
     } catch (error) {
       console.error("Error sending invoice email:", error);
-      res.status(500).json({ error: "Failed to send invoice email", details: error.message });
+      res
+        .status(500)
+        .json({
+          error: "Failed to send invoice email",
+          details: error.message,
+        });
     }
   },
 
-  
   getRecentInvoices: async (_req, res) => {
     try {
       const now = new Date();
