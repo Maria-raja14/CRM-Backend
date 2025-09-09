@@ -1,4 +1,6 @@
-// routes/files.routes.js
+
+
+
 import express from "express";
 import { protect } from "../middlewares/auth.middleware.js";
 import fs from "fs";
@@ -6,6 +8,7 @@ import path from "path";
 
 const router = express.Router();
 
+// Add this route for file downloads
 router.get("/download", protect, async (req, res) => {
   try {
     const { filePath } = req.query;
@@ -37,7 +40,5 @@ router.get("/download", protect, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-
-
 
 export default router;
