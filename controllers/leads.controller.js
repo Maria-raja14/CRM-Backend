@@ -15,44 +15,47 @@ const computeFollowUp = (status) => {
 
 export default {
   // ➡️ Create Lead
-  createLead: async (req, res) => {
-    console.log(req.body);
-    
-    try {
-      const { leadName, companyName } = req.body;
-      if (!leadName || !companyName) {
-        return res
-          .status(400)
-          .json({ message: "Lead name and company name are required" });
-      }
-
-      const data = { ...req.body };
-
-      // Handle file uploads
-    if (req.files?.length > 0) {
-  data.attachments = req.files.map((file) => ({
-    name: file.originalname,
-    path: `/uploads/${file.filename}`, // ✅ public path
-    type: file.mimetype,
-    uploadedAt: new Date(),
-  }));
-}
 
 
-      // Sales users can only assign to themselves
-      if (req.user.role.name !== "Admin") {
-        data.assignTo = req.user._id;
-      }
-
-      const lead = new Lead(data);
-      const savedLead = await lead.save();
-
-      // res.status(201).json(savedLead);
-      res.status(201).json({ message: "Lead created successfully", lead: savedLead });
-    } catch (error) {
-      res.status(400).json({ message: error.message });
+createLead: async (req, res) => {
+  console.log(req.body);
+  
+  try {
+    const { leadName, companyName } = req.body;
+    if (!leadName || !companyName) {
+      return res
+        .status(400)
+        .json({ message: "Lead name and company name are required" });
     }
-  },
+
+    const data = { ...req.body };
+
+    // Handle file uploads
+    if (req.files?.length > 0) {
+      data.attachments = req.files.map((file) => ({
+        name: file.originalname,
+        path: `/uploads/leads/${file.filename}`, // ✅ Correct path
+        type: file.mimetype,
+        size: file.size,
+        uploadedAt: new Date(),
+      }));
+    }
+
+    // Sales users can only assign to themselves
+    if (req.user.role.name !== "Admin") {
+      data.assignTo = req.user._id;
+    }
+
+    const lead = new Lead(data);
+    const savedLead = await lead.save();
+
+    res.status(201).json({ message: "Lead created successfully", lead: savedLead });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+},
+
+
 
   // ➡️ Get All Leads
   getLeads: async (req, res) => {
