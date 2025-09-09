@@ -399,7 +399,7 @@ export default {
 
       const browser = await puppeteer.launch({
         headless: "new",
-        executablePath: "/snap/bin/chromium-browser",
+        executablePath: "/snap/bin/chromium",
         args: ["--no-sandbox", "--disable-setuid-sandbox"],
       });
 
