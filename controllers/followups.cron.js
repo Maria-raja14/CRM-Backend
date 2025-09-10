@@ -11,7 +11,7 @@ import { sendNotification } from "../services/notificationService.js";
 
 
 // Avoid duplicate reminders within the same gap (in minutes)
-const SHOULD_REMIND_EVERY_MINUTES = 120;
+const SHOULD_REMIND_EVERY_MINUTES = 1440;
 
 // ✅ Get Admin UserIds
 const getAdminUserIds = async () => {
@@ -75,7 +75,9 @@ export function startFollowUpCron() {
             {
               leadId: lead._id.toString(),
               salesman: lead.assignTo?.firstName || "Unknown",
-            }
+              
+            },
+                  lead.assignTo?._id   // ✅ salesman is the creator
           );
         }
 
