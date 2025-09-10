@@ -1,10 +1,9 @@
-
-
-
 import User from "../models/user.model.js";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import fs from "fs";
+import sendEmail from "../utils/sendEmail.js";
+import crypto from "crypto"; 
 
 dotenv.config();
 
@@ -63,7 +62,7 @@ createUser : async (req, res) => {
   }
 },
 
-  getUsers: async (req, res) => {
+getUsers: async (req, res) => {
     try {
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
@@ -160,7 +159,7 @@ createUser : async (req, res) => {
 },
 
 
-  deleteUser: async (req, res) => {
+deleteUser: async (req, res) => {
     try {
       const { id } = req.params;
       const deletedUser = await User.findByIdAndDelete(id);
@@ -233,6 +232,69 @@ updatePassword: async (req, res) => {
     await user.save();
 
     res.json({ message: "Password updated successfully" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+  },
+
+
+forgotPassword: async (req, res) => {
+    try {
+      const { email } = req.body;
+      const user = await User.findOne({ email });
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const resetToken = user.getResetPasswordToken();
+      await user.save({ validateBeforeSave: false });
+
+      // const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+      const resetUrl = `https://crm.stagingzar.com/reset-password/${resetToken}`;
+      const message = `
+        <h2>Password Reset</h2>
+        <p>You requested a password reset</p>
+        <p>Click this link to reset your password:</p>
+        <a href="${resetUrl}">${resetUrl}</a>
+      `;
+
+      await sendEmail({
+        to: user.email,
+        subject: "Password Reset",
+        html: message,
+      });
+
+      res.json({ message: "Reset link sent to your email" });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: err.message });
+    }
+  },
+
+
+resetPassword: async (req, res) => {
+  try {
+    const resetPasswordToken = crypto
+      .createHash("sha256")
+      .update(req.params.token)
+      .digest("hex");
+
+    const user = await User.findOne({
+      resetPasswordToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired token" });
+    }
+
+    user.password = req.body.password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    res.json({ message: "Password reset successful" });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
