@@ -5,18 +5,21 @@ const dealSchema = new mongoose.Schema({
   dealTitle: { type: String, require: true },
   dealName: { type: String, required: true },
   assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  value: { type: Number }, // optional: deal value
+  value: { type: String, required: true }, // store "$44", "₹5000", "TJS11111"
+
   stage: {
     type: String,
     enum: [
       "Qualification",
       "Negotiation",
+
       "Proposal Sent",
       "Closed Won",
       "Closed Lost",
     ],
     default: "Qualification",
   },
+
   notes: { type: String },
   phoneNumber: { type: String },
   email: { type: String },
@@ -38,6 +41,4 @@ dealSchema.pre("save", function (next) {
 });
 
 const Deal = mongoose.model("Deal", dealSchema);
-export default Deal;//ori
-
-
+export default Deal; //ori
