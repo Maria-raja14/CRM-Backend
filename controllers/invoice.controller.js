@@ -6,7 +6,6 @@ import fs from "fs";
 import puppeteer from "puppeteer";
 import nodemailer from "nodemailer";
 
-
 // Keep a global browser instance
 let browserInstance = null;
 const getBrowser = async () => {
@@ -199,7 +198,7 @@ export default {
 
       const invoice = await Invoice.findById(invoiceId)
         .populate("assignTo", "firstName lastName email")
-        .populate("items.deal", "dealName value stage");
+        .populate("items.deal", "dealName value stage email");
 
       if (!invoice) {
         return res.status(404).json({ error: "Invoice not found" });
@@ -269,98 +268,135 @@ export default {
     }
   },
 
+  sendInvoiceEmail: async (req, res) => {
+    try {
+      const { id } = req.params;
 
- sendInvoiceEmail : async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Validate ID
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ error: "Invalid invoice ID" });
-    }
-
-    // Fetch invoice with assigned user and deal info
-    const invoice = await Invoice.findById(id)
-      .populate("assignTo", "firstName lastName email")
-      .populate("items.deal", "dealName value stage");
-
-    if (!invoice) {
-      return res.status(404).json({ error: "Invoice not found" });
-    }
-
-    // Respond immediately so frontend doesn't wait
-    res.status(200).json({ message: "Invoice email is being sent!" });
-
-    // Start async email sending
-    setImmediate(async () => {
-      try {
-        // Path to EJS template
-        const templatePath = path.join(
-          process.cwd(),
-          "views",
-          "invoiceTemplate.ejs"
-        );
-
-        if (!fs.existsSync(templatePath)) {
-          console.error("Invoice template missing at:", templatePath);
-          return;
-        }
-
-        // Render EJS template
-        const templateData = await ejs.renderFile(
-          templatePath,
-          { invoice },
-          { async: true }
-        );
-
-        // Reuse Puppeteer browser
-        const browser = await getBrowser();
-        const page = await browser.newPage();
-        await page.setContent(templateData, { waitUntil: "networkidle0" });
-
-        // Generate PDF
-        const pdfBuffer = await page.pdf({ format: "A4" });
-        await page.close(); // close only page, not browser
-
-        // Setup Nodemailer
-        const transporter = nodemailer.createTransport({
-          service: "gmail",
-          auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS,
-          },
-        });
-
-        // Send email
-        const mailOptions = {
-          from: `"Your Company" <${process.env.EMAIL_USER}>`,
-          to: invoice.assignTo?.email || "default@email.com",
-          subject: `Invoice #${invoice.invoicenumber || invoice._id}`,
-          text: "Please find attached your invoice.",
-          attachments: [
-            {
-              filename: `Invoice_${
-                invoice.invoicenumber || invoice._id
-              }.pdf`,
-              content: pdfBuffer,
-            },
-          ],
-        };
-
-        await transporter.sendMail(mailOptions);
-        console.log(`Invoice email sent to: ${invoice.assignTo?.email}`);
-      } catch (err) {
-        console.error("Error sending invoice email asynchronously:", err);
+      // Validate invoice ID
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ error: "Invalid invoice ID" });
       }
-    });
-  } catch (error) {
-    console.error("Error processing invoice email request:", error);
-    res.status(500).json({
-      error: "Failed to send invoice email",
-      details: error.message,
-    });
-  }
-},
+
+      // Fetch invoice with deal info
+      const invoice = await Invoice.findById(id).populate(
+        "items.deal",
+        "dealName email value stage"
+      );
+
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      // Collect client emails from deals
+      const clientEmails = invoice.items
+        .map((item) => item.deal?.email)
+        .filter((email) => !!email); // remove undefined/null
+
+      if (clientEmails.length === 0) {
+        console.error(
+          `Invoice #${
+            invoice.invoicenumber || invoice._id
+          } has no deal/client emails!`
+        );
+        return res
+          .status(400)
+          .json({ error: "No client emails found in invoice deals" });
+      }
+
+      // Respond immediately to frontend
+      res.status(200).json({ message: "Invoice email is being sent!" });
+
+      // Async email sending
+      setImmediate(async () => {
+        try {
+          const templatePath = path.join(
+            process.cwd(),
+            "views",
+            "invoiceTemplate.ejs"
+          );
+
+          if (!fs.existsSync(templatePath)) {
+            console.error("Invoice template missing at:", templatePath);
+            return;
+          }
+
+          // Render EJS template
+          const templateData = await ejs.renderFile(
+            templatePath,
+            { invoice },
+            { async: true }
+          );
+
+          // Launch or reuse browser
+          const browser = await getBrowser();
+          const page = await browser.newPage();
+          await page.setContent(templateData, { waitUntil: "networkidle0" });
+
+          // Generate PDF
+          const pdfBuffer = await page.pdf({
+            format: "A4",
+            margin: {
+              top: "20mm",
+              right: "10mm",
+              bottom: "20mm",
+              left: "10mm",
+            },
+            printBackground: true,
+          });
+
+          await page.close(); // close only page, reuse browser
+
+          // Nodemailer setup
+          const transporter = nodemailer.createTransport({
+            service: "gmail",
+            auth: {
+              user: process.env.EMAIL_USER,
+              pass: process.env.EMAIL_PASS,
+            },
+          });
+
+          // Send email to all client emails
+          for (const email of clientEmails) {
+            const mailOptions = {
+              from: `"TechZarInfo Software Solution" <${process.env.EMAIL_USER}>`,
+              to: email,
+              subject: `Invoice #${invoice.invoicenumber || invoice._id}`,
+              text: `Hello,
+
+Please find attached your invoice #${invoice.invoicenumber || invoice._id}.
+
+Included deals:
+${invoice.items
+  .map((item) => `- ${item.deal.dealName} ($${item.amount})`)
+  .join("\n")}
+
+Thank you!`,
+              attachments: [
+                {
+                  filename: `Invoice_${
+                    invoice.invoicenumber || invoice._id
+                  }.pdf`,
+                  content: pdfBuffer,
+                },
+              ],
+            };
+
+            await transporter.sendMail(mailOptions);
+            console.log(`✅ Invoice email sent to: ${email}`);
+          }
+        } catch (err) {
+          console.error("❌ Error sending invoice email asynchronously:", err);
+        }
+      });
+    } catch (error) {
+      console.error("❌ Error processing invoice email request:", error);
+      res.status(500).json({
+        error: "Failed to send invoice email",
+        details: error.message,
+      });
+    }
+  },
+
   getRecentInvoices: async (_req, res) => {
     try {
       const now = new Date();

@@ -1,4 +1,3 @@
-
 import dayjs from "dayjs";
 import Lead from "../models/leads.model.js";
 import userModel from "../models/user.model.js";
@@ -15,45 +14,6 @@ const computeFollowUp = (status) => {
 
 export default {
   // ➡️ Create Lead
-
-
-// createLead: async (req, res) => {
-//   console.log(req.body);
-  
-//   try {
-//     const { leadName, companyName } = req.body;
-//     if (!leadName || !companyName) {
-//       return res
-//         .status(400)
-//         .json({ message: "Lead name and company name are required" });
-//     }
-
-//     const data = { ...req.body };
-
-//     // Handle file uploads
-//     if (req.files?.length > 0) {
-//       data.attachments = req.files.map((file) => ({
-//         name: file.originalname,
-//         path: `/uploads/leads/${file.filename}`, // ✅ Correct path
-//         type: file.mimetype,
-//         size: file.size,
-//         uploadedAt: new Date(),
-//       }));
-//     }
-
-//     // Sales users can only assign to themselves
-//     if (req.user.role.name !== "Admin") {
-//       data.assignTo = req.user._id;
-//     }
-
-//     const lead = new Lead(data);
-//     const savedLead = await lead.save();
-
-//     res.status(201).json({ message: "Lead created successfully", lead: savedLead });
-//   } catch (error) {
-//     res.status(400).json({ message: error.message });
-//   }
-// },
 
   createLead: async (req, res) => {
     try {
@@ -85,7 +45,9 @@ export default {
       const lead = new Lead(data);
       const savedLead = await lead.save();
 
-      res.status(201).json({ message: "Lead created successfully", lead: savedLead });
+      res
+        .status(201)
+        .json({ message: "Lead created successfully", lead: savedLead });
     } catch (error) {
       res.status(400).json({ message: error.message });
     }
@@ -123,85 +85,7 @@ export default {
     }
   },
 
-  // ➡️ Update Lead
-//   updateLead: async (req, res) => {
-//     try {
-//       const before = await Lead.findById(req.params.id).select(
-//         "status assignTo leadName followUpDate attachments"
-//       );
-//       if (!before) return res.status(404).json({ message: "Lead not found" });
-
-//       const patch = { ...req.body };
-
-//       // Handle existing + new attachments
-//       let existingAttachments = [];
-//       if (req.body.existingAttachments) {
-//         try {
-//           existingAttachments = JSON.parse(req.body.existingAttachments);
-//         } catch {
-//           existingAttachments = [];
-//         }
-//       }
-
-//       let newFiles = [];
-// if (req.files && req.files.length > 0) {
-//   newFiles = req.files.map((file) => ({
-//     name: file.originalname,
-//     path: `/uploads/${file.filename}`,
-//     type: file.mimetype,
-//     uploadedAt: new Date(),
-//   }));
-// }
-// patch.attachments = [...existingAttachments, ...newFiles];
-
-
-//       // Recompute followUpDate if status changes
-//       if (patch.status && patch.status !== before.status) {
-//         const computed = computeFollowUp(patch.status);
-//         patch.followUpDate = computed || null;
-//         patch.lastReminderAt = null;
-//       }
-
-//       const updated = await Lead.findByIdAndUpdate(req.params.id, patch, {
-//         new: true,
-//       }).populate("assignTo", "firstName lastName email");
-
-//       // Notify if converted
-//       if (before.status !== "Converted" && updated.status === "Converted") {
-//         const userId = updated.assignTo?._id?.toString();
-//         const fullName = `${updated.assignTo?.firstName || ""} ${
-//           updated.assignTo?.lastName || ""
-//         }`.trim();
-
-//         if (userId) {
-//           notifyUser(userId, "deal:converted", {
-//             leadId: updated._id,
-//             leadName: updated.leadName,
-//             when: new Date(),
-//           });
-//         }
-
-//         if (updated.assignTo?.email) {
-//           await sendEmail({
-//             to: updated.assignTo.email,
-//             subject: `🎉 Deal Converted: ${updated.leadName}`,
-//             text: `Deal converted for lead ${updated.leadName}. Congrats, ${fullName}!`,
-//           });
-//         }
-//       }
-
-//       // res.status(200).json(updated);
-//   res.status(200).json({
-//   message: "Lead updated successfully",
-//   lead: updated
-// });
-
-//     } catch (error) {
-//       res.status(400).json({ message: error.message });
-//     }
-//   },
-
-    // Update Lead
+  // Update Lead
   updateLead: async (req, res) => {
     try {
       const before = await Lead.findById(req.params.id).select(
@@ -231,7 +115,7 @@ export default {
           uploadedAt: new Date(),
         }));
       }
-      
+
       patch.attachments = [...existingAttachments, ...newFiles];
 
       // Recompute followUpDate if status changes
@@ -269,15 +153,15 @@ export default {
         }
       }
 
-      res.status(200).json({ 
-        message: "Lead updated successfully", 
-        lead: updated 
+      res.status(200).json({
+        message: "Lead updated successfully",
+        lead: updated,
       });
     } catch (error) {
       res.status(400).json({ message: error.message });
     }
   },
-  
+
   // ➡️ Delete Lead
   deleteLead: async (req, res) => {
     try {
@@ -312,74 +196,72 @@ export default {
   },
 
   // ➡️ Convert Lead to Deal
-
 convertLeadToDeal: async (req, res) => {
-    try {
-      const lead = await Lead.findById(req.params.id).populate("assignTo");
-      if (!lead) return res.status(404).json({ message: "Lead not found" });
-      if (lead.status === "Converted") {
-        return res.status(400).json({ message: "Lead already converted" });
-      }
-
-      const { value, notes } = req.body;
-
-      // Save follow-up fields
-      const followUpDate = lead.followUpDate;
-      const reminderSentAt = lead.lastReminderAt;
-      const followUpStatus = lead.followUpStatus || "Pending";
-      const followUpFrequencyDays = lead.followUpFrequencyDays || null;
-
-      // Create deal first
-      const deal = new Deal({
-        leadId: lead._id,
-        dealName: lead.leadName,
-        assignedTo: lead.assignTo?._id,
-        value,
-        notes,
-        stage: "Qualification",
-        email: lead.email || "", // store email from lead
-        phoneNumber: lead.phoneNumber,
-        source: lead.source,
-        companyName: lead.companyName,
-        industry: lead.industry,
-        requirement: lead.requirement,
-        country: lead.country,
-        address: lead.address,
-        attachments: lead.attachments,
-        followUpDate,
-        reminderSentAt,
-        followUpStatus,
-        followUpFrequencyDays,
-      });
-      await deal.save();
-
-      // ❌ Remove the lead instead of keeping it as Converted
-      await Lead.findByIdAndDelete(req.params.id);
-
-      // Notify & email assignee
-      const userId = lead.assignTo?._id?.toString();
-      if (userId) {
-        notifyUser(userId, "deal:created", {
-          dealId: deal._id,
-          dealName: deal.dealName,
-        });
-      }
-
-      if (lead.assignTo?.email) {
-        await sendEmail({
-          to: lead.assignTo.email,
-          subject: `New Deal Created: ${deal.dealName}`,
-          text: `Deal created for lead ${lead.leadName}. Stage: Qualification`,
-        });
-      }
-
-      res.status(200).json({ message: "Lead converted to deal", deal });
-    } catch (error) {
-      console.error("Error converting lead to deal:", error);
-      res.status(500).json({ message: error.message });
+  try {
+    const lead = await Lead.findById(req.params.id).populate("assignTo");
+    if (!lead) return res.status(404).json({ message: "Lead not found" });
+    if (lead.status === "Converted") {
+      return res.status(400).json({ message: "Lead already converted" });
     }
-  },
 
+    const { value, notes, currency } = req.body;
+
+    // ✅ Format value with commas
+    const formattedNumber = new Intl.NumberFormat("en-US").format(
+      Number(value || 0)
+    );
+
+    // ✅ Final formatted value (e.g. "1,524 INR")
+    const formattedValue = `${formattedNumber} ${currency}`;
+
+    // Save follow-up fields
+    const followUpDate = lead.followUpDate;
+    const reminderSentAt = lead.lastReminderAt;
+    const followUpStatus = lead.followUpStatus || "Pending";
+    const followUpFrequencyDays = lead.followUpFrequencyDays || null;
+
+    const deal = new Deal({
+      leadId: lead._id,
+      dealName: lead.leadName,
+      assignedTo: lead.assignTo?._id,
+      value: formattedValue, // ✅ "1,524 INR"
+      notes,
+      stage: "Qualification",
+      email: lead.email || "",
+      phoneNumber: lead.phoneNumber,
+      source: lead.source,
+      companyName: lead.companyName,
+      industry: lead.industry,
+      requirement: lead.requirement,
+      country: lead.country,
+      address: lead.address,
+      attachments: lead.attachments,
+      followUpDate,
+      reminderSentAt,
+      followUpStatus,
+      followUpFrequencyDays,
+    });
+
+    await deal.save();
+
+    // ❌ Remove the lead
+    await Lead.findByIdAndDelete(req.params.id);
+
+    // Notify assignee
+    const userId = lead.assignTo?._id?.toString();
+    if (userId) {
+      notifyUser(userId, "deal:created", {
+        dealId: deal._id,
+        dealName: deal.dealName,
+      });
+    }
+
+    res.status(200).json({ message: "Lead converted to deal", deal });
+  } catch (error) {
+    console.error("Error converting lead to deal:", error);
+    res.status(500).json({ message: error.message });
+  }
+},
 
 
   // ➡️ Get Recent Leads (last 5)

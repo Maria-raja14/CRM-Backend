@@ -34,70 +34,80 @@ export default {
     }
   },
 
-  createManualDeal: async (req, res) => {
-    try {
-      const {
-        dealName,
-        assignTo, // frontend sends assignTo
-        dealValue, // frontend sends dealValue
-        stage,
-        notes,
-        phoneNumber,
-        email,
-        source,
-        companyName,
-        industry,
-        requirement,
-        address,
-        country,
-      } = req.body;
+createManualDeal: async (req, res) => {
+  try {
+    const {
+      dealName,
+      assignTo,
+      dealValue,
+      currency,   // ✅ frontend is already sending this
+      stage,
+      notes,
+      phoneNumber,
+      email,
+      source,
+      companyName,
+      industry,
+      requirement,
+      address,
+      country,
+    } = req.body;
 
-      // Validation
-      if (!dealName || !phoneNumber || !companyName) {
-        return res.status(400).json({
-          message: "dealName, phoneNumber & companyName are required",
-        });
-      }
-
-      const allowedStages = [
-        "Qualification",
-        "Negotiation",
-        "Proposal Sent",
-        "Closed Won",
-        "Closed Lost",
-      ];
-
-      const dealStage =
-        stage && allowedStages.includes(stage) ? stage : "Qualification";
-
-      // Store attachments as array of paths
-      const attachments = req.files ? req.files.map((file) => file.path) : [];
-
-      // Map frontend fields to backend schema
-      const deal = new Deal({
-        dealName,
-        assignedTo: assignTo || null, // map assignTo to assignedTo
-        value: Number(dealValue) || 0, // map dealValue to value
-        stage: dealStage,
-        notes: notes || "",
-        phoneNumber,
-        email,
-        source,
-        companyName,
-        industry,
-        requirement,
-        address,
-        country,
-        attachments,
+    // Validation
+    if (!dealName || !phoneNumber || !companyName) {
+      return res.status(400).json({
+        message: "dealName, phoneNumber & companyName are required",
       });
-
-      await deal.save();
-      res.status(201).json({ message: "Manual deal created", deal });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ message: err.message });
     }
-  },
+
+    const allowedStages = [
+      "Qualification",
+      "Negotiation",
+      "Proposal Sent",
+      "Closed Won",
+      "Closed Lost",
+    ];
+
+    const dealStage =
+      stage && allowedStages.includes(stage) ? stage : "Qualification";
+
+    // ✅ Format dealValue with commas
+    let formattedValue = null;
+    if (dealValue && currency) {
+      const numericValue = Number(dealValue.toString().replace(/,/g, "")); // remove commas
+      const withCommas = new Intl.NumberFormat("en-US").format(numericValue);
+      formattedValue = `${withCommas} ${currency}`; // e.g. "1,211,111 INR"
+    }
+
+    // Store attachments
+    const attachments = req.files ? req.files.map((file) => file.path) : [];
+
+    // Save Deal
+    const deal = new Deal({
+      dealName,
+      assignedTo: assignTo || null,
+      value: formattedValue || "0", // ✅ properly formatted value
+      stage: dealStage,
+      notes: notes || "",
+      phoneNumber,
+      email,
+      source,
+      companyName,
+      industry,
+      requirement,
+      address,
+      country,
+      attachments,
+    });
+
+    await deal.save();
+    res.status(201).json({ message: "Manual deal created", deal });
+  } catch (err) {
+    console.error("Error creating manual deal:", err);
+    res.status(500).json({ message: err.message });
+  }
+},
+
 
   
   getAllDeals: async (req, res) => {
@@ -266,58 +276,72 @@ export default {
     }
   },
 
-  updateDeal: async (req, res) => {
-    try {
-      const { assignedTo, stage, value, notes, followUpDate } = req.body;
+updateDeal: async (req, res) => {
+  try {
+    const { assignedTo, stage, value, notes, followUpDate } = req.body;
 
-      // Find the deal first to check permissions
-      const deal = await Deal.findById(req.params.id);
-      if (!deal) return res.status(404).json({ message: "Deal not found" });
+    // Find the deal first to check permissions
+    const deal = await Deal.findById(req.params.id);
+    if (!deal) return res.status(404).json({ message: "Deal not found" });
 
-      // Check if user has permission to update this deal
-      if (
-        req.user.role.name !== "Admin" &&
-        deal.assignedTo.toString() !== req.user._id.toString()
-      ) {
-        return res.status(403).json({
-          message: "Access denied: You can only update deals assigned to you",
-        });
-      }
-
-      // Allowed stages list
-      const allowedStages = [
-        "Qualification",
-        "Negotiation",
-        "Proposal Sent",
-        "Closed Won",
-        "Closed Lost",
-      ];
-      if (stage && !allowedStages.includes(stage)) {
-        return res.status(400).json({ message: "Invalid stage" });
-      }
-
-      // Update only editable fields
-      const updateFields = {};
-      if (assignedTo) updateFields.assignedTo = assignedTo;
-      if (stage) updateFields.stage = stage;
-      if (value !== undefined) updateFields.value = value;
-      if (notes !== undefined) updateFields.notes = notes;
-      if (followUpDate !== undefined) updateFields.followUpDate = followUpDate;
-
-      const updatedDeal = await Deal.findByIdAndUpdate(
-        req.params.id,
-        updateFields,
-        { new: true }
-      ).populate("assignedTo", "firstName lastName email");
-
-   
-      res
-        .status(200)
-        .json({ message: "Deal updated successfully", deal: updatedDeal });
-    } catch (err) {
-      res.status(500).json({ message: err.message });
+    // Check if user has permission to update this deal
+    if (
+      req.user.role.name !== "Admin" &&
+      deal.assignedTo.toString() !== req.user._id.toString()
+    ) {
+      return res.status(403).json({
+        message: "Access denied: You can only update deals assigned to you",
+      });
     }
-  },
+
+    // Allowed stages list
+    const allowedStages = [
+      "Qualification",
+      "Negotiation",
+      "Proposal Sent",
+      "Closed Won",
+      "Closed Lost",
+    ];
+    if (stage && !allowedStages.includes(stage)) {
+      return res.status(400).json({ message: "Invalid stage" });
+    }
+
+    // Prepare update fields
+    const updateFields = {};
+    if (assignedTo) updateFields.assignedTo = assignedTo;
+    if (stage) updateFields.stage = stage;
+    if (notes !== undefined) updateFields.notes = notes;
+    if (followUpDate !== undefined) updateFields.followUpDate = followUpDate;
+
+    // Handle value formatting
+    if (value !== undefined && value !== null) {
+      const numericValue = Number(value.toString().replace(/,/g, ""));
+      if (!isNaN(numericValue)) {
+        // Use existing currency if present, otherwise default to INR
+        const currency = deal.value?.split(" ")[1] || "INR";
+        const formattedValue = `${new Intl.NumberFormat("en-IN").format(
+          numericValue
+        )} ${currency}`;
+        updateFields.value = formattedValue;
+      } else {
+        updateFields.value = value; // fallback
+      }
+    }
+
+    const updatedDeal = await Deal.findByIdAndUpdate(
+      req.params.id,
+      updateFields,
+      { new: true }
+    ).populate("assignedTo", "firstName lastName email");
+
+    res
+      .status(200)
+      .json({ message: "Deal updated successfully", deal: updatedDeal });
+  } catch (err) {
+    console.error("Update deal error:", err);
+    res.status(500).json({ message: err.message });
+  }
+},
 
   deleteDeal: async (req, res) => {
     try {

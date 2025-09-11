@@ -126,7 +126,7 @@ import Role from "../models/role.model.js";
 
 dayjs.extend(utc);
 
-const SHOULD_REMIND_EVERY_MINUTES = 120;
+const SHOULD_REMIND_EVERY_MINUTES = 1440;
 
 // ✅ Get all admin IDs
 const getAdminUserIds = async () => {
