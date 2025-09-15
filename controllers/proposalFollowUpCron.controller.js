@@ -54,12 +54,12 @@ export function startProposalFollowUpCron() {
         // });
 
         // 🔔 Send in-app notification (to admins or proposal owner)
-        await sendNotification(
-          proposal.deal, // or proposal.userId (depends on your schema)
-          `Follow-up due for proposal: ${proposal.title}`,
-          "followup",
-          { proposalId: proposal._id }
-        );
+        // await sendNotification(
+        //   proposal.deal, // or proposal.userId (depends on your schema)
+        //   `Follow-up due for proposal: ${proposal.title}`,
+        //   "followup",
+        //   { proposalId: proposal._id }
+        // );
 
         // Update last reminder timestamp
         proposal.lastReminderAt = new Date();

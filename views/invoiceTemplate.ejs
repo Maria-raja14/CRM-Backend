@@ -17,37 +17,41 @@
         padding: 30px;
         background: #fff;
       }
-      header {
-        border-bottom: 2px solid #000;
-        padding-bottom: 10px;
-        margin-bottom: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-      }
 
+      /* Logo */
       .logo {
-        width: 300px; /* logo size increased from 150px to 200px */
-        height: auto;
+        display: block;
+        margin: 0 auto 20px auto;
+        width: 280px; /* bigger logo */
       }
 
-      .company-info {
-        font-size: 12px;
-        text-align: right;
-        line-height: 1.4;
-      }
-      .details {
+      /* Info section */
+      .info-section {
+        display: flex;
+        justify-content: space-between;
         margin-top: 10px;
+      }
+      .info-box {
+        width: 48%;
+        font-size: 12px;
+        line-height: 1.6;
+      }
+      .info-box strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      /* Invoice details */
+      .invoice-details {
+        margin-top: 20px;
         font-size: 12px;
       }
+
+      /* Table */
       table {
         width: 100%;
         border-collapse: collapse;
-        margin-top: 15px;
-      }
-      th {
-        background: #f0f0f0;
-        font-weight: bold;
+        margin-top: 20px;
       }
       table,
       th,
@@ -59,40 +63,63 @@
         padding: 8px;
         text-align: left;
       }
+      th {
+        font-weight: bold;
+      }
       .right {
         text-align: right;
       }
+
+      /* Totals */
       .totals {
-        margin-top: 15px;
-        text-align: right;
+        margin-top: 20px;
+        width: 100%;
+        display: flex;
+        justify-content: flex-end;
+      }
+      .totals-table {
+        width: 320px;
+        border-collapse: collapse;
         font-size: 12px;
       }
-      .totals p {
-        margin: 3px 0;
+      .totals-table td {
+        padding: 6px;
+        border: none;
       }
+      .totals-table tr td:first-child {
+        text-align: left;
+      }
+      .totals-table tr td:last-child {
+        text-align: right;
+      }
+      .totals-table tr.total-row td {
+        font-weight: bold;
+        border-top: 1px solid #000;
+        padding-top: 8px;
+      }
+
       .footer {
-        border-top: 1px solid #ccc;
         font-size: 10px;
         text-align: center;
-        margin-top: 25px;
-        padding-top: 5px;
+        margin-top: 30px;
         color: gray;
       }
     </style>
   </head>
   <body>
     <div class="invoice-box">
-      <!-- Header -->
-      <header>
-        <div>
-          <img
-            src="https://crm.stagingzar.com/images/TZI_Logo-04_-_Copy-removebg-preview.png"
-            alt="TZI Logo"
-            class="logo"
-          />
-        </div>
-        <div class="company-info">
-          <strong>TechZarInfo Software Solutions Pvt Ltd</strong><br />
+      <!-- Logo -->
+      <img
+        src="https://crm.stagingzar.com/images/TZI_Logo-04_-_Copy-removebg-preview.png"
+        alt="TZI Logo"
+        class="logo"
+      />
+
+      <!-- Info -->
+      <div class="info-section">
+        <!-- Company Info (left) -->
+        <div class="info-box">
+          <strong>TechZarInfo Software Solutions Pvt Ltd</strong>
           No.2D, M.S Tower, 4th Floor, Convent Rd, Cantonment,<br />
           Tiruchirappalli, Tamil Nadu 620001<br />
           Email: accounts@techzarinfo.com<br />
@@ -100,35 +127,39 @@
           GSTIN: 33AAJCT1568Q1ZP<br />
           PAN: AAJCT1568Q
         </div>
-      </header>
 
-      <!-- Invoice Info -->
-      <div class="details">
-        <p>
-          <strong>Invoice Date:</strong> <%= new
-          Date(invoice.createdAt).toLocaleDateString() %>
-        </p>
-        <p><strong>Invoice Number:</strong> <%= invoice.invoicenumber %></p>
-        <p>
-          <strong>Client:</strong> <%= invoice.assignTo ?
-          invoice.assignTo.firstName + ' ' + invoice.assignTo.lastName : '' %>
-        </p>
+        <!-- Client Info (right) -->
+        <div class="info-box" style="text-align: right">
+          <strong>Bill To:</strong>
+          <%= invoice.items[0]?.deal?.companyName || invoice.items[0]?.deal?.dealName || "Client" %><br />
+          <%= invoice.items[0]?.deal?.address || "" %><br />
+          <%= invoice.items[0]?.deal?.country || "" %><br />
+          Email: <%= invoice.items[0]?.deal?.email || "" %><br />
+          Phone: <%= invoice.items[0]?.deal?.phoneNumber || "" %>
+        </div>
+      </div>
+
+      <!-- Invoice Details -->
+      <div class="invoice-details">
+        <strong>Invoice Date:</strong>
+        <%= new Date(invoice.createdAt).toLocaleDateString() %><br />
+        <strong>Invoice Number:</strong> <%= invoice.invoicenumber %>
       </div>
 
       <!-- Table -->
       <table>
         <thead>
           <tr>
-            <th>Project Description</th>
+            <th>Client Name</th>
             <th>HSN/SAC Code</th>
             <th>Total Effort (Days)</th>
-            <th class="right">Amount (USD)</th>
+            <th class="right">Amount (<%= invoice.currency || "USD" %>)</th>
           </tr>
         </thead>
         <tbody>
           <% invoice.items.forEach(item => { %>
           <tr>
-            <td><%= item.deal?.dealName || '' %></td>
+            <td><%= item.deal?.dealName || "" %></td>
             <td>998314</td>
             <td>30</td>
             <td class="right"><%= Number(item.amount).toFixed(2) %></td>
@@ -139,9 +170,53 @@
 
       <!-- Totals -->
       <div class="totals">
-        <p><strong>Total Cost:</strong> USD <%= invoice.total %></p>
-        <p><strong>Amount Received:</strong> USD 0.00</p>
-        <p><strong>Balance Amount:</strong> USD <%= invoice.total %></p>
+        <table class="totals-table">
+          <tr>
+            <td>Subtotal</td>
+            <td><%= invoice.currency %> <%= Number(invoice.subtotal).toFixed(2) %></td>
+          </tr>
+
+          <% 
+            let taxAmount = 0; 
+            let discountAmount = 0; 
+            let finalTotal = Number(invoice.subtotal); 
+
+            // Apply Tax only if currency = INR
+            if(invoice.currency === "INR" && invoice.taxValue > 0) {
+              if(invoice.taxType === "percentage") {
+                taxAmount = (invoice.subtotal * invoice.taxValue) / 100;
+              } else {
+                taxAmount = invoice.taxValue;
+              }
+              finalTotal += taxAmount;
+          %>
+          <tr>
+            <td>Tax (<%= invoice.taxType === "percentage" ? invoice.taxValue + "%" : invoice.taxValue %>)</td>
+            <td><%= invoice.currency %> <%= taxAmount.toFixed(2) %></td>
+          </tr>
+          <% } %>
+
+          <% 
+            // Apply Discount always
+            if(invoice.discountValue > 0) {
+              if(invoice.discountType === "percentage") {
+                discountAmount = (finalTotal * invoice.discountValue) / 100;
+              } else {
+                discountAmount = invoice.discountValue;
+              }
+              finalTotal -= discountAmount;
+          %>
+          <tr>
+            <td>Discount (<%= invoice.discountType === "percentage" ? invoice.discountValue + "%" : invoice.discountValue %>)</td>
+            <td>- <%= invoice.currency %> <%= discountAmount.toFixed(2) %></td>
+          </tr>
+          <% } %>
+
+          <tr class="total-row">
+            <td>Total</td>
+            <td><%= invoice.currency %> <%= finalTotal.toFixed(2) %></td>
+          </tr>
+        </table>
       </div>
 
       <!-- Footer -->
