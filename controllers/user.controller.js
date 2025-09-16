@@ -192,10 +192,12 @@ loginUser: async (req, res) => {
       _id: user._id,
       name: `${user.firstName} ${user.lastName}`,
       email: user.email,
+       profileImage: user.profileImage, // Add this line
       role: {
         _id: user.role._id,
         name: user.role.name,
-        permissions: user.role.permissions
+        permissions: user.role.permissions,
+         profileImage: user.profileImage // Add this line
       }, // Send the full role object with name and permissions
       token: generateToken(user._id),
     });
