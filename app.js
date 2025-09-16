@@ -4,6 +4,7 @@
 // import path from "path";
 // import { fileURLToPath } from "url";
 // import http from "http";
+// import fs from "fs"; // Added missing import
 
 // import connectDB from "./config/db.js";
 // import routes from "./routes/index.routes.js";
@@ -40,7 +41,7 @@
 
 //     // Security check: Ensure the file path is within your uploads directory
 //     const fullPath = path.join(__dirname, filePath);
-//     const uploadsDir = path.join(__dirname, 'uploads');
+//     const uploadsDir = path.join(__dirname, "uploads");
 
 //     if (!fullPath.startsWith(uploadsDir)) {
 //       return res.status(403).json({ message: "Access denied" });
@@ -51,8 +52,8 @@
 //     }
 
 //     const fileName = path.basename(fullPath);
-//     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-//     res.setHeader('Content-Type', 'application/octet-stream');
+//     res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+//     res.setHeader("Content-Type", "application/octet-stream");
 
 //     const fileStream = fs.createReadStream(fullPath);
 //     fileStream.pipe(res);
@@ -69,7 +70,7 @@
 // });
 
 // const server = http.createServer(app);
-// initSocket(server);          // Socket.IO
+// initSocket(server); // Socket.IO
 // startFollowUpCron();
 // startActivityReminderCron(); // ✅ for activities      // Cron jobs
 // startProposalFollowUpCron();
@@ -88,13 +89,15 @@
 
 // startServer();
 
+
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import http from "http";
-import fs from "fs"; // Added missing import
+import fs from "fs";
+import jwt from "jsonwebtoken";
 
 import connectDB from "./config/db.js";
 import routes from "./routes/index.routes.js";
@@ -117,11 +120,29 @@ app.use(cors());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(express.static(path.join(__dirname, "public")));
 
+// Authentication middleware
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "Not authorized, no token" });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ message: "Token is not valid" });
+    }
+    req.user = user;
+    next();
+  });
+};
+
 app.use("/api", routes);
 app.use("/api/files", fileRoutes);
 
-// Add this route for file downloads
-app.get("/api/files/download", (req, res) => {
+// Protected file download endpoint
+app.get("/api/files/download", authenticateToken, (req, res) => {
   try {
     const { filePath } = req.query;
 
