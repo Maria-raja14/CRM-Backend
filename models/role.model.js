@@ -1,41 +1,29 @@
 import mongoose from "mongoose";
 
+const permissionsSchema = new mongoose.Schema(
+  {
+    dashboard: { type: Boolean, default: false },
+    leads: { type: Boolean, default: false },
+    deals_all: { type: Boolean, default: false },
+    deals_pipeline: { type: Boolean, default: false },
+    invoices: { type: Boolean, default: false },
+    proposal: { type: Boolean, default: false },
+    activities: { type: Boolean, default: false },
+    activities_calendar: { type: Boolean, default: false },
+    activities_list: { type: Boolean, default: false },
+    users_roles: { type: Boolean, default: false },
+    admin_access: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
 const roleSchema = new mongoose.Schema(
   {
-
-    name: { type: String, required: true, unique: true },
-
-    description: { type: String },
-    permissions: {
-      dashboard: { type: Boolean, default: true },
-      leads: { type: Boolean, default: true },
-      deals: { type: Boolean, default: true },
-      deals_all: { type: Boolean, default: true },
-      deals_pipeline: { type: Boolean, default: true },
-      invoices: { type: Boolean, default: true },
-      proposal: { type: Boolean, default: true },
-      proposal_list: { type: Boolean, default: true },
-      proposal_templates: { type: Boolean, default: true },
-      activities: { type: Boolean, default: true },
-      activities_calendar: { type: Boolean, default: true },
-      activities_list: { type: Boolean, default: true },
-      expenses: { type: Boolean, default: true },
-      expenses_all: { type: Boolean, default: true },
-      expenses_area: { type: Boolean, default: true },
-      reports: { type: Boolean, default: true },
-      reports_deals: { type: Boolean, default: true },
-      reports_proposal: { type: Boolean, default: true },
-      reports_pipeline: { type: Boolean, default: true },
-      reports_payment: { type: Boolean, default: true },
-      admin_access: { type: Boolean, default: true },
-    },
-
+    name: { type: String, required: true, unique: true, trim: true },
+    description: { type: String, trim: true },
+    permissions: { type: permissionsSchema, default: () => ({}) },
   },
   { timestamps: true }
 );
 
-// ✅ Prevent OverwriteModelError
 export default mongoose.models.Role || mongoose.model("Role", roleSchema);
-
-
-
