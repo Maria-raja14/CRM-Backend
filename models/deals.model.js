@@ -9,7 +9,13 @@
 
 //   stage: {
 //     type: String,
-//     enum: ["Qualification", "Negotiation", "Proposal Sent", "Closed Won", "Closed Lost"],
+//     enum: [
+//       "Qualification",
+//       "Negotiation",
+//       "Proposal Sent",
+//       "Closed Won",
+//       "Closed Lost",
+//     ],
 //     default: "Qualification",
 //   },
 
@@ -91,3 +97,6 @@ dealSchema.pre("save", function (next) {
 
 const Deal = mongoose.model("Deal", dealSchema);
 export default Deal; //ori
+
+
+

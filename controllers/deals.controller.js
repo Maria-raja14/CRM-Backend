@@ -113,7 +113,9 @@ createManualDeal: async (req, res) => {
     console.error("Error creating manual deal:", err);
     res.status(500).json({ message: err.message });
   }
-},
+  },//org
+  
+
   
   getAllDeals: async (req, res) => {
     try {
@@ -400,7 +402,7 @@ updateDeal: async (req, res) => {
     console.error("Update deal error:", err);
     res.status(500).json({ message: err.message });
   }
-},
+},//org
 
 
 
@@ -455,4 +457,10 @@ updateDeal: async (req, res) => {
       res.status(500).json({ message: "Server error" });
     }
   },
+
+
+
+
+
+
 }; //with sales perimission
