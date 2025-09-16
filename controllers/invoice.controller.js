@@ -24,10 +24,19 @@ const getBrowser = async () => {
 };
 
 export default {
-  // ✅ Create Invoice
   createInvoice: async (req, res) => {
     try {
-      let { items, tax = 0, discount = 0, ...rest } = req.body;
+      let {
+        items,
+        tax = 0, // tax percentage or fixed
+        taxType = "percentage",
+        discountValue = 0, // discount percentage or fixed
+        discountType = "percentage",
+        currency = "USD",
+        ...rest
+      } = req.body;
+
+      console.log("Incoming request body:", req.body);
 
       if (!items || items.length === 0) {
         return res
@@ -35,51 +44,72 @@ export default {
           .json({ error: "Invoice must contain at least one item" });
       }
 
-      // Ensure numeric values and calculate amount
+      // Ensure numeric values and calculate item amounts
       items = items.map((item) => {
-        const price = Number(item.price) || 0;
+        const price = Number(item.price.toString().replace(/,/g, "")) || 0;
         const quantity = Number(item.quantity) || 1;
         const amount = price * quantity;
-        return {
-          ...item,
-          amount: amount.toFixed(2), // store as string if you want, or Number(amount)
-        };
+        return { ...item, amount: Number(amount.toFixed(2)) };
       });
 
-      const subtotal = items.reduce(
-        (sum, item) => sum + Number(item.amount),
-        0
-      );
+      // Calculate subtotal
+      let subtotal = items.reduce((sum, item) => sum + item.amount, 0);
 
-      // Ensure tax and discount are numbers
-      const taxValue = Number(tax) || 0; // e.g., 5 for 5%
-      const discountValue = Number(discount) || 0;
+      // Calculate discount amount
+      let discountAmount = 0;
+      if (discountType === "percentage") {
+        discountAmount = (subtotal * Number(discountValue)) / 100;
+      } else if (discountType === "fixed") {
+        discountAmount = Number(discountValue);
+      }
 
-      // Apply discount first
-      const discountedSubtotal = subtotal - discountValue;
+      // Amount after discount
+      let taxableAmount = subtotal - discountAmount;
 
-      // Apply tax (% of discounted subtotal)
-      const taxAmount = (discountedSubtotal * taxValue) / 100;
+      // Calculate tax amount
+      let taxAmount = 0;
+      if (taxType === "percentage") {
+        taxAmount = (taxableAmount * Number(tax)) / 100;
+      } else if (taxType === "fixed") {
+        taxAmount = Number(tax);
+      }
 
-      const total = discountedSubtotal + taxAmount;
+      // Final total
+      let total = taxableAmount + taxAmount;
 
+      // Save invoice
       const invoice = new Invoice({
         ...rest,
         items,
-        tax: taxValue,
-        discount: discountValue,
-        subtotal,
+        subtotal: Number(subtotal.toFixed(2)),
+        discountType,
+        discountValue: Number(discountValue), // percentage/fixed
+        discount: Number(discountAmount.toFixed(2)), // actual discount amount
+        taxType,
+        taxValue: Number(tax), // percentage/fixed
+        tax: Number(taxAmount.toFixed(2)), // actual tax amount
         total: Number(total.toFixed(2)),
+        currency,
       });
 
       await invoice.save();
 
-      // Populate before returning
       const populatedInvoice = await Invoice.findById(invoice._id)
         .populate("assignTo", "firstName lastName email")
         .populate("items.deal", "dealName requirement value stage");
 
-      res.status(201).json(populatedInvoice);
+      // Format for frontend
+      const formatCurrency = (val) =>
+        `${new Intl.NumberFormat("en-US").format(val)} ${currency}`;
+      const formattedInvoice = {
+        ...populatedInvoice.toObject(),
+        subtotal: formatCurrency(populatedInvoice.subtotal),
+        discount: formatCurrency(populatedInvoice.discount),
+        tax: formatCurrency(populatedInvoice.tax),
+        total: formatCurrency(populatedInvoice.total),
+      };
+
+      res.status(201).json(formattedInvoice);
     } catch (error) {
       console.error("Error creating invoice:", error);
       res.status(400).json({ error: error.message });
@@ -91,7 +121,7 @@ export default {
     try {
       const invoice = await Invoice.findById(req.params.id)
         .populate("assignTo", "firstName lastName email")
-        .populate("items.deal", "dealName value stage");
+        .populate("items.deal", "dealName value stage companyName");
 
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
@@ -198,7 +228,10 @@ export default {
 
       const invoice = await Invoice.findById(invoiceId)
         .populate("assignTo", "firstName lastName email")
-        .populate("items.deal", "dealName value stage email");
+        .populate(
+          "items.deal",
+          "dealName value stage email companyName address country phoneNumber"
+        );
 
       if (!invoice) {
         return res.status(404).json({ error: "Invoice not found" });
@@ -244,11 +277,11 @@ export default {
       await browser.close();
 
       // ✅ Optional: Save temporarily to check PDF
-      const tempPath = path.join(
-        process.cwd(),
-        `Invoice_${invoice.invoicenumber || invoice._id}.pdf`
-      );
-      fs.writeFileSync(tempPath, pdfBuffer);
+      // const tempPath = path.join(
+      //   process.cwd(),
+      //   `Invoice_${invoice.invoicenumber || invoice._id}.pdf`
+      // );
+      // fs.writeFileSync(tempPath, pdfBuffer);
 
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader(
