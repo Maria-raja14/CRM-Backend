@@ -1,5 +1,3 @@
-
-
 import mongoose from "mongoose";
 
 const ProposalSchema = new mongoose.Schema(
@@ -15,8 +13,9 @@ const ProposalSchema = new mongoose.Schema(
     cc: { type: String },
     content: { type: String, required: false, default: "" },
     image: { type: String },
-     value: { type: Number }, // optional: deal value
-     companyName: { type: String },
+    value: { type: String, required: true },
+    // currency: { type: String, required: true },
+    companyName: { type: String },
     status: {
       type: String,
       enum: ["draft", "sent", "no reply", "rejection", "success"],
@@ -27,7 +26,7 @@ const ProposalSchema = new mongoose.Schema(
     followUpComment: { type: String, default: "" }, // 📝 comment
 
     lastReminderAt: { type: Date }, // avoid duplicate reminders
-     attachments: [
+    attachments: [
       {
         filename: String,
         path: String, // file path if you store in disk

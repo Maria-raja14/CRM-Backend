@@ -26,17 +26,24 @@ const getBrowser = async () => {
 export default {
   createInvoice: async (req, res) => {
     try {
+      // ✅ Only Admin can create invoice
+      if (!req.user || !req.user.role || req.user.role.name !== "Admin") {
+        return res
+          .status(403)
+          .json({ error: "Only Admin can create invoices" });
+      }
+
       let {
         items,
-        tax = 0, // tax percentage or fixed
+        tax = 0,
         taxType = "percentage",
-        discountValue = 0, // discount percentage or fixed
+        discountValue = 0,
         discountType = "percentage",
         currency = "USD",
+        assignTo, // sales user id
+        dueDate,
         ...rest
       } = req.body;
-
-      console.log("Incoming request body:", req.body);
 
       if (!items || items.length === 0) {
         return res
@@ -44,75 +51,57 @@ export default {
           .json({ error: "Invoice must contain at least one item" });
       }
 
-      // Ensure numeric values and calculate item amounts
-      items = items.map((item) => {
-        const price = Number(item.price.toString().replace(/,/g, "")) || 0;
-        const quantity = Number(item.quantity) || 1;
-        const amount = price * quantity;
-        return { ...item, amount: Number(amount.toFixed(2)) };
-      });
+      // ✅ Convert tax and discountValue to numbers
+      tax = Number(tax) || 0;
+      discountValue = Number(discountValue) || 0;
 
-      // Calculate subtotal
-      let subtotal = items.reduce((sum, item) => sum + item.amount, 0);
+      // ✅ Subtotal calculation with safety
+      let subtotal = items.reduce((acc, item) => {
+        const quantity = Number(item.quantity) || 0;
+        const unitPrice = Number(item.unitPrice) || 0;
+        return acc + quantity * unitPrice;
+      }, 0);
 
-      // Calculate discount amount
-      let discountAmount = 0;
-      if (discountType === "percentage") {
-        discountAmount = (subtotal * Number(discountValue)) / 100;
-      } else if (discountType === "fixed") {
-        discountAmount = Number(discountValue);
-      }
+      // ✅ Tax calculation
+      let taxAmount = taxType === "percentage" ? (subtotal * tax) / 100 : tax;
 
-      // Amount after discount
-      let taxableAmount = subtotal - discountAmount;
+      // ✅ Discount calculation
+      let discount =
+        discountType === "percentage"
+          ? (subtotal * discountValue) / 100
+          : discountValue;
 
-      // Calculate tax amount
-      let taxAmount = 0;
-      if (taxType === "percentage") {
-        taxAmount = (taxableAmount * Number(tax)) / 100;
-      } else if (taxType === "fixed") {
-        taxAmount = Number(tax);
-      }
+      // ✅ Total calculation
+      let total = subtotal + taxAmount - discount;
+      if (total < 0) total = 0;
 
-      // Final total
-      let total = taxableAmount + taxAmount;
-
-      // Save invoice
-      const invoice = new Invoice({
-        ...rest,
+      // ✅ Create invoice document
+      const newInvoice = new Invoice({
         items,
-        subtotal: Number(subtotal.toFixed(2)),
-        discountType,
-        discountValue: Number(discountValue), // percentage/fixed
-        discount: Number(discountAmount.toFixed(2)), // actual discount amount
+        subtotal,
+        tax,
         taxType,
-        taxValue: Number(tax), // percentage/fixed
-        tax: Number(taxAmount.toFixed(2)), // actual tax amount
-        total: Number(total.toFixed(2)),
+        taxAmount,
+        discountValue,
+        discountType,
+        discount,
+        total,
         currency,
+        assignTo,
+        dueDate,
+        createdBy: req.user._id, // track which admin created
+        ...rest,
       });
 
-      await invoice.save();
+      await newInvoice.save();
 
-      const populatedInvoice = await Invoice.findById(invoice._id)
-        .populate("assignTo", "firstName lastName email")
-        .populate("items.deal", "dealName requirement value stage");
-
-      // Format for frontend
-      const formatCurrency = (val) =>
-        `${new Intl.NumberFormat("en-US").format(val)} ${currency}`;
-      const formattedInvoice = {
-        ...populatedInvoice.toObject(),
-        subtotal: formatCurrency(populatedInvoice.subtotal),
-        discount: formatCurrency(populatedInvoice.discount),
-        tax: formatCurrency(populatedInvoice.tax),
-        total: formatCurrency(populatedInvoice.total),
-      };
-
-      res.status(201).json(formattedInvoice);
+      res.status(201).json({
+        message: "Invoice created successfully",
+        invoice: newInvoice,
+      });
     } catch (error) {
-      console.error("Error creating invoice:", error);
-      res.status(400).json({ error: error.message });
+      console.error("❌ Error creating invoice:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
     }
   },
 
@@ -135,27 +124,52 @@ export default {
   // ✅ Get All Invoices with Pagination
   getAllInvoices: async (req, res) => {
     try {
-      let { page = 1, limit = 10 } = req.query;
-      page = Number(page);
-      limit = Number(limit);
+      if (!req.user) {
+        return res.status(401).json({ error: "Unauthorized: No user found" });
+      }
 
-      const totalCount = await Invoice.countDocuments();
-      const invoices = await Invoice.find()
+      let invoicesQuery;
+
+      if (req.user.role?.name === "Admin") {
+        // Admin → all invoices
+        invoicesQuery = Invoice.find();
+      } else if (req.user.role?.name === "Sales") {
+        // Sales → only invoices assigned to them
+        invoicesQuery = Invoice.find({ assignTo: req.user._id });
+      } else {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const invoices = await invoicesQuery
         .populate("assignTo", "firstName lastName email")
-        .populate("items.deal", "dealName value stage")
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit);
+        .populate("items.deal", "dealName value stage") // ✅ populate deal info
+        .sort({ createdAt: -1 });
 
-      res.status(200).json({ invoices, totalCount });
+      res.status(200).json(invoices);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      console.error("❌ Error fetching invoices:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
   },
 
-  // ✅ Update Invoice (fixed quantity logic)
   updateInvoice: async (req, res) => {
+    console.log(req.body);
+
     try {
+      const invoice = await Invoice.findById(req.params.id);
+
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      // Sales can only update invoices assigned to them
+      if (
+        req.user.role?.name === "Sales" &&
+        invoice.assignTo.toString() !== req.user._id.toString()
+      ) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
       let { items, tax = 0, discount = 0, ...rest } = req.body;
 
       if (items && items.length > 0) {
@@ -190,18 +204,18 @@ export default {
       const updatedInvoice = await Invoice.findByIdAndUpdate(
         req.params.id,
         rest,
-        { new: true, runValidators: true }
+        {
+          new: true,
+          runValidators: true,
+        }
       )
-        .populate("assignTo", "firstName lastName email")
+        .populate("assignTo", "firstName lastName email role")
         .populate("items.deal", "dealName value stage");
-
-      if (!updatedInvoice) {
-        return res.status(404).json({ message: "Invoice not found" });
-      }
 
       res.status(200).json(updatedInvoice);
     } catch (error) {
-      res.status(400).json({ error: error.message });
+      console.error("❌ Error updating invoice:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
   },
 
@@ -242,7 +256,6 @@ export default {
         "views",
         "invoiceTemplate.ejs"
       );
-      console.log(templatePath);
 
       if (!fs.existsSync(templatePath)) {
         console.error("Invoice template missing at:", templatePath);
@@ -275,13 +288,6 @@ export default {
       });
 
       await browser.close();
-
-      // ✅ Optional: Save temporarily to check PDF
-      // const tempPath = path.join(
-      //   process.cwd(),
-      //   `Invoice_${invoice.invoicenumber || invoice._id}.pdf`
-      // );
-      // fs.writeFileSync(tempPath, pdfBuffer);
 
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader(

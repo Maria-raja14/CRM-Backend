@@ -32,7 +32,7 @@ export const protect = async (req, res, next) => {
 };
 
 export const adminOnly = (req, res, next) => {
-  if (req.user.role.name !== "Admin") {
+  if (req.user.role.name !== "Admin" && req.user.role.name !== "Sales") {
     return res.status(403).json({ message: "Access denied: Admins only" });
   }
   next();
@@ -92,6 +92,12 @@ export const adminOrAssignedToDeal = async (req, res, next) => {
 };
 
 // Middleware to check if user is admin or sales
+// export const adminOrSales = (req, res, next) => {
+//   if (req.user.role.name === "Admin" || req.user.role.name === "Sales") {
+//     return next();
+//   }
+//   return res.status(403).json({ message: "Access denied: Admins or Sales only" });
+// };
 export const adminOrSales = (req, res, next) => {
   if (req.user.role.name === "Admin" || req.user.role.name === "Sales") {
     return next();
