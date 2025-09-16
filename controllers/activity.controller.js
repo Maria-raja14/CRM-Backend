@@ -5,18 +5,47 @@ import Deal from "../models/deals.model.js"; // Make sure you have this
 
 export default {
   // GET all activities
-  getActivities: async (req, res) => {
-    try {
-      const activities = await Activity.find()
-        .populate("deal", "title") // populate deal title
-        .populate("assignedTo", "firstName  lastName email"); // populate assigned user
+  // getActivities: async (req, res) => {
+  //   try {
+  //     const activities = await Activity.find()
+  //       .populate("deal", "title") // populate deal title
+  //       .populate("assignedTo", "firstName  lastName email"); // populate assigned user
 
-      res.status(200).json(activities);
-    } catch (error) {
-      console.error("Error fetching activities:", error);
-      res.status(500).json({ message: "Error fetching activities" });
+  //     res.status(200).json(activities);
+  //   } catch (error) {
+  //     console.error("Error fetching activities:", error);
+  //     res.status(500).json({ message: "Error fetching activities" });
+  //   }
+  // },
+getActivities: async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Unauthorized: No user found" });
     }
-  },
+
+    let activitiesQuery;
+
+    if (req.user.role?.name === "Admin") {
+      // Admin → all activities
+      activitiesQuery = Activity.find();
+    } else if (req.user.role?.name === "Sales") {
+      // Sales → only activities assigned to them
+      activitiesQuery = Activity.find({ assignedTo: req.user._id });
+    } else {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const activities = await activitiesQuery
+      .populate("deal", "title") // populate deal title
+      .populate("assignedTo", "firstName lastName email") // populate assigned user
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(activities);
+  } catch (error) {
+    console.error("❌ Error fetching activities:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+},
 
   // GET activity by ID
   getActivityById: async (req, res) => {
