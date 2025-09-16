@@ -13,7 +13,6 @@
 // import { startActivityReminderCron } from "./controllers/activityReminder.cron.js";
 // import { startProposalFollowUpCron } from "./controllers/proposalFollowUpCron.controller.js";
 
-
 // dotenv.config();
 
 // const __filename = fileURLToPath(import.meta.url);
@@ -29,6 +28,39 @@
 
 // app.use("/api", routes);
 // app.use("/api/files", fileRoutes);
+
+// // Add this route for file downloads
+// app.get("/api/files/download", (req, res) => {
+//   try {
+//     const { filePath } = req.query;
+
+//     if (!filePath) {
+//       return res.status(400).json({ message: "File path is required" });
+//     }
+
+//     // Security check: Ensure the file path is within your uploads directory
+//     const fullPath = path.join(__dirname, filePath);
+//     const uploadsDir = path.join(__dirname, 'uploads');
+
+//     if (!fullPath.startsWith(uploadsDir)) {
+//       return res.status(403).json({ message: "Access denied" });
+//     }
+
+//     if (!fs.existsSync(fullPath)) {
+//       return res.status(404).json({ message: "File not found" });
+//     }
+
+//     const fileName = path.basename(fullPath);
+//     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+//     res.setHeader('Content-Type', 'application/octet-stream');
+
+//     const fileStream = fs.createReadStream(fullPath);
+//     fileStream.pipe(res);
+//   } catch (error) {
+//     console.error("File download error:", error);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// });
 
 // app.use((req, res) => res.status(404).json({ message: "Route not found" }));
 // app.use((err, _req, res, _next) => {
@@ -56,13 +88,13 @@
 
 // startServer();
 
-
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import http from "http";
+import fs from "fs"; // Added missing import
 
 import connectDB from "./config/db.js";
 import routes from "./routes/index.routes.js";
@@ -92,15 +124,15 @@ app.use("/api/files", fileRoutes);
 app.get("/api/files/download", (req, res) => {
   try {
     const { filePath } = req.query;
-    
+
     if (!filePath) {
       return res.status(400).json({ message: "File path is required" });
     }
 
     // Security check: Ensure the file path is within your uploads directory
     const fullPath = path.join(__dirname, filePath);
-    const uploadsDir = path.join(__dirname, 'uploads');
-    
+    const uploadsDir = path.join(__dirname, "uploads");
+
     if (!fullPath.startsWith(uploadsDir)) {
       return res.status(403).json({ message: "Access denied" });
     }
@@ -110,9 +142,9 @@ app.get("/api/files/download", (req, res) => {
     }
 
     const fileName = path.basename(fullPath);
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    res.setHeader('Content-Type', 'application/octet-stream');
-    
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.setHeader("Content-Type", "application/octet-stream");
+
     const fileStream = fs.createReadStream(fullPath);
     fileStream.pipe(res);
   } catch (error) {
@@ -128,8 +160,8 @@ app.use((err, _req, res, _next) => {
 });
 
 const server = http.createServer(app);
-initSocket(server);          // Socket.IO
-startFollowUpCron();   
+initSocket(server); // Socket.IO
+startFollowUpCron();
 startActivityReminderCron(); // ✅ for activities      // Cron jobs
 startProposalFollowUpCron();
 
@@ -145,4 +177,4 @@ const startServer = async () => {
   }
 };
 
-startServer();  
+startServer();
