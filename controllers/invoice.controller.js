@@ -163,12 +163,12 @@ export default {
       }
 
       // Sales can only update invoices assigned to them
-      if (
-        req.user.role?.name === "Sales" &&
-        invoice.assignTo.toString() !== req.user._id.toString()
-      ) {
-        return res.status(403).json({ error: "Access denied" });
-      }
+      // if (
+      //   req.user.role?.name === "Sales" &&
+      //   invoice.assignTo.toString() !== req.user._id.toString()
+      // ) {
+      //   return res.status(403).json({ error: "Access denied" });
+      // }
 
       let { items, tax = 0, discount = 0, ...rest } = req.body;
 
