@@ -60,6 +60,7 @@ const userSchema = new mongoose.Schema({
     address: { type: String },
     dateOfBirth: { type: Date },
     profileImage: { type: String },
+name: { type: String },
 
     resetPasswordToken: String,
     resetPasswordExpire: Date
