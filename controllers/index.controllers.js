@@ -9,6 +9,8 @@ import proposalController from "./proposal.controller.js";
 import dealsController from "./deals.controller.js";
 import adminDashboardController from "./adminDashboard.controller.js";
 
+
+
 export default {
   usersController,
   roleController,
@@ -17,6 +19,6 @@ export default {
   activityController,
   invoiceController,
   proposalController,
-  adminDashboardController
-
+  adminDashboardController,
+  
 };
