@@ -20,6 +20,7 @@
         enum: ["Hot", "Warm", "Cold", "Junk", "Converted"],
         default: "Cold",
       },
+      
 
       // next follow-up trigger
       followUpDate: { type: Date },

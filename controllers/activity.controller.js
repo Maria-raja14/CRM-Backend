@@ -4,19 +4,7 @@ import Deal from "../models/deals.model.js"; // Make sure you have this
 
 
 export default {
-  // GET all activities
-  // getActivities: async (req, res) => {
-  //   try {
-  //     const activities = await Activity.find()
-  //       .populate("deal", "title") // populate deal title
-  //       .populate("assignedTo", "firstName  lastName email"); // populate assigned user
 
-  //     res.status(200).json(activities);
-  //   } catch (error) {
-  //     console.error("Error fetching activities:", error);
-  //     res.status(500).json({ message: "Error fetching activities" });
-  //   }
-  // },
 getActivities: async (req, res) => {
   try {
     if (!req.user) {

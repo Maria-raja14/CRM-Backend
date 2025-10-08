@@ -4,7 +4,51 @@ import Deal from "../models/deals.model.js";
 import Invoice from "../models/invoice.model.js";
 
 export default {
-  getDashboardSummary: async (req, res) => {
+  // getDashboardSummary: async (req, res) => {
+  //   try {
+  //     const { start, end } = req.query;
+  //     let dateFilter = {};
+
+  //     if (start || end) {
+  //       dateFilter.createdAt = {};
+  //       if (start) dateFilter.createdAt.$gte = new Date(start);
+  //       if (end) {
+  //         const endDate = new Date(end);
+  //         endDate.setHours(23, 59, 59, 999);
+  //         dateFilter.createdAt.$lte = endDate;
+  //       }
+  //     }
+
+  //     const totalLeads = await Lead.countDocuments(dateFilter);
+
+  //     const totalDealsWon = await Deal.countDocuments({
+  //       stage: "Closed Won",
+  //       ...dateFilter,
+  //     });
+
+  //     const totalRevenueAgg = await Deal.aggregate([
+  //       { $match: { stage: "Closed Won", ...(dateFilter.createdAt && { createdAt: dateFilter.createdAt }) } },
+  //       { $group: { _id: null, total: { $sum: "$value" } } },
+  //     ]);
+  //     const totalRevenue = totalRevenueAgg[0]?.total || 0;
+
+  //     const pendingInvoices = await Invoice.countDocuments({
+  //       status: "unpaid",
+  //       ...(dateFilter.createdAt && { createdAt: dateFilter.createdAt }),
+  //     });
+
+  //     res.json({
+  //       totalLeads,
+  //       totalDealsWon,
+  //       totalRevenue,
+  //       pendingInvoices,
+  //     });
+  //   } catch (error) {
+  //     console.error("Dashboard summary error:", error);
+  //     res.status(500).json({ message: "Server Error" });
+  //   }
+  // },
+getDashboardSummary: async (req, res) => {
     try {
       const { start, end } = req.query;
       let dateFilter = {};
@@ -26,11 +70,21 @@ export default {
         ...dateFilter,
       });
 
-      const totalRevenueAgg = await Deal.aggregate([
-        { $match: { stage: "Closed Won", ...(dateFilter.createdAt && { createdAt: dateFilter.createdAt }) } },
-        { $group: { _id: null, total: { $sum: "$value" } } },
+      // Revenue grouped by currency
+      const revenueByCurrencyAgg = await Deal.aggregate([
+        { 
+          $match: { stage: "Closed Won", ...(dateFilter.createdAt && { createdAt: dateFilter.createdAt }) } 
+        },
+        { 
+          $group: { _id: "$currency", totalRevenue: { $sum: "$value" } } 
+        },
       ]);
-      const totalRevenue = totalRevenueAgg[0]?.total || 0;
+
+      // Convert to object like { USD: 1000, AED: 500, JPY: 2000 }
+      const revenueByCurrency = {};
+      revenueByCurrencyAgg.forEach(item => {
+        revenueByCurrency[item._id] = item.totalRevenue;
+      });
 
       const pendingInvoices = await Invoice.countDocuments({
         status: "unpaid",
@@ -40,7 +94,7 @@ export default {
       res.json({
         totalLeads,
         totalDealsWon,
-        totalRevenue,
+        revenueByCurrency, // <-- here
         pendingInvoices,
       });
     } catch (error) {
@@ -48,7 +102,6 @@ export default {
       res.status(500).json({ message: "Server Error" });
     }
   },
-
   getPipeline: async (req, res) => {
     try {
       const { start, end } = req.query;

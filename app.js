@@ -140,7 +140,6 @@ const authenticateToken = (req, res, next) => {
 
 app.use("/api", routes);
 app.use("/api/files", fileRoutes);
-
 // Protected file download endpoint
 app.get("/api/files/download", authenticateToken, (req, res) => {
   try {

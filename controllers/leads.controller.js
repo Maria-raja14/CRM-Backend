@@ -1,5 +1,3 @@
-
-
 import dayjs from "dayjs";
 import Lead from "../models/leads.model.js";
 import userModel from "../models/user.model.js";
@@ -17,43 +15,100 @@ const computeFollowUp = (status) => {
 export default {
   // ➡️ Create Lead
 
-  createLead: async (req, res) => {
-    try {
-      const { leadName, companyName } = req.body;
-      if (!leadName || !companyName) {
-        return res
-          .status(400)
-          .json({ message: "Lead name and company name are required" });
-      }
+  // createLead: async (req, res) => {
+  //   try {
+  //     const { leadName, companyName } = req.body;
+  //     if (!leadName || !companyName) {
+  //       return res
+  //         .status(400)
+  //         .json({ message: "Lead name and company name are required" });
+  //     }
 
-      const data = { ...req.body };
+  //     const data = { ...req.body };
 
-      // Handle file uploads
-      if (req.files?.length > 0) {
-        data.attachments = req.files.map((file) => ({
-          name: file.originalname,
-          path: `/uploads/leads/${file.filename}`,
-          type: file.mimetype,
-          size: file.size,
-          uploadedAt: new Date(),
-        }));
-      }
+  //     // Handle file uploads
+  //     if (req.files?.length > 0) {
+  //       data.attachments = req.files.map((file) => ({
+  //         name: file.originalname,
+  //         path: `/uploads/leads/${file.filename}`,
+  //         type: file.mimetype,
+  //         size: file.size,
+  //         uploadedAt: new Date(),
+  //       }));
+  //     }
 
-      // Sales users can only assign to themselves
-      if (req.user.role.name !== "Admin") {
-        data.assignTo = req.user._id;
-      }
+  //     // Sales users can only assign to themselves
+  //     if (req.user.role.name !== "Admin") {
+  //       data.assignTo = req.user._id;
+  //     }
 
-      const lead = new Lead(data);
-      const savedLead = await lead.save();
+  //     const lead = new Lead(data);
+  //     const savedLead = await lead.save();
 
-      res
-        .status(201)
-        .json({ message: "Lead created successfully", lead: savedLead });
-    } catch (error) {
-      res.status(400).json({ message: error.message });
+  //     res
+  //       .status(201)
+  //       .json({ message: "Lead created successfully", lead: savedLead });
+  //   } catch (error) {
+  //     res.status(400).json({ message: error.message });
+  //   }
+  // },
+createLead: async (req, res) => {
+  try {
+    const { leadName, companyName, email, status } = req.body;
+
+    if (!leadName || !companyName || !email) {
+      return res
+        .status(400)
+        .json({ message: "Lead name, company name, and email are required" });
     }
-  },
+
+    const data = { ...req.body };
+
+    // Handle file uploads
+    if (req.files?.length > 0) {
+      data.attachments = req.files.map((file) => ({
+        name: file.originalname,
+        path: `/uploads/leads/${file.filename}`,
+        type: file.mimetype,
+        size: file.size,
+        uploadedAt: new Date(),
+      }));
+    }
+
+    // Sales users can only assign to themselves
+    if (req.user.role.name !== "Admin") {
+      data.assignTo = req.user._id;
+    }
+
+    // Compute follow-up date if status defined
+    if (data.status) {
+      const computed = computeFollowUp(data.status);
+      if (computed) data.followUpDate = computed;
+      data.lastReminderAt = null;
+    }
+
+    const lead = new Lead(data);
+    const savedLead = await lead.save();
+
+    // ✉️ Send confirmation email to the lead
+    try {
+      await sendEmail({
+        to: email,
+        subject: `Thanks for reaching out, ${leadName}!`,
+        text: `Hello ${leadName},\n\nThank you for showing interest in ${companyName}. Our team will reach out to you soon.\n\nYour inquiry has been successfully received.\n\nBest regards,\nCRM Support Team`,
+      });
+    } catch (err) {
+      console.warn("⚠️ Failed to send lead creation email:", err.message || err);
+    }
+
+    res.status(201).json({
+      message: "Lead created successfully and confirmation email sent",
+      lead: savedLead,
+    });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+},
 
   // ➡️ Get All Leads
   getLeads: async (req, res) => {
@@ -299,6 +354,60 @@ export default {
       res.status(500).json({ message: error.message });
     }
   },
+
+  updateLeadStatus: async (req, res) => {
+    try {
+      const { status } = req.body; // new status: e.g., "Hot"
+      if (!status) return res.status(400).json({ message: "Status required" });
+
+      const lead = await Lead.findById(req.params.id).populate("assignTo");
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+
+      const oldStatus = lead.status;
+      lead.status = status;
+
+      // Recompute follow-up date if needed
+      const newFollowUp = computeFollowUp(status);
+      if (newFollowUp) lead.followUpDate = newFollowUp;
+
+      // Reset last reminder if status changes
+      if (status !== oldStatus) lead.lastReminderAt = null;
+
+      await lead.save();
+
+      // Notify if converted to deal
+      if (oldStatus !== "Converted" && status === "Converted") {
+        const userId = lead.assignTo?._id?.toString();
+        const fullName = `${lead.assignTo?.firstName || ""} ${
+          lead.assignTo?.lastName || ""
+        }`.trim();
+
+        if (userId) {
+          notifyUser(userId, "deal:converted", {
+            leadId: lead._id,
+            leadName: lead.leadName,
+            when: new Date(),
+          });
+        }
+
+        if (lead.assignTo?.email) {
+          await sendEmail({
+            to: lead.assignTo.email,
+            subject: `🎉 Deal Converted: ${lead.leadName}`,
+            text: `Deal converted for lead ${lead.leadName}. Congrats, ${fullName}!`,
+          });
+        }
+      }
+
+      res.status(200).json({
+        message: "Lead status updated successfully",
+        lead,
+      });
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  },
+
 
 
   
