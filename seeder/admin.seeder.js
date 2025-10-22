@@ -1,48 +1,3 @@
-// import dotenv from "dotenv";
-// import bcrypt from "bcryptjs";
-// import connectDB from "../config/db.js";
-// import Role from "../models/role.model.js";
-// import User from "../models/user.model.js";
-
-// dotenv.config();
-
-// const seedAdmin = async () => {
-//   try {
-//     await connectDB();
-
-//     let adminRole = await Role.findOne({ name: "Admin" });
-//     if (!adminRole) {
-//       adminRole = await Role.create({ name: "Admin" });
-//       console.log(" Admin role created");
-//     }
-
-//     const existingAdmin = await User.findOne({ email: "admin@gmail.com" });
-//     if (existingAdmin) {
-//       console.log("⚠️ Admin already exists");
-//       process.exit(0);
-//     }
-
-//     const hashedPassword = await bcrypt.hash("admin123", 10);
-//     console.log("hash", hashedPassword);
-
-//     await User.create({
-//       firstName: "Super",
-//       lastName: "Admin",
-//       email: "admin@gmail.com",
-//       password: hashedPassword,
-//       role: adminRole._id,
-//     });
-
-//     console.log(" Admin user created successfully");
-//     process.exit(0);
-//   } catch (error) {
-//     console.error(" Error seeding admin:", error);
-//     process.exit(1);
-//   }
-// };
-
-// seedAdmin();
-
 
 
 
@@ -76,6 +31,7 @@ const seedAdmin = async () => {
       admin.lastName = "Admin";
       admin.role = adminRole._id;
       admin.password = "admin123"; // PLAIN — pre-save will hash
+            admin.status = "Active"; 
       await admin.save();          // triggers pre-save hook
       console.log("✅ Admin user password reset and updated");
     } else {

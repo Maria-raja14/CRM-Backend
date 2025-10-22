@@ -9,6 +9,7 @@ import proposalRoutes from "./proposal.routes.js";
 import dealsRoutes from "./deals.route.js";
 import adminDashboard from "./adminDashboard.routes.js";
 import notificationRoutes from "./notification.routes.js";
+import salesRoutes from "./salesReports.routes.js"
 
 const router = express.Router();
 
@@ -25,5 +26,7 @@ router.use("/invoice", invoice);
 router.use("/proposal", proposalRoutes);
 router.use("/dashboard", adminDashboard);
 router.use("/notification", notificationRoutes);
+router.use("/sales", salesRoutes);
+
 
 export default router;

@@ -111,7 +111,6 @@ import Role from "../models/role.model.js";
 import Notification from "../models/notification.model.js";
 import moment from "moment"; // ✅ keep only moment
 import { sendNotification } from "../services/notificationService.js";
-import { computeLeadScore } from "../utils/leadScore.js"; // ✅ compute lead score
 import sendEmail from "../services/email.js"; // ✅ make sure this exists
 
 // Avoid duplicate reminders within the same gap (in minutes)

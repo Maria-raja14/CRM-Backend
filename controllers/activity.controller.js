@@ -6,6 +6,8 @@ import Deal from "../models/deals.model.js"; // Make sure you have this
 export default {
 
 getActivities: async (req, res) => {
+  console.log("GetActivies",req.body);
+  
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Unauthorized: No user found" });

@@ -8,6 +8,7 @@ import activityController from "./activity.controller.js";
 import proposalController from "./proposal.controller.js";
 import dealsController from "./deals.controller.js";
 import adminDashboardController from "./adminDashboard.controller.js";
+import salesReportsController from "./salesReports.controller.js"
 
 
 
@@ -20,5 +21,6 @@ export default {
   invoiceController,
   proposalController,
   adminDashboardController,
+  salesReportsController
   
 };

@@ -61,7 +61,12 @@ const userSchema = new mongoose.Schema({
     dateOfBirth: { type: Date },
     profileImage: { type: String },
 name: { type: String },
-
+  loginHistory: [
+      {
+        login: { type: Date },
+        logout: { type: Date },
+      }
+    ],
     resetPasswordToken: String,
     resetPasswordExpire: Date
 }, { timestamps: true });
@@ -90,3 +95,5 @@ userSchema.methods.getResetPasswordToken = function () {
 };
 
 export default mongoose.model("User", userSchema);
+
+

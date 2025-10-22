@@ -174,8 +174,9 @@ deleteUser: async (req, res) => {
     }
   },
 
-  
 
+
+// ✅ FIXED loginUser
 loginUser: async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -187,24 +188,53 @@ loginUser: async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
+    const now = new Date();
+    // ✅ Always push a new login entry (even if multiple times per day)
+    user.loginHistory.push({ login: now });
+    await user.save({ validateBeforeSave: false });
+
     res.json({
       message: "Login successful",
       _id: user._id,
       name: `${user.firstName} ${user.lastName}`,
       email: user.email,
-       profileImage: user.profileImage, // Add this line
-      role: {
-        _id: user.role._id,
-        name: user.role.name,
-        permissions: user.role.permissions,
-         profileImage: user.profileImage // Add this line
-      }, // Send the full role object with name and permissions
+      profileImage: user.profileImage,
+      role: user.role,
       token: generateToken(user._id),
     });
   } catch (err) {
+    console.error("Login error:", err);
     res.status(500).json({ message: err.message });
   }
-  },
+},
+
+
+
+// ✅ FIXED logoutUser
+logoutUser: async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const now = new Date();
+
+    // ✅ Find the latest login without logout
+    const latestEntry = [...user.loginHistory].reverse().find(e => !e.logout);
+    if (latestEntry) {
+      latestEntry.logout = now;
+      await user.save({ validateBeforeSave: false });
+    } else {
+      console.warn("⚠️ No open login session found for logout update");
+    }
+
+    res.json({ message: "Logout successful" });
+  } catch (err) {
+    console.error("Logout error:", err);
+    res.status(500).json({ message: err.message });
+  }
+},
+
+
 
   // Add this to your existing user controller
 updatePassword: async (req, res) => {
