@@ -24,12 +24,11 @@ router.get("/getLead/:id", adminOrAssigned, indexControllers.leadsController.get
 router.put("/updateLead/:id", upload.array("attachments", 5), adminOrAssigned, indexControllers.leadsController.updateLead);
 router.delete("/deleteLead/:id", adminOrAssigned, indexControllers.leadsController.deleteLead);
 
-router.patch("/:id/followup", adminOrAssigned, indexControllers.leadsController.updateFollowUpDate);
+router.patch("/:id/followup", protect, indexControllers.leadsController.updateFollowUpDate);
 router.patch("/:id/convert", adminOrAssigned, indexControllers.leadsController.convertLeadToDeal);
 router.get("/recent", indexControllers.leadsController.getRecentLeads);
 router.get("/pending", indexControllers.leadsController.getPendingLeads);
 
 router.patch("/:id/status", adminOrAssigned, indexControllers.leadsController.updateLeadStatus);
-
 export default router;
 
