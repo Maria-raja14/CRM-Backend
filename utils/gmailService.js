@@ -1,4 +1,3 @@
-
 import { google } from "googleapis";
 import dotenv from "dotenv";
 import fs from "fs/promises";
@@ -29,8 +28,6 @@ export const oauth2Client = new google.auth.OAuth2(
   CLIENT_SECRET,
   REDIRECT_URI
 );
-
- const TOKEN_PATH = path.join(__dirname, "..", "tokens.json");
 
 // Cache authentication
 let gmailClient = null;
@@ -66,26 +63,58 @@ export async function initializeGmailClient() {
   }
 
   try {
+    console.log("🔄 Initializing Gmail client...");
+    
+    // First, try to load tokens from environment variables
     const tokens = await loadTokens();
+    
     if (!tokens || !tokens.access_token) {
-      throw new Error("No Gmail tokens found. Connect Gmail first.");
+      throw new Error("No valid Gmail tokens found. Connect Gmail first.");
     }
 
-    gmailClient = google.gmail({ version: "v1", auth: oauth2Client });
+    console.log("✅ Tokens loaded, setting credentials...");
+    
+    // Create a fresh OAuth2 client with the tokens
+    const oauth2ClientWithTokens = new google.auth.OAuth2(
+      CLIENT_ID,
+      CLIENT_SECRET,
+      REDIRECT_URI
+    );
+    
+    oauth2ClientWithTokens.setCredentials(tokens);
+    
+    // Create Gmail client with authenticated OAuth2 client
+    gmailClient = google.gmail({ 
+      version: "v1", 
+      auth: oauth2ClientWithTokens 
+    });
+    
+    // Also update the global oauth2Client
+    oauth2Client.setCredentials(tokens);
     
     // Cache user profile
     if (!userProfile) {
+      console.log("🔄 Fetching user profile...");
       const profile = await gmailClient.users.getProfile({ userId: "me" });
       userProfile = profile.data;
+      console.log("✅ User profile fetched:", userProfile.emailAddress);
     }
     
     authInitialized = true;
+    console.log("✅ Gmail client initialized successfully");
     return gmailClient;
   } catch (error) {
-    console.error("❌ Error initializing Gmail client:", error);
-    throw error;
+    console.error("❌ Error initializing Gmail client:", error.message);
+    console.error("Full error:", error);
+    
+    // Reset auth state
+    gmailClient = null;
+    authInitialized = false;
+    userProfile = null;
+    
+    throw new Error(`Failed to initialize Gmail client: ${error.message}`);
   }
-}//old one..
+}
 
 export function generateAuthUrl() {
   if (!CLIENT_ID || !CLIENT_SECRET) {
@@ -93,7 +122,10 @@ export function generateAuthUrl() {
   }
 
   const scopes = [
-    "https://mail.google.com/"
+    "https://mail.google.com/",
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/gmail.compose",
+    "https://www.googleapis.com/auth/gmail.readonly"
   ];
 
   const authUrl = oauth2Client.generateAuthUrl({
@@ -108,12 +140,27 @@ export function generateAuthUrl() {
 
 export async function saveTokens(tokens) {
   try {
-    await fs.writeFile(TOKEN_PATH, JSON.stringify(tokens, null, 2));
+    console.log("💾 Saving tokens...", {
+      hasAccessToken: !!tokens.access_token,
+      hasRefreshToken: !!tokens.refresh_token,
+      expiry_date: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : 'none'
+    });
+    
+    // Calculate expiry date if not present (1 hour from now)
+    if (!tokens.expiry_date && tokens.access_token) {
+      tokens.expiry_date = Date.now() + 3600000; // 1 hour
+      console.log("📅 Setting expiry date to 1 hour from now");
+    }
+    
+    // Set credentials on the global oauth2Client
     oauth2Client.setCredentials(tokens);
-    console.log("✅ Tokens saved successfully");
+    
     // Reset cached client to force reinitialization
     gmailClient = null;
     authInitialized = false;
+    userProfile = null;
+    
+    console.log("✅ Tokens saved successfully to memory");
     return true;
   } catch (error) {
     console.error("❌ Error saving tokens:", error);
@@ -123,23 +170,77 @@ export async function saveTokens(tokens) {
 
 export async function loadTokens() {
   try {
-    const raw = await fs.readFile(TOKEN_PATH, "utf8");
-    const tokens = JSON.parse(raw);
-
-    // Check if token is expired and refresh if needed
-    if (tokens.expiry_date && Date.now() > tokens.expiry_date) {
-      console.log("🔄 Token expired, refreshing...");
-      oauth2Client.setCredentials(tokens);
-      const { credentials } = await oauth2Client.refreshAccessToken();
-      await saveTokens(credentials);
-      return credentials;
+    console.log("🔄 Loading tokens...");
+    
+    // Get tokens from environment variables
+    const accessToken = process.env.GMAIL_ACCESS_TOKEN;
+    const refreshToken = process.env.GMAIL_REFRESH_TOKEN;
+    const tokenType = process.env.GMAIL_TOKEN_TYPE;
+    
+    console.log("🔍 Checking environment variables:", {
+      hasAccessToken: !!accessToken,
+      hasRefreshToken: !!refreshToken,
+      tokenType
+    });
+    
+    if (!accessToken || !refreshToken) {
+      throw new Error("GMAIL_ACCESS_TOKEN and GMAIL_REFRESH_TOKEN must be set in .env file");
     }
 
-    oauth2Client.setCredentials(tokens);
-    console.log("✅ Tokens loaded successfully");
+    // Parse expiry date from environment variable or calculate it
+    let expiryDate;
+    if (process.env.GMAIL_TOKEN_EXPIRY) {
+      // If it's a number, treat it as timestamp
+      const expiryNum = parseInt(process.env.GMAIL_TOKEN_EXPIRY);
+      if (!isNaN(expiryNum)) {
+        expiryDate = expiryNum;
+      } else {
+        // Try to parse as date string
+        const date = new Date(process.env.GMAIL_TOKEN_EXPIRY);
+        if (!isNaN(date.getTime())) {
+          expiryDate = date.getTime();
+        }
+      }
+    }
+    
+    // If no valid expiry date found, set to 1 hour from now
+    if (!expiryDate) {
+      expiryDate = Date.now() + 3600000;
+      console.log("⚠️ No expiry date found, setting to 1 hour from now");
+    }
+    
+    const tokens = {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      scope: 'https://mail.google.com/',
+      token_type: tokenType || 'Bearer',
+      expiry_date: expiryDate
+    };
+    
+    console.log("✅ Tokens loaded from environment variables");
+    console.log("📅 Token expiry:", new Date(tokens.expiry_date).toISOString());
+    console.log("⏰ Current time:", new Date().toISOString());
+    console.log("⏳ Token valid:", tokens.expiry_date > Date.now() ? "Yes" : "No (expired)");
+    
+    // Check if token needs refresh
+    if (tokens.expiry_date && Date.now() > tokens.expiry_date) {
+      console.log("🔄 Token expired, attempting to refresh...");
+      try {
+        oauth2Client.setCredentials(tokens);
+        const { credentials } = await oauth2Client.refreshAccessToken();
+        console.log("✅ Token refreshed successfully");
+        return credentials;
+      } catch (refreshError) {
+        console.error("❌ Failed to refresh token:", refreshError.message);
+        console.log("💡 The refresh token might be invalid. You may need to reconnect Gmail.");
+        throw new Error("Token expired and could not be refreshed. Please reconnect Gmail.");
+      }
+    }
+    
     return tokens;
-  } catch (err) {
-    console.log("❌ No tokens found or error loading:", err.message);
+  } catch (error) {
+    console.error("❌ Error loading tokens from environment variables:", error.message);
+    console.log("💡 Make sure GMAIL_ACCESS_TOKEN and GMAIL_REFRESH_TOKEN are set in your .env file");
     return null;
   }
 }
@@ -148,29 +249,70 @@ export async function exchangeCodeForTokens(code) {
   try {
     console.log("🔄 Exchanging code for tokens...");
     const { tokens } = await oauth2Client.getToken(code);
-    console.log("✅ Received tokens from Google");
+    console.log("✅ Received tokens from Google:", {
+      hasAccessToken: !!tokens.access_token,
+      hasRefreshToken: !!tokens.refresh_token,
+      tokenType: tokens.token_type,
+      scope: tokens.scope
+    });
+    
     await saveTokens(tokens);
+    
+    // Also update environment variables for current session
+    if (tokens.access_token) {
+      process.env.GMAIL_ACCESS_TOKEN = tokens.access_token;
+    }
+    if (tokens.refresh_token) {
+      process.env.GMAIL_REFRESH_TOKEN = tokens.refresh_token;
+    }
+    if (tokens.token_type) {
+      process.env.GMAIL_TOKEN_TYPE = tokens.token_type;
+    }
+    if (tokens.expiry_date) {
+      process.env.GMAIL_TOKEN_EXPIRY = tokens.expiry_date.toString();
+    }
+    
+    console.log("✅ Tokens exchanged and saved successfully");
     return tokens;
   } catch (error) {
     console.error("❌ Error exchanging code for tokens:", error);
+    console.error("Full error:", error.response?.data || error.message);
     throw new Error(`Failed to exchange code for tokens: ${error.message}`);
   }
 }
 
 export async function checkAuth() {
   try {
+    console.log("🔐 Checking authentication status...");
+    
+    // First try to initialize the client
     await initializeGmailClient();
+    
+    if (!userProfile) {
+      // If we don't have user profile yet, try to get it
+      const gmail = await initializeGmailClient();
+      const profile = await gmail.users.getProfile({ userId: "me" });
+      userProfile = profile.data;
+    }
+    
+    console.log("✅ Auth check successful. User email:", userProfile?.emailAddress);
     
     return {
       authenticated: true,
       message: "Gmail is connected",
-      email: userProfile.emailAddress
+      email: userProfile?.emailAddress || "Unknown"
     };
   } catch (error) {
-    console.error("❌ Auth check failed:", error);
+    console.error("❌ Auth check failed:", error.message);
+    
+    // If auth fails, clear any cached data
+    gmailClient = null;
+    authInitialized = false;
+    userProfile = null;
+    
     return {
       authenticated: false,
-      message: "Authentication failed. Please reconnect Gmail.",
+      message: `Authentication failed: ${error.message}`,
     };
   }
 }
@@ -296,9 +438,6 @@ function calculateEmailSize(to, cc, bcc, subject, message, attachments = [], fro
   };
 }
 
-
-
-
 // Create multipart email with attachments (CORRECTED VERSION)
 function createMultipartEmail(to, cc, bcc, subject, message, attachments = [], fromEmail) {
   const boundaryMixed = `mixed_${Date.now()}`;
@@ -359,7 +498,6 @@ function createMultipartEmail(to, cc, bcc, subject, message, attachments = [], f
   return email;
 }
 
-
 // Validate email addresses
 function validateEmailAddress(email) {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -374,8 +512,6 @@ function processEmailList(emailString) {
     .filter(email => email && validateEmailAddress(email));
 }
 
-
-
 // Split large attachments into multiple emails
 async function sendWithLargeAttachments(to, cc, bcc, subject, message, attachments, fromEmail) {
   const gmail = await initializeGmailClient();
@@ -388,7 +524,6 @@ async function sendWithLargeAttachments(to, cc, bcc, subject, message, attachmen
   console.log("🔍 bcc:", bcc);
   console.log("🔍 subject:", subject);
   console.log("🔍 message length:", message?.length || 0);
-  console.log("🔍 message preview:", message?.substring(0, 100) + "...");
   console.log("🔍 attachments count:", attachments?.length || 0);
   console.log("🔍 fromEmail:", fromEmail);
   
@@ -404,8 +539,6 @@ async function sendWithLargeAttachments(to, cc, bcc, subject, message, attachmen
     console.log("🔍 [DEBUG] Creating text-only email...");
     const textEmail = createMultipartEmail(to, cc, bcc, subject, message, [], fromEmail);
     
-    // DEBUG: Check if message is included
-    console.log("🔍 [DEBUG] Text email contains message:", textEmail.includes(message || '') ? 'YES' : 'NO');
     console.log("🔍 [DEBUG] Text email length:", textEmail.length);
     
     const base64TextEmail = Buffer.from(textEmail)
@@ -627,7 +760,6 @@ export async function sendEmailWithAttachments(to, subject, message, cc = '', bc
       .replace(/=+$/, '');
     
     console.log(`📧 Actual base64 size: ${Math.round(base64Email.length / 1024)}KB`);
-    console.log(`📧 Message included: ${email.includes(message || '') ? 'YES' : 'NO'}`);
     
     // Set timeout for sending
     const sendPromise = gmail.users.messages.send({
@@ -1592,4 +1724,23 @@ export function validateFiles(files) {
   });
   
   return errors;
-}//all work correctly...
+}
+
+// Disconnect Gmail (clear tokens)
+export async function disconnectGmail() {
+  try {
+    // Clear cached data
+    gmailClient = null;
+    authInitialized = false;
+    userProfile = null;
+    
+    // Clear credentials from OAuth2 client
+    oauth2Client.setCredentials({});
+    
+    console.log("✅ Gmail disconnected");
+    return { success: true, message: "Gmail disconnected successfully" };
+  } catch (error) {
+    console.error("❌ Error disconnecting Gmail:", error);
+    throw error;
+  }
+}//all come correctly without error..
