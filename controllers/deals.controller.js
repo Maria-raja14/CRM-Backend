@@ -326,7 +326,7 @@ updateDeal: async (req, res) => {
     const allowedStages = [
       "Qualification",
       "Negotiation",
-      "Proposal Sent",
+      "Proposal",
       "Closed Won",
       "Closed Lost",
     ];

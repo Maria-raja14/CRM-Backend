@@ -152,74 +152,195 @@ export default {
     }
   },
 
-  updateInvoice: async (req, res) => {
-    console.log(req.body);
+  // updateInvoice: async (req, res) => {
+  //   console.log(req.body);
 
-    try {
-      const invoice = await Invoice.findById(req.params.id);
+  //   try {
+  //     const invoice = await Invoice.findById(req.params.id);
 
-      if (!invoice) {
-        return res.status(404).json({ message: "Invoice not found" });
-      }
+  //     if (!invoice) {
+  //       return res.status(404).json({ message: "Invoice not found" });
+  //     }
 
-      // Sales can only update invoices assigned to them
-      // if (
-      //   req.user.role?.name === "Sales" &&
-      //   invoice.assignTo.toString() !== req.user._id.toString()
-      // ) {
-      //   return res.status(403).json({ error: "Access denied" });
-      // }
+  //     // Sales can only update invoices assigned to them
+  //     // if (
+  //     //   req.user.role?.name === "Sales" &&
+  //     //   invoice.assignTo.toString() !== req.user._id.toString()
+  //     // ) {
+  //     //   return res.status(403).json({ error: "Access denied" });
+  //     // }
 
-      let { items, tax = 0, discount = 0, ...rest } = req.body;
+  //     let { items, tax = 0, discount = 0, ...rest } = req.body;
 
-      if (items && items.length > 0) {
-        items = items.map((item) => {
-          const price = Number(item.price) || 0;
-          const quantity = Number(item.quantity) || 1;
-          const amount = price * quantity;
-          return {
-            ...item,
-            amount: amount.toFixed(2),
-          };
-        });
+  //     if (items && items.length > 0) {
+  //       items = items.map((item) => {
+  //         const price = Number(item.price) || 0;
+  //         const quantity = Number(item.quantity) || 1;
+  //         const amount = price * quantity;
+  //         return {
+  //           ...item,
+  //           amount: amount.toFixed(2),
+  //         };
+  //       });
 
-        const subtotal = items.reduce(
-          (sum, item) => sum + Number(item.amount),
-          0
-        );
+  //       const subtotal = items.reduce(
+  //         (sum, item) => sum + Number(item.amount),
+  //         0
+  //       );
 
-        const taxValue = Number(tax) || 0;
-        const discountValue = Number(discount) || 0;
-        const discountedSubtotal = subtotal - discountValue;
-        const taxAmount = (discountedSubtotal * taxValue) / 100;
-        const total = discountedSubtotal + taxAmount;
+  //       const taxValue = Number(tax) || 0;
+  //       const discountValue = Number(discount) || 0;
+  //       const discountedSubtotal = subtotal - discountValue;
+  //       const taxAmount = (discountedSubtotal * taxValue) / 100;
+  //       const total = discountedSubtotal + taxAmount;
 
-        rest.items = items;
-        rest.tax = taxValue;
-        rest.discount = discountValue;
-        rest.subtotal = subtotal;
-        rest.total = Number(total.toFixed(2));
-      }
+  //       rest.items = items;
+  //       rest.tax = taxValue;
+  //       rest.discount = discountValue;
+  //       rest.subtotal = subtotal;
+  //       rest.total = Number(total.toFixed(2));
+  //     }
 
-      const updatedInvoice = await Invoice.findByIdAndUpdate(
-        req.params.id,
-        rest,
-        {
-          new: true,
-          runValidators: true,
-        }
-      )
-        .populate("assignTo", "firstName lastName email role")
-        .populate("items.deal", "dealName value stage");
+  //     const updatedInvoice = await Invoice.findByIdAndUpdate(
+  //       req.params.id,
+  //       rest,
+  //       {
+  //         new: true,
+  //         runValidators: true,
+  //       }
+  //     )
+  //       .populate("assignTo", "firstName lastName email role")
+  //       .populate("items.deal", "dealName value stage");
 
-      res.status(200).json(updatedInvoice);
-    } catch (error) {
-      console.error("❌ Error updating invoice:", error);
-      res.status(500).json({ error: "Internal server error" });
-    }
-  },
+  //     res.status(200).json(updatedInvoice);
+  //   } catch (error) {
+  //     console.error("❌ Error updating invoice:", error);
+  //     res.status(500).json({ error: "Internal server error" });
+  //   }
+  // },//org
 
   // ✅ Delete Invoice
+ 
+ updateInvoice: async (req, res) => {
+  console.log(req.body);
+
+  try {
+    const invoice = await Invoice.findById(req.params.id);
+
+    if (!invoice) {
+      return res.status(404).json({ message: "Invoice not found" });
+    }
+
+    let { 
+      items, 
+      tax = 0, 
+      discount = 0, 
+      discountType = "fixed", 
+      discountValue = 0,
+      taxType = "fixed",
+      price, // Single price from frontend
+      ...rest 
+    } = req.body;
+
+    // Calculate totals based on the data structure
+    let subtotal = 0;
+    let finalDiscount = 0;
+    let taxAmount = 0;
+    let finalTotal = 0;
+
+    // If items array exists, calculate from items
+    if (items && items.length > 0) {
+      items = items.map((item) => {
+        const itemPrice = Number(item.price) || 0;
+        const quantity = Number(item.quantity) || 1;
+        const amount = itemPrice * quantity;
+        return {
+          ...item,
+          amount: amount.toFixed(2),
+        };
+      });
+
+      subtotal = items.reduce((sum, item) => sum + Number(item.amount), 0);
+    } 
+    // If single price is provided (from frontend modal)
+    else if (price) {
+      subtotal = Number(price) || 0;
+      // Create a single item if needed
+      items = [{
+        deal: rest.deal || invoice.items?.[0]?.deal,
+        price: subtotal,
+        amount: subtotal,
+        quantity: 1
+      }];
+    }
+    // Fallback to existing invoice subtotal
+    else {
+      subtotal = invoice.subtotal || 0;
+    }
+
+    // Calculate discount based on type
+    if (discountType === "percentage") {
+      finalDiscount = (subtotal * discountValue) / 100;
+    } else {
+      // Fixed amount discount
+      finalDiscount = Number(discountValue) || Number(discount) || 0;
+    }
+
+    // Ensure discount doesn't exceed subtotal
+    if (finalDiscount > subtotal) {
+      finalDiscount = subtotal;
+    }
+
+    // Calculate tax
+    const discountedSubtotal = subtotal - finalDiscount;
+    
+    if (taxType === "percentage") {
+      taxAmount = (discountedSubtotal * tax) / 100;
+    } else {
+      taxAmount = Number(tax) || 0;
+    }
+
+    // Calculate final total
+    finalTotal = discountedSubtotal + taxAmount;
+    
+    // Ensure total is not negative
+    if (finalTotal < 0) {
+      finalTotal = 0;
+    }
+
+    // Prepare update data
+    const updateData = {
+      ...rest,
+      items,
+      subtotal: Number(subtotal.toFixed(2)),
+      discount: Number(finalDiscount.toFixed(2)),
+      discountValue: Number(discountValue) || Number(discount) || 0,
+      discountType: discountType || "fixed",
+      tax: Number(tax) || 0,
+      taxType: taxType || "fixed",
+      taxAmount: Number(taxAmount.toFixed(2)),
+      total: Number(finalTotal.toFixed(2))
+    };
+
+    const updatedInvoice = await Invoice.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      {
+        new: true,
+        runValidators: true,
+      }
+    )
+      .populate("assignTo", "firstName lastName email role")
+      .populate("items.deal", "dealName value stage");
+
+    res.status(200).json(updatedInvoice);
+  } catch (error) {
+    console.error("❌ Error updating invoice:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+},
+ 
+ 
   deleteInvoice: async (req, res) => {
     try {
       const deletedInvoice = await Invoice.findByIdAndDelete(req.params.id);

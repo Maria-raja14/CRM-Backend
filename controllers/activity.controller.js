@@ -2,40 +2,38 @@ import mongoose from "mongoose";
 import Activity from "../models/activity.models.js";
 import Deal from "../models/deals.model.js"; // Make sure you have this
 
-
 export default {
+  getActivities: async (req, res) => {
+    console.log("GetActivies", req.body);
 
-getActivities: async (req, res) => {
-  console.log("GetActivies",req.body);
-  
-  try {
-    if (!req.user) {
-      return res.status(401).json({ error: "Unauthorized: No user found" });
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Unauthorized: No user found" });
+      }
+
+      let activitiesQuery;
+
+      if (req.user.role?.name === "Admin") {
+        // Admin → all activities
+        activitiesQuery = Activity.find();
+      } else if (req.user.role?.name === "Sales") {
+        // Sales → only activities assigned to them
+        activitiesQuery = Activity.find({ assignedTo: req.user._id });
+      } else {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const activities = await activitiesQuery
+        .populate("deal", "title") // populate deal title
+        .populate("assignedTo", "firstName lastName email") // populate assigned user
+        .sort({ createdAt: -1 });
+
+      res.status(200).json(activities);
+    } catch (error) {
+      console.error("❌ Error fetching activities:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
-
-    let activitiesQuery;
-
-    if (req.user.role?.name === "Admin") {
-      // Admin → all activities
-      activitiesQuery = Activity.find();
-    } else if (req.user.role?.name === "Sales") {
-      // Sales → only activities assigned to them
-      activitiesQuery = Activity.find({ assignedTo: req.user._id });
-    } else {
-      return res.status(403).json({ error: "Access denied" });
-    }
-
-    const activities = await activitiesQuery
-      .populate("deal", "title") // populate deal title
-      .populate("assignedTo", "firstName lastName email") // populate assigned user
-      .sort({ createdAt: -1 });
-
-    res.status(200).json(activities);
-  } catch (error) {
-    console.error("❌ Error fetching activities:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-},
+  },
 
   // GET activity by ID
   getActivityById: async (req, res) => {
@@ -72,7 +70,6 @@ getActivities: async (req, res) => {
         assignedTo,
         reminder,
       } = req.body;
-
 
       const newActivity = new Activity({
         title,
@@ -141,12 +138,10 @@ getActivities: async (req, res) => {
       if (!updatedActivity)
         return res.status(404).json({ message: "Activity not found" });
 
-      res
-        .status(200)
-        .json({
-          message: "Activity updated successfully",
-          data: updatedActivity,
-        });
+      res.status(200).json({
+        message: "Activity updated successfully",
+        data: updatedActivity,
+      });
     } catch (error) {
       console.error("Error updating activity:", error);
       res.status(500).json({ message: "Error updating activity" });

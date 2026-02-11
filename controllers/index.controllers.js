@@ -9,7 +9,7 @@ import proposalController from "./proposal.controller.js";
 import dealsController from "./deals.controller.js";
 import adminDashboardController from "./adminDashboard.controller.js";
 import salesReportsController from "./salesReports.controller.js"
-
+import googleAuthController from './googleAuth.controller.js';
 
 
 export default {
@@ -21,6 +21,7 @@ export default {
   invoiceController,
   proposalController,
   adminDashboardController,
-  salesReportsController
+  salesReportsController,
+ googleAuthController 
   
 };

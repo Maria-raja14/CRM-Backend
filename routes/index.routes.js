@@ -9,7 +9,11 @@ import proposalRoutes from "./proposal.routes.js";
 import dealsRoutes from "./deals.route.js";
 import adminDashboard from "./adminDashboard.routes.js";
 import notificationRoutes from "./notification.routes.js";
-import salesRoutes from "./salesReports.routes.js"
+
+import gmailRoutes from "./gmailRoutes.js"; // ✅ Add this
+import googleAuthRoutes from "./googleAuthRoutes.js"; // Add this
+
+
 
 const router = express.Router();
 
@@ -26,7 +30,10 @@ router.use("/invoice", invoice);
 router.use("/proposal", proposalRoutes);
 router.use("/dashboard", adminDashboard);
 router.use("/notification", notificationRoutes);
-router.use("/sales", salesRoutes);
+
+router.use("/gmail", gmailRoutes); // ✅ Mount Gmail API routes
+
+router.use("/google-auth", googleAuthRoutes); // Add this line
 
 
 export default router;

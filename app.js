@@ -1,10 +1,126 @@
+// // import express from "express";
+
+// // import dotenv from "dotenv";
+// // import cors from "cors";
+// // import path from "path";
+// // import { fileURLToPath } from "url";
+// // import http from "http";
+// // import fs from "fs";
+// // import jwt from "jsonwebtoken";
+
+// // import connectDB from "./config/db.js";
+// // import routes from "./routes/index.routes.js";
+// // import fileRoutes from "./routes/files.routes.js";
+// // import { initSocket } from "./realtime/socket.js";
+// // import { startFollowUpCron } from "./controllers/followups.cron.js";
+// // import { startActivityReminderCron } from "./controllers/activityReminder.cron.js";
+// // import { startProposalFollowUpCron } from "./controllers/proposalFollowUpCron.controller.js";
+
+// // dotenv.config();
+
+// // const __filename = fileURLToPath(import.meta.url);
+// // const __dirname = path.dirname(__filename);
+
+// // const app = express();
+// // app.use(express.json());
+// // app.use(express.urlencoded({ extended: true }));
+// // app.use(cors());
+
+// // app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+// // app.use(express.static(path.join(__dirname, "public")));
+
+// // // Authentication middleware
+// // const authenticateToken = (req, res, next) => {
+// //   const authHeader = req.headers["authorization"];
+// //   const token = authHeader && authHeader.split(" ")[1];
+
+// //   if (!token) {
+// //     return res.status(401).json({ message: "Not authorized, no token" });
+// //   }
+
+// //   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+// //     if (err) {
+// //       return res.status(403).json({ message: "Token is not valid" });
+// //     }
+// //     req.user = user;
+// //     next();
+// //   });
+// // };
+
+// // app.use("/api", routes);
+// // app.use("/api/files", fileRoutes);
+// // // Protected file download endpoint
+// // app.get("/api/files/download", authenticateToken, (req, res) => {
+// //   try {
+// //     const { filePath } = req.query;
+
+// //     if (!filePath) {
+// //       return res.status(400).json({ message: "File path is required" });
+// //     }
+
+// //     // Security check: Ensure the file path is within your uploads directory
+// //     const fullPath = path.join(__dirname, filePath);
+// //     const uploadsDir = path.join(__dirname, "uploads");
+
+// //     if (!fullPath.startsWith(uploadsDir)) {
+// //       return res.status(403).json({ message: "Access denied" });
+// //     }
+
+// //     if (!fs.existsSync(fullPath)) {
+// //       return res.status(404).json({ message: "File not found" });
+// //     }
+
+// //     const fileName = path.basename(fullPath);
+// //     res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+// //     res.setHeader("Content-Type", "application/octet-stream");
+
+// //     const fileStream = fs.createReadStream(fullPath);
+// //     fileStream.pipe(res);
+// //   } catch (error) {
+// //     console.error("File download error:", error);
+// //     res.status(500).json({ message: "Server error" });
+// //   }
+// // });
+
+// // app.use((req, res) => res.status(404).json({ message: "Route not found" }));
+// // app.use((err, _req, res, _next) => {
+// //   console.error(err.stack);
+// //   res.status(500).json({ message: "Server Error" });
+// // });
+
+// // const server = http.createServer(app);
+// // initSocket(server); // Socket.IO
+// // startFollowUpCron();
+// // startActivityReminderCron(); // ✅ for activities      // Cron jobs
+// // startProposalFollowUpCron();
+
+// // const PORT = process.env.PORT || 5000;
+
+// // const startServer = async () => {
+// //   try {
+// //     await connectDB();
+// //     server.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+// //   } catch (error) {
+// //     console.error("❌ Failed to start server:", error.message);
+// //     process.exit(1);
+// //   }
+// // };
+
+// // startServer();//orginal
+
+
+
+
+
+
 // import express from "express";
 // import dotenv from "dotenv";
 // import cors from "cors";
 // import path from "path";
 // import { fileURLToPath } from "url";
 // import http from "http";
-// import fs from "fs"; // Added missing import
+// import fs from "fs";
+// import jwt from "jsonwebtoken";
 
 // import connectDB from "./config/db.js";
 // import routes from "./routes/index.routes.js";
@@ -13,6 +129,10 @@
 // import { startFollowUpCron } from "./controllers/followups.cron.js";
 // import { startActivityReminderCron } from "./controllers/activityReminder.cron.js";
 // import { startProposalFollowUpCron } from "./controllers/proposalFollowUpCron.controller.js";
+// import gmailRoutes from "./routes/gmailRoutes.js";
+
+
+
 
 // dotenv.config();
 
@@ -20,18 +140,60 @@
 // const __dirname = path.dirname(__filename);
 
 // const app = express();
+
+// // CORS Configuration - FIXED
+// const corsOptions = {
+//   origin: process.env.FRONTEND_URL || "http://localhost:5173",
+//   credentials: true, // This is important for withCredentials
+//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+//   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+// };
+
+// app.use(cors(corsOptions));
 // app.use(express.json());
 // app.use(express.urlencoded({ extended: true }));
-// app.use(cors());
+
 
 // app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // app.use(express.static(path.join(__dirname, "public")));
 
+// // Authentication middleware
+// const authenticateToken = (req, res, next) => {
+//   const authHeader = req.headers["authorization"];
+//   const token = authHeader && authHeader.split(" ")[1];
+
+//   if (!token) {
+//     return res.status(401).json({ message: "Not authorized, no token" });
+//   }
+
+//   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+//     if (err) {
+//       return res.status(403).json({ message: "Token is not valid" });
+//     }
+//     req.user = user;
+//     next();
+//   });
+// };
+
+// // API routes
 // app.use("/api", routes);
 // app.use("/api/files", fileRoutes);
+// app.use("/api/gmail", gmailRoutes);
 
-// // Add this route for file downloads
-// app.get("/api/files/download", (req, res) => {
+// // app.use('/api/google-auth', googleAuthRoutes); // Add this line
+
+
+
+// app.get('/api/auth/google/callback', (req, res) => {
+//   console.log('📝 Redirecting old callback URL to new one...');
+//   // Redirect to the correct callback URL
+//   const { code, state, error } = req.query;
+//   const redirectUrl = `/api/google-auth/auth/google/callback?${new URLSearchParams(req.query).toString()}`;
+//   res.redirect(redirectUrl);
+// });
+
+// // Protected file download endpoint
+// app.get("/api/files/download", authenticateToken, (req, res) => {
 //   try {
 //     const { filePath } = req.query;
 
@@ -63,31 +225,62 @@
 //   }
 // });
 
-// app.use((req, res) => res.status(404).json({ message: "Route not found" }));
+// // Health check endpoint
+// app.get("/api/health", (req, res) => {
+//   res.json({
+//     status: "OK",
+//     timestamp: new Date().toISOString(),
+//     service: "CRM Server"
+//   });
+// });
+
+// // Catch-all handler for undefined routes
+// app.use((req, res) => {
+//   console.log(`❌ Route not found: ${req.method} ${req.url}`);
+//   res.status(404).json({
+//     message: "Route not found",
+//     path: req.url,
+//     method: req.method
+//   });
+// });
+
+// // Global error handler
 // app.use((err, _req, res, _next) => {
-//   console.error(err.stack);
-//   res.status(500).json({ message: "Server Error" });
+//   console.error("🚨 Server Error:", err.stack);
+//   res.status(500).json({
+//     message: "Server Error",
+//     error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+//   });
 // });
 
 // const server = http.createServer(app);
 // initSocket(server); // Socket.IO
 // startFollowUpCron();
-// startActivityReminderCron(); // ✅ for activities      // Cron jobs
+// startActivityReminderCron(); // ✅ for activities
 // startProposalFollowUpCron();
 
 // const PORT = process.env.PORT || 5000;
 
+
 // const startServer = async () => {
 //   try {
 //     await connectDB();
-//     server.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+//     console.log("✅ MongoDB connected");
 //   } catch (error) {
-//     console.error("❌ Failed to start server:", error.message);
-//     process.exit(1);
+//     console.error("⚠️ MongoDB connection failed:", error.message);
+//     console.error("⚠️ Server will still start (Gmail needs no DB)");
 //   }
+
+//   server.listen(PORT, () => {
+//     console.log(`✅ Server running on port ${PORT}`);
+//     console.log(`🔗 CORS: ${process.env.FRONTEND_URL || "http://localhost:5173"}`);
+//     console.log(`📧 Gmail test: http://localhost:${PORT}/api/gmail/test`);
+//     console.log(`🏥 Health check: http://localhost:${PORT}/api/health`);
+//   });
 // };
 
-// startServer();
+
+// startServer();//original
 
 
 import express from "express";
@@ -106,6 +299,8 @@ import { initSocket } from "./realtime/socket.js";
 import { startFollowUpCron } from "./controllers/followups.cron.js";
 import { startActivityReminderCron } from "./controllers/activityReminder.cron.js";
 import { startProposalFollowUpCron } from "./controllers/proposalFollowUpCron.controller.js";
+import gmailRoutes from "./routes/gmailRoutes.js";
+import googleAuthRoutes from "./routes/googleAuthRoutes.js"; // Add this import
 
 dotenv.config();
 
@@ -113,9 +308,21 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// CORS Configuration - UPDATED to include PATCH method
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors());
+
+// Handle preflight requests for all routes
+app.options('*', cors(corsOptions));
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(express.static(path.join(__dirname, "public")));
@@ -138,8 +345,19 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+// API routes
 app.use("/api", routes);
 app.use("/api/files", fileRoutes);
+app.use("/api/gmail", gmailRoutes);
+app.use('/api/google-auth', googleAuthRoutes); // Add this line
+
+app.get('/api/auth/google/callback', (req, res) => {
+  console.log('📝 Redirecting old callback URL to new one...');
+  const { code, state, error } = req.query;
+  const redirectUrl = `/api/google-auth/auth/google/callback?${new URLSearchParams(req.query).toString()}`;
+  res.redirect(redirectUrl);
+});
+
 // Protected file download endpoint
 app.get("/api/files/download", authenticateToken, (req, res) => {
   try {
@@ -149,7 +367,6 @@ app.get("/api/files/download", authenticateToken, (req, res) => {
       return res.status(400).json({ message: "File path is required" });
     }
 
-    // Security check: Ensure the file path is within your uploads directory
     const fullPath = path.join(__dirname, filePath);
     const uploadsDir = path.join(__dirname, "uploads");
 
@@ -173,16 +390,38 @@ app.get("/api/files/download", authenticateToken, (req, res) => {
   }
 });
 
-app.use((req, res) => res.status(404).json({ message: "Route not found" }));
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+  res.json({ 
+    status: "OK", 
+    timestamp: new Date().toISOString(),
+    service: "CRM Server"
+  });
+});
+
+// Catch-all handler for undefined routes
+app.use((req, res) => {
+  console.log(`❌ Route not found: ${req.method} ${req.url}`);
+  res.status(404).json({
+    message: "Route not found",
+    path: req.url,
+    method: req.method
+  });
+});
+
+// Global error handler
 app.use((err, _req, res, _next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: "Server Error" });
+  console.error("🚨 Server Error:", err.stack);
+  res.status(500).json({
+    message: "Server Error",
+    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+  });
 });
 
 const server = http.createServer(app);
-initSocket(server); // Socket.IO
+initSocket(server);
 startFollowUpCron();
-startActivityReminderCron(); // ✅ for activities      // Cron jobs
+startActivityReminderCron();
 startProposalFollowUpCron();
 
 const PORT = process.env.PORT || 5000;
@@ -190,17 +429,18 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   try {
     await connectDB();
-    server.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+    console.log("✅ MongoDB connected");
   } catch (error) {
-    console.error("❌ Failed to start server:", error.message);
-    process.exit(1);
+    console.error("⚠️ MongoDB connection failed:", error.message);
+    console.error("⚠️ Server will still start (Gmail needs no DB)");
   }
+
+  server.listen(PORT, () => {
+    console.log(`✅ Server running on port ${PORT}`);
+    console.log(`🔗 CORS: ${process.env.FRONTEND_URL || "http://localhost:5173"}`);
+    console.log(`📧 Gmail test: http://localhost:${PORT}/api/gmail/test`);
+    console.log(`🏥 Health check: http://localhost:${PORT}/api/health`);
+  });
 };
 
-startServer();//orginal
-
-
-
-
-
-
+startServer();
