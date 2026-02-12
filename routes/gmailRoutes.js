@@ -28,12 +28,21 @@ import {
   getDrafts,
   getEmailSuggestions,
   initializeGmailClient,
+  // checkNewEmails
 } from "../utils/gmailService.js";
 
 const router = express.Router();
 
 // ✅ Base Frontend URL
-const FRONTEND_URL = "http://localhost:5173";
+// const FRONTEND_URL = "http://localhost:5173";
+
+// ✅ Get environment-specific frontend URL
+const FRONTEND_URL = process.env.NODE_ENV === 'production' 
+  ? process.env.FRONTEND_URL_LIVE || "https://crm.stagingzar.com"
+  : process.env.FRONTEND_URL_LOCAL || "http://localhost:5173";
+
+console.log(`📧 Gmail routes using frontend URL: ${FRONTEND_URL}`);
+
 
 // Configure multer for file uploads with 30MB limit
 const storage = multer.memoryStorage();
@@ -76,51 +85,6 @@ router.get("/auth-status", async (req, res) => {
   }
 });
 
-// 3️⃣ OAuth callback
-// router.get("/oauth2callback", async (req, res) => {
-//   const { code, error } = req.query;
-//   console.log("🔄 OAuth callback received:", req.query);
-
-//   if (error) {
-//     console.error("OAuth error:", error);
-//     const msg =
-//       error === "access_denied"
-//         ? "App not verified. Please contact the developer or check Google Cloud Console settings."
-//         : "Authorization failed.";
-//     return res.redirect(
-//       `${FRONTEND_URL}/email-integration?gmail_error=1&error=${encodeURIComponent(
-//         msg
-//       )}`
-//     );
-//   }
-
-//   if (!code) {
-//     return res.redirect(
-//       `${FRONTEND_URL}/email-integration?gmail_error=1&error=No authorization code received`
-//     );
-//   }
-
-//   try {
-//     console.log("🔄 Exchanging authorization code for tokens...");
-//     await exchangeCodeForTokens(code);
-//     console.log("✅ Gmail connected successfully");
-//     res.redirect(`${FRONTEND_URL}/email-integration?gmail_connected=1`);
-//   } catch (err) {
-//     console.error("❌ OAuth failed:", err);
-//     let msg = err.message;
-//     if (err.message.includes("verification"))
-//       msg =
-//         "App verification required. Please ensure app is published or you're added as test user.";
-//     else if (err.message.includes("invalid_grant"))
-//       msg =
-//         "Authorization code expired or already used. Please reconnect Gmail.";
-//     res.redirect(
-//       `${FRONTEND_URL}/email-integration?gmail_error=1&error=${encodeURIComponent(
-//         msg
-//       )}`
-//     );
-//   }
-// });
 
 router.get("/oauth2callback", async (req, res) => {
   const { code, error } = req.query;
@@ -165,7 +129,7 @@ router.get("/oauth2callback", async (req, res) => {
       )}`,
     );
   }
-});
+});//original
 
 // 4️⃣ List Gmail threads with labels
 router.get("/threads", async (req, res) => {
@@ -590,4 +554,23 @@ router.get("/test", (req, res) => {
   });
 });
 
+// ✅ Check for new emails (for polling)
+// router.get("/check-new", async (req, res) => {
+//   try {
+//     const lastCheck = parseInt(req.query.lastCheck) || 0;
+//     const newEmails = await checkNewEmails(lastCheck);
+    
+//     res.json({
+//       success: true,
+//       count: newEmails.length,
+//       emails: newEmails
+//     });
+//   } catch (err) {
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
 export default router; //come correctly..
+
+
+
