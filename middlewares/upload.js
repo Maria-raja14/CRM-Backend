@@ -1,59 +1,37 @@
-// import multer from "multer";
-// import path from "path";
-// import fs from "fs";
-
-// // Set storage folder
-// const storage = multer.diskStorage({
-//   destination: function (req, file, cb) {
-//     const uploadPath = path.join("uploads", "leads");
-//     fs.mkdirSync(uploadPath, { recursive: true });
-//     cb(null, uploadPath);
-//   },
-//   filename: function (req, file, cb) {
-//     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-//     cb(null, uniqueSuffix + "-" + file.originalname);
-//   },
-// });
-
-// // Accept all file types
-// const fileFilter = (req, file, cb) => {
-//   cb(null, true); // accept all files
-// };
-
-// const upload = multer({ storage, fileFilter });
-
-// export default upload;//ori
-
-
 import multer from "multer";
 import path from "path";
 import fs from "fs";
 
-// Set storage folder
+const uploadPath = "uploads/users";
+
+if (!fs.existsSync(uploadPath)) {
+  fs.mkdirSync(uploadPath, { recursive: true });
+}
+
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadPath = path.join("uploads", "leads");
-    fs.mkdirSync(uploadPath, { recursive: true });
-    cb(null, uploadPath);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + "-" + file.originalname);
+  destination: (req, file, cb) => cb(null, uploadPath),
+
+  filename: (req, file, cb) => {
+    const uniqueName =
+      Date.now() + "-" + Math.round(Math.random() * 1e9) +
+      path.extname(file.originalname);
+
+    cb(null, uniqueName);
   },
 });
 
-// File filter to accept all file types
 const fileFilter = (req, file, cb) => {
-  cb(null, true);
+  const allowed = /jpeg|jpg|png|gif|webp/;
+  const isValid = allowed.test(file.mimetype);
+
+  if (isValid) cb(null, true);
+  else cb(new Error("Only image files allowed"), false);
 };
 
-// Configure multer with 20MB file size limit
 const upload = multer({
   storage,
+  limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter,
-  limits: {
-    fileSize: 20 * 1024 * 1024, // 20MB limit
-  },
 });
 
-export default upload;
+export default upload;  
