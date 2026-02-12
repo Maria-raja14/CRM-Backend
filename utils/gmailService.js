@@ -1113,28 +1113,28 @@ export async function listThreads(maxResults = 50, pageToken = null, label = 'IN
 
 
 // ✅ Simple function to check for new emails
-export async function checkNewEmails(lastCheckTime) {
-  try {
-    const gmail = await initializeGmailClient();
+// export async function checkNewEmails(lastCheckTime) {
+//   try {
+//     const gmail = await initializeGmailClient();
     
-    // Search for emails after the last check time
-    const query = lastCheckTime 
-      ? `after:${Math.floor(lastCheckTime / 1000)}` 
-      : 'newer_than:1h';
+//     // Search for emails after the last check time
+//     const query = lastCheckTime 
+//       ? `after:${Math.floor(lastCheckTime / 1000)}` 
+//       : 'newer_than:1h';
     
-    const res = await gmail.users.messages.list({
-      userId: 'me',
-      maxResults: 10,
-      q: query,
-      labelIds: ['INBOX']
-    });
+//     const res = await gmail.users.messages.list({
+//       userId: 'me',
+//       maxResults: 10,
+//       q: query,
+//       labelIds: ['INBOX']
+//     });
     
-    return res.data.messages || [];
-  } catch (error) {
-    console.error("❌ Error checking new emails:", error);
-    return [];
-  }
-}
+//     return res.data.messages || [];
+//   } catch (error) {
+//     console.error("❌ Error checking new emails:", error);
+//     return [];
+//   }
+// }
 
 // Get single thread details
 export async function getThread(threadId) {

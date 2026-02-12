@@ -28,7 +28,7 @@ import {
   getDrafts,
   getEmailSuggestions,
   initializeGmailClient,
-  checkNewEmails
+  // checkNewEmails
 } from "../utils/gmailService.js";
 
 const router = express.Router();
@@ -555,20 +555,20 @@ router.get("/test", (req, res) => {
 });
 
 // ✅ Check for new emails (for polling)
-router.get("/check-new", async (req, res) => {
-  try {
-    const lastCheck = parseInt(req.query.lastCheck) || 0;
-    const newEmails = await checkNewEmails(lastCheck);
+// router.get("/check-new", async (req, res) => {
+//   try {
+//     const lastCheck = parseInt(req.query.lastCheck) || 0;
+//     const newEmails = await checkNewEmails(lastCheck);
     
-    res.json({
-      success: true,
-      count: newEmails.length,
-      emails: newEmails
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
+//     res.json({
+//       success: true,
+//       count: newEmails.length,
+//       emails: newEmails
+//     });
+//   } catch (err) {
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
 
 export default router; //come correctly..
 
