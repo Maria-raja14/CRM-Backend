@@ -12,6 +12,9 @@ const generateToken = (id) =>
 
 export default {
   createUser: async (req, res) => {
+    console.log("BODY:", req.body);
+    console.log("FILE:", req.file);
+
     try {
       const {
         firstName,
@@ -26,19 +29,17 @@ export default {
         dateOfBirth,
       } = req.body;
 
-      // Check if user already exists
       const existingUser = await User.findOne({ email });
+
       if (existingUser) {
-        // Remove uploaded file if user already exists
-        if (req.file) {
-          fs.unlinkSync(req.file.path);
-        }
+        if (req.file) fs.unlinkSync(req.file.path);
         return res
           .status(400)
           .json({ message: "User already exists with this email" });
       }
 
-      const profileImage = req.file ? req.file.path : null;
+      // ✅ filename mattum DB-la save
+      const profileImage = req.file ? req.file.filename : null;
 
       const user = await User.create({
         firstName,
@@ -56,10 +57,7 @@ export default {
 
       res.status(201).json(user);
     } catch (err) {
-      // Remove uploaded file if error occurs
-      if (req.file) {
-        fs.unlinkSync(req.file.path);
-      }
+      if (req.file) fs.unlinkSync(req.file.path);
       res.status(500).json({ message: err.message });
     }
   },
@@ -76,33 +74,30 @@ export default {
       res.status(500).json({ message: err.message });
     }
   },
+  getMe: async (req, res) => {
+    try {
+      const user = await User.findById(req.user.id).populate("role");
 
-  // getUsers: async (req, res) => {
-  //     try {
-  //       const page = parseInt(req.query.page) || 1;
-  //       const limit = parseInt(req.query.limit) || 10;
-  //       const skip = (page - 1) * limit;
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
 
-  //       const users = await User.find().populate("role")
-  //         .skip(skip)
-  //         .limit(limit);
-
-  //       const total = await User.countDocuments();
-
-  //       res.json({
-  //         users,
-  //         total,
-  //         page,
-  //         pages: Math.ceil(total / limit)
-  //       });
-  //     } catch (err) {
-  //       res.status(500).json({ message: err.message });
-  //     }
-  //   },
+      res.json({
+        _id: user._id,
+        name: `${user.firstName} ${user.lastName}`,
+        email: user.email,
+        profileImage: user.profileImage,
+        role: user.role,
+      });
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  },
 
   updateUser: async (req, res) => {
     try {
       const { id } = req.params;
+
       const {
         firstName,
         lastName,
@@ -115,37 +110,39 @@ export default {
         dateOfBirth,
       } = req.body;
 
-      // Find user
+      // 1️⃣ Find user
       const user = await User.findById(id);
       if (!user) {
-        if (req.file) {
-          fs.unlinkSync(req.file.path);
-        }
+        if (req.file) fs.unlinkSync(req.file.path);
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Check if email is being changed and if it's already taken
+      // 2️⃣ Email duplicate check
       if (email && email !== user.email) {
         const existingUser = await User.findOne({ email });
         if (existingUser) {
-          if (req.file) {
-            fs.unlinkSync(req.file.path);
-          }
+          if (req.file) fs.unlinkSync(req.file.path);
           return res.status(400).json({ message: "Email already taken" });
         }
       }
 
-      // If new image is uploaded, delete the old one
+      // 3️⃣ Image replace logic (IMPORTANT)
       let profileImage = user.profileImage;
+
       if (req.file) {
-        // Delete old image if it exists
-        if (user.profileImage && fs.existsSync(user.profileImage)) {
-          fs.unlinkSync(user.profileImage);
+        // delete old image
+        if (user.profileImage) {
+          const oldPath = `uploads/users/${user.profileImage}`;
+          if (fs.existsSync(oldPath)) {
+            fs.unlinkSync(oldPath);
+          }
         }
-        profileImage = req.file.path;
+
+        // save only filename in DB
+        profileImage = req.file.filename;
       }
 
-      // Update user
+      // 4️⃣ Update user
       const updatedUser = await User.findByIdAndUpdate(
         id,
         {
@@ -165,9 +162,7 @@ export default {
 
       res.json(updatedUser);
     } catch (err) {
-      if (req.file) {
-        fs.unlinkSync(req.file.path);
-      }
+      if (req.file) fs.unlinkSync(req.file.path);
       res.status(500).json({ message: err.message });
     }
   },
