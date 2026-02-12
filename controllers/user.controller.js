@@ -3,138 +3,107 @@ import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import fs from "fs";
 import sendEmail from "../utils/sendEmail.js";
-import crypto from "crypto"; 
+import crypto from "crypto";
 
 dotenv.config();
 
-const generateToken = (id) => jwt.sign({ id }, process.env.SECRET_KEY, { expiresIn: "1d" });
+const generateToken = (id) =>
+  jwt.sign({ id }, process.env.SECRET_KEY, { expiresIn: "1d" });
 
 export default {
+  createUser: async (req, res) => {
+    try {
+      const {
+        firstName,
+        lastName,
+        email,
+        password,
+        mobileNumber,
+        role,
+        status,
+        gender,
+        address,
+        dateOfBirth,
+      } = req.body;
 
-createUser : async (req, res) => {
-  try {
-    const {
-      firstName,
-      lastName,
-      email,
-      password,
-      mobileNumber,
-      role,
-      status,
-      gender,
-      address,
-      dateOfBirth
-    } = req.body;
+      // Check if user already exists
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        // Remove uploaded file if user already exists
+        if (req.file) {
+          fs.unlinkSync(req.file.path);
+        }
+        return res
+          .status(400)
+          .json({ message: "User already exists with this email" });
+      }
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      // Remove uploaded file if user already exists
+      const profileImage = req.file ? req.file.path : null;
+
+      const user = await User.create({
+        firstName,
+        lastName,
+        email,
+        password,
+        mobileNumber,
+        role,
+        status,
+        gender,
+        address,
+        dateOfBirth,
+        profileImage,
+      });
+
+      res.status(201).json(user);
+    } catch (err) {
+      // Remove uploaded file if error occurs
       if (req.file) {
         fs.unlinkSync(req.file.path);
       }
-      return res.status(400).json({ message: "User already exists with this email" });
+      res.status(500).json({ message: err.message });
     }
+  },
 
-    const profileImage = req.file ? req.file.path : null;
-
-    const user = await User.create({
-      firstName,
-      lastName,
-      email,
-      password,
-      mobileNumber,
-      role,
-      status,
-      gender,
-      address,
-      dateOfBirth,
-      profileImage
-    });
-
-    res.status(201).json(user);
-  } catch (err) {
-    // Remove uploaded file if error occurs
-    if (req.file) {
-      fs.unlinkSync(req.file.path);
-    }
-    res.status(500).json({ message: err.message });
-  }
-},
-
-getUsers: async (req, res) => {
+  getUsers: async (req, res) => {
     try {
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 10;
-      const skip = (page - 1) * limit;
-
-      const users = await User.find().populate("role")
-        .skip(skip)
-        .limit(limit);
-      
-      const total = await User.countDocuments();
+      const users = await User.find().populate("role");
 
       res.json({
         users,
-        total,
-        page,
-        pages: Math.ceil(total / limit)
+        total: users.length,
       });
     } catch (err) {
       res.status(500).json({ message: err.message });
     }
   },
 
+  // getUsers: async (req, res) => {
+  //     try {
+  //       const page = parseInt(req.query.page) || 1;
+  //       const limit = parseInt(req.query.limit) || 10;
+  //       const skip = (page - 1) * limit;
 
- updateUser : async (req, res) => {
-  try {
-    const { id } = req.params;
-    const {
-      firstName,
-      lastName,
-      email,
-      mobileNumber,
-      role,
-      status,
-      gender,
-      address,
-      dateOfBirth
-    } = req.body;
+  //       const users = await User.find().populate("role")
+  //         .skip(skip)
+  //         .limit(limit);
 
-    // Find user
-    const user = await User.findById(id);
-    if (!user) {
-      if (req.file) {
-        fs.unlinkSync(req.file.path);
-      }
-      return res.status(404).json({ message: "User not found" });
-    }
+  //       const total = await User.countDocuments();
 
-    // Check if email is being changed and if it's already taken
-    if (email && email !== user.email) {
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
-        if (req.file) {
-          fs.unlinkSync(req.file.path);
-        }
-        return res.status(400).json({ message: "Email already taken" });
-      }
-    }
+  //       res.json({
+  //         users,
+  //         total,
+  //         page,
+  //         pages: Math.ceil(total / limit)
+  //       });
+  //     } catch (err) {
+  //       res.status(500).json({ message: err.message });
+  //     }
+  //   },
 
-    // If new image is uploaded, delete the old one
-    let profileImage = user.profileImage;
-    if (req.file) {
-      // Delete old image if it exists
-      if (user.profileImage && fs.existsSync(user.profileImage)) {
-        fs.unlinkSync(user.profileImage);
-      }
-      profileImage = req.file.path;
-    }
-
-    // Update user
-    const updatedUser = await User.findByIdAndUpdate(
-      id,
-      {
+  updateUser: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const {
         firstName,
         lastName,
         email,
@@ -144,26 +113,70 @@ getUsers: async (req, res) => {
         gender,
         address,
         dateOfBirth,
-        profileImage
-      },
-      { new: true, runValidators: true }
-    ).populate("role");
+      } = req.body;
 
-    res.json(updatedUser);
-  } catch (err) {
-    if (req.file) {
-      fs.unlinkSync(req.file.path);
+      // Find user
+      const user = await User.findById(id);
+      if (!user) {
+        if (req.file) {
+          fs.unlinkSync(req.file.path);
+        }
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Check if email is being changed and if it's already taken
+      if (email && email !== user.email) {
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+          if (req.file) {
+            fs.unlinkSync(req.file.path);
+          }
+          return res.status(400).json({ message: "Email already taken" });
+        }
+      }
+
+      // If new image is uploaded, delete the old one
+      let profileImage = user.profileImage;
+      if (req.file) {
+        // Delete old image if it exists
+        if (user.profileImage && fs.existsSync(user.profileImage)) {
+          fs.unlinkSync(user.profileImage);
+        }
+        profileImage = req.file.path;
+      }
+
+      // Update user
+      const updatedUser = await User.findByIdAndUpdate(
+        id,
+        {
+          firstName,
+          lastName,
+          email,
+          mobileNumber,
+          role,
+          status,
+          gender,
+          address,
+          dateOfBirth,
+          profileImage,
+        },
+        { new: true, runValidators: true },
+      ).populate("role");
+
+      res.json(updatedUser);
+    } catch (err) {
+      if (req.file) {
+        fs.unlinkSync(req.file.path);
+      }
+      res.status(500).json({ message: err.message });
     }
-    res.status(500).json({ message: err.message });
-  }
-},
+  },
 
-
-deleteUser: async (req, res) => {
+  deleteUser: async (req, res) => {
     try {
       const { id } = req.params;
       const deletedUser = await User.findByIdAndDelete(id);
-      
+
       if (!deletedUser) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -174,103 +187,102 @@ deleteUser: async (req, res) => {
     }
   },
 
+  // ✅ FIXED loginUser
+  loginUser: async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      const user = await User.findOne({ email })
+        .populate("role")
+        .select("+password");
 
+      if (!user || !(await user.matchPassword(password))) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
 
-// ✅ FIXED loginUser
-loginUser: async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email })
-      .populate("role")
-      .select("+password");
-
-    if (!user || !(await user.matchPassword(password))) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    const now = new Date();
-    // ✅ Always push a new login entry (even if multiple times per day)
-    user.loginHistory.push({ login: now });
-    await user.save({ validateBeforeSave: false });
-
-    res.json({
-      message: "Login successful",
-      _id: user._id,
-      name: `${user.firstName} ${user.lastName}`,
-      email: user.email,
-      profileImage: user.profileImage,
-      role: user.role,
-      token: generateToken(user._id),
-    });
-  } catch (err) {
-    console.error("Login error:", err);
-    res.status(500).json({ message: err.message });
-  }
-},
-
-
-
-// ✅ FIXED logoutUser
-logoutUser: async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    const now = new Date();
-
-    // ✅ Find the latest login without logout
-    const latestEntry = [...user.loginHistory].reverse().find(e => !e.logout);
-    if (latestEntry) {
-      latestEntry.logout = now;
+      const now = new Date();
+      // ✅ Always push a new login entry (even if multiple times per day)
+      user.loginHistory.push({ login: now });
       await user.save({ validateBeforeSave: false });
-    } else {
-      console.warn("⚠️ No open login session found for logout update");
+
+      res.json({
+        message: "Login successful",
+        _id: user._id,
+        name: `${user.firstName} ${user.lastName}`,
+        email: user.email,
+        profileImage: user.profileImage,
+        role: user.role,
+        token: generateToken(user._id),
+      });
+    } catch (err) {
+      console.error("Login error:", err);
+      res.status(500).json({ message: err.message });
     }
-
-    res.json({ message: "Logout successful" });
-  } catch (err) {
-    console.error("Logout error:", err);
-    res.status(500).json({ message: err.message });
-  }
-},
-
-
-
-  // Add this to your existing user controller
-updatePassword: async (req, res) => {
-  try {
-    const { email, currentPassword, newPassword } = req.body;
-    const userId = req.user.id; // From auth middleware
-
-    // Find user
-    const user = await User.findById(userId).select("+password");
-    
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    // Verify email matches
-    if (user.email !== email) {
-      return res.status(400).json({ message: "Email does not match your account" });
-    }
-
-    // Verify current password
-    if (!(await user.matchPassword(currentPassword))) {
-      return res.status(401).json({ message: "Current password is incorrect" });
-    }
-
-    // Update password
-    user.password = newPassword;
-    await user.save();
-
-    res.json({ message: "Password updated successfully" });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
   },
 
+  // ✅ FIXED logoutUser
+  logoutUser: async (req, res) => {
+    try {
+      const user = await User.findById(req.user.id);
+      if (!user) return res.status(404).json({ message: "User not found" });
 
-forgotPassword: async (req, res) => {
+      const now = new Date();
+
+      // ✅ Find the latest login without logout
+      const latestEntry = [...user.loginHistory]
+        .reverse()
+        .find((e) => !e.logout);
+      if (latestEntry) {
+        latestEntry.logout = now;
+        await user.save({ validateBeforeSave: false });
+      } else {
+        console.warn("⚠️ No open login session found for logout update");
+      }
+
+      res.json({ message: "Logout successful" });
+    } catch (err) {
+      console.error("Logout error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  },
+
+  // Add this to your existing user controller
+  updatePassword: async (req, res) => {
+    try {
+      const { email, currentPassword, newPassword } = req.body;
+      const userId = req.user.id; // From auth middleware
+
+      // Find user
+      const user = await User.findById(userId).select("+password");
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Verify email matches
+      if (user.email !== email) {
+        return res
+          .status(400)
+          .json({ message: "Email does not match your account" });
+      }
+
+      // Verify current password
+      if (!(await user.matchPassword(currentPassword))) {
+        return res
+          .status(401)
+          .json({ message: "Current password is incorrect" });
+      }
+
+      // Update password
+      user.password = newPassword;
+      await user.save();
+
+      res.json({ message: "Password updated successfully" });
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  },
+
+  forgotPassword: async (req, res) => {
     try {
       const { email } = req.body;
       const user = await User.findOne({ email });
@@ -304,33 +316,30 @@ forgotPassword: async (req, res) => {
     }
   },
 
+  resetPassword: async (req, res) => {
+    try {
+      const resetPasswordToken = crypto
+        .createHash("sha256")
+        .update(req.params.token)
+        .digest("hex");
 
-resetPassword: async (req, res) => {
-  try {
-    const resetPasswordToken = crypto
-      .createHash("sha256")
-      .update(req.params.token)
-      .digest("hex");
+      const user = await User.findOne({
+        resetPasswordToken,
+        resetPasswordExpire: { $gt: Date.now() },
+      });
 
-    const user = await User.findOne({
-      resetPasswordToken,
-      resetPasswordExpire: { $gt: Date.now() },
-    });
+      if (!user) {
+        return res.status(400).json({ message: "Invalid or expired token" });
+      }
 
-    if (!user) {
-      return res.status(400).json({ message: "Invalid or expired token" });
+      user.password = req.body.password;
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save();
+
+      res.json({ message: "Password reset successful" });
+    } catch (err) {
+      res.status(500).json({ message: err.message });
     }
-
-    user.password = req.body.password;
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpire = undefined;
-    await user.save();
-
-    res.json({ message: "Password reset successful" });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-},
-
-
+  },
 };
