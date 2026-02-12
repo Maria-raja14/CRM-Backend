@@ -62,18 +62,19 @@ export default {
     }
   },
 
-  getUsers: async (req, res) => {
-    try {
-      const users = await User.find().populate("role");
+getUsers: async (req, res) => {
+  try {
+    const users = await User.find().populate("role");
 
-      res.json({
-        users,
-        total: users.length,
-      });
-    } catch (err) {
-      res.status(500).json({ message: err.message });
-    }
-  },
+    res.json({
+      users,
+      total: users.length,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+}
+,
 
   updateUser: async (req, res) => {
     try {
