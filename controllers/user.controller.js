@@ -62,19 +62,37 @@ export default {
     }
   },
 
-getUsers: async (req, res) => {
-  try {
-    const users = await User.find().populate("role");
+  getUsers: async (req, res) => {
+    try {
+      const users = await User.find().populate("role");
 
-    res.json({
-      users,
-      total: users.length,
-    });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-}
-,
+      res.json({
+        users,
+        total: users.length,
+      });
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  },
+  getMe: async (req, res) => {
+    try {
+      const user = await User.findById(req.user.id).populate("role");
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({
+        _id: user._id,
+        name: `${user.firstName} ${user.lastName}`,
+        email: user.email,
+        profileImage: user.profileImage,
+        role: user.role,
+      });
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  },
 
   updateUser: async (req, res) => {
     try {

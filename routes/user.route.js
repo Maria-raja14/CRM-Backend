@@ -25,6 +25,9 @@ router.get(
   adminCreateOnly,
   indexControllers.usersController.getUsers,
 );
+
+router.get("/me", protect, indexControllers.usersController.getMe);
+
 router.put(
   "/update-user/:id",
   upload.single("profileImage"),
