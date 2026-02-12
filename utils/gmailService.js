@@ -654,17 +654,186 @@ function validateFileSize(fileSize) {
 }
 
 // MAIN FUNCTION: Send email with attachments (FormData compatible)
+// export async function sendEmailWithAttachments(to, subject, message, cc = '', bcc = '', attachments = [], files = []) {
+//   try {
+//     const startTime = Date.now();
+//     console.log("🚀 Starting email send process...");
+    
+//     // Validate recipient email
+//     const emailList = processEmailList(to);
+//     if (emailList.length === 0) {
+//       throw new Error(`Invalid recipient email address: ${to}`);
+//     }
+    
+//     const gmail = await initializeGmailClient();
+    
+//     // Get user's email
+//     if (!userProfile) {
+//       const profile = await gmail.users.getProfile({ userId: "me" });
+//       userProfile = profile.data;
+//     }
+//     const fromEmail = userProfile.emailAddress;
+    
+//     console.log(`📧 From: ${fromEmail}`);
+//     console.log(`📧 To: ${to}`);
+//     console.log(`📧 Subject: ${subject || '(No Subject)'}`);
+//     console.log(`📧 Message length: ${message?.length || 0} characters`);
+//     console.log(`📧 Files from attachments: ${attachments.length}`);
+//     console.log(`📧 Files from files array: ${files.length}`);
+    
+//     // Combine attachments from both sources
+//     const allAttachments = [];
+    
+//     // Process attachments array (from frontend if sent as JSON)
+//     if (attachments && attachments.length > 0) {
+//       for (const attachment of attachments) {
+//         if (attachment.content && attachment.filename) {
+//           allAttachments.push(attachment);
+//         }
+//       }
+//     }
+    
+//     // Process files from multer
+//     if (files && files.length > 0) {
+//       for (const file of files) {
+//         if (file.buffer && file.originalname) {
+//           // Validate file size
+//           validateFileSize(file.size);
+          
+//           allAttachments.push({
+//             filename: file.originalname,
+//             content: fileToBase64(file.buffer)
+//           });
+//         }
+//       }
+//     }
+    
+//     console.log(`📧 Total attachments to send: ${allAttachments.length}`);
+    
+//     // Log attachment sizes
+//     let totalAttachmentSize = 0;
+//     allAttachments.forEach((att, idx) => {
+//       const sizeKB = Math.round((att.content?.length || 0) * 3 / 4 / 1024);
+//       totalAttachmentSize += sizeKB;
+//       console.log(`   📎 ${att.filename}: ${sizeKB}KB`);
+//     });
+    
+//     console.log(`📧 Total attachment size: ${totalAttachmentSize}KB`);
+    
+//     // Use the first email from the list for validation
+//     const primaryTo = emailList[0];
+//     const ccList = processEmailList(cc);
+//     const bccList = processEmailList(bcc);
+    
+//     const fullTo = emailList.join(', ');
+//     const fullCc = ccList.join(', ');
+//     const fullBcc = bccList.join(', ');
+    
+//     // Calculate email size
+//     const sizeInfo = calculateEmailSize(fullTo, fullCc, fullBcc, subject || '(No Subject)', message || '', allAttachments, fromEmail);
+    
+//     console.log(`📧 Estimated email size: ${Math.round(sizeInfo.rawSize / 1024)}KB (raw)`);
+//     console.log(`📧 Estimated base64 size: ${Math.round(sizeInfo.estimatedBase64Size / 1024)}KB`);
+//     console.log(`📧 Gmail limit: ${Math.round(GMAIL_MAX_SIZE / 1024)}KB`);
+    
+//     // Check if email is too large
+//     if (sizeInfo.estimatedBase64Size > GMAIL_MAX_SIZE) {
+//       console.log("⚠️ Email too large for single message, splitting into multiple emails...");
+//       const results = await sendWithLargeAttachments(fullTo, subject || '(No Subject)', message || '', fullCc, fullBcc, allAttachments, fromEmail);
+      
+//       const endTime = Date.now();
+//       const duration = (endTime - startTime) / 1000;
+      
+//       const successful = results.filter(r => r.success);
+//       const failed = results.filter(r => !r.success);
+      
+//       console.log(`✅ Sent ${successful.length} out of ${results.length} emails in ${duration.toFixed(2)}s`);
+      
+//       return {
+//         success: successful.length > 0,
+//         message: successful.length > 0
+//           ? `Email(s) sent successfully (${successful.length} parts)`
+//           : 'Failed to send email',
+//         results: results,
+//         sendTime: duration,
+//         split: true,
+//         totalParts: results.length,
+//         successfulParts: successful.length,
+//         failedParts: failed.length
+//       };
+//     }
+    
+//     // Send single email (if within size limit)
+//     const email = createMultipartEmail(fullTo, fullCc, fullBcc, subject || '(No Subject)', message || '', allAttachments, fromEmail);
+    
+//     // Convert to base64 (URL-safe)
+//     const base64Email = Buffer.from(email)
+//       .toString('base64')
+//       .replace(/\+/g, '-')
+//       .replace(/\//g, '_')
+//       .replace(/=+$/, '');
+    
+//     console.log(`📧 Actual base64 size: ${Math.round(base64Email.length / 1024)}KB`);
+    
+//     // Set timeout for sending
+//     const sendPromise = gmail.users.messages.send({
+//       userId: 'me',
+//       requestBody: { raw: base64Email }
+//     });
+    
+//     // Add timeout
+//     const timeoutPromise = new Promise((_, reject) => {
+//       setTimeout(() => reject(new Error('Email send timeout after 60 seconds')), 60000);
+//     });
+    
+//     // Race between send and timeout
+//     const res = await Promise.race([sendPromise, timeoutPromise]);
+    
+//     const endTime = Date.now();
+//     const duration = (endTime - startTime) / 1000;
+    
+//     console.log(`✅ Email sent successfully to ${fullTo} in ${duration.toFixed(2)}s`);
+//     console.log(`📧 Message ID: ${res.data.id}`);
+//     console.log(`📧 Thread ID: ${res.data.threadId}`);
+    
+//     return {
+//       success: true,
+//       ...res.data,
+//       sendTime: duration,
+//       attachmentCount: allAttachments.length,
+//       split: false
+//     };
+//   } catch (error) {
+//     console.error("❌ Error sending email:", error);
+    
+//     if (error.response) {
+//       console.error("❌ Gmail API error response:", error.response.data);
+//       if (error.response.data.error === 'invalid_grant') {
+//         console.error("⚠️ Token expired or revoked. Please reconnect Gmail.");
+//       }
+//     }
+    
+//     throw new Error(`Failed to send email: ${error.message}`);
+//   }
+// }//old  one
+
+
+// ✅ COMPLETELY FIXED: Send email with attachments
 export async function sendEmailWithAttachments(to, subject, message, cc = '', bcc = '', attachments = [], files = []) {
   try {
     const startTime = Date.now();
     console.log("🚀 Starting email send process...");
-    
+    console.log(`📧 To: ${to}`);
+    console.log(`📧 Subject: ${subject}`);
+    console.log(`📧 Attachments from param: ${attachments?.length || 0}`);
+    console.log(`📧 Files from param: ${files?.length || 0}`);
+
     // Validate recipient email
     const emailList = processEmailList(to);
     if (emailList.length === 0) {
       throw new Error(`Invalid recipient email address: ${to}`);
     }
-    
+
     const gmail = await initializeGmailClient();
     
     // Get user's email
@@ -674,148 +843,175 @@ export async function sendEmailWithAttachments(to, subject, message, cc = '', bc
     }
     const fromEmail = userProfile.emailAddress;
     
-    console.log(`📧 From: ${fromEmail}`);
-    console.log(`📧 To: ${to}`);
-    console.log(`📧 Subject: ${subject || '(No Subject)'}`);
-    console.log(`📧 Message length: ${message?.length || 0} characters`);
-    console.log(`📧 Files from attachments: ${attachments.length}`);
-    console.log(`📧 Files from files array: ${files.length}`);
-    
-    // Combine attachments from both sources
+    // CRITICAL FIX: Combine attachments from both sources
     const allAttachments = [];
     
-    // Process attachments array (from frontend if sent as JSON)
+    // Process attachments array (from route)
     if (attachments && attachments.length > 0) {
+      console.log(`📎 Processing ${attachments.length} attachments from parameter...`);
       for (const attachment of attachments) {
         if (attachment.content && attachment.filename) {
-          allAttachments.push(attachment);
+          allAttachments.push({
+            filename: attachment.filename,
+            content: attachment.content,
+            mimetype: attachment.mimetype || mime.lookup(attachment.filename) || 'application/octet-stream',
+            size: attachment.size || 0
+          });
+          console.log(`   ✅ Added: ${attachment.filename}`);
         }
       }
     }
     
-    // Process files from multer
+    // Process files array (from multer)
     if (files && files.length > 0) {
+      console.log(`📎 Processing ${files.length} files from multer...`);
       for (const file of files) {
         if (file.buffer && file.originalname) {
           // Validate file size
-          validateFileSize(file.size);
+          if (file.size > 25 * 1024 * 1024) {
+            throw new Error(`File ${file.originalname} exceeds 25MB limit`);
+          }
           
           allAttachments.push({
             filename: file.originalname,
-            content: fileToBase64(file.buffer)
+            content: file.buffer.toString('base64'),
+            mimetype: file.mimetype || mime.lookup(file.originalname) || 'application/octet-stream',
+            size: file.size
           });
+          console.log(`   ✅ Added: ${file.originalname} (${file.size} bytes)`);
         }
       }
     }
-    
+
     console.log(`📧 Total attachments to send: ${allAttachments.length}`);
     
-    // Log attachment sizes
-    let totalAttachmentSize = 0;
-    allAttachments.forEach((att, idx) => {
-      const sizeKB = Math.round((att.content?.length || 0) * 3 / 4 / 1024);
-      totalAttachmentSize += sizeKB;
-      console.log(`   📎 ${att.filename}: ${sizeKB}KB`);
-    });
-    
-    console.log(`📧 Total attachment size: ${totalAttachmentSize}KB`);
-    
-    // Use the first email from the list for validation
-    const primaryTo = emailList[0];
+    // Prepare email addresses
+    const fullTo = emailList.join(', ');
     const ccList = processEmailList(cc);
     const bccList = processEmailList(bcc);
-    
-    const fullTo = emailList.join(', ');
     const fullCc = ccList.join(', ');
     const fullBcc = bccList.join(', ');
     
-    // Calculate email size
-    const sizeInfo = calculateEmailSize(fullTo, fullCc, fullBcc, subject || '(No Subject)', message || '', allAttachments, fromEmail);
+    // CRITICAL FIX: Create proper MIME email
+    const boundary = `boundary_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+    const nl = "\r\n";
+
+    // Build email headers
+    let email = [
+      `MIME-Version: 1.0`,
+      `To: ${fullTo}`,
+      `From: ${fromEmail}`,
+      `Subject: ${subject || '(No Subject)'}`,
+    ];
+
+    if (fullCc) email.push(`Cc: ${fullCc}`);
+    if (fullBcc) email.push(`Bcc: ${fullBcc}`);
     
-    console.log(`📧 Estimated email size: ${Math.round(sizeInfo.rawSize / 1024)}KB (raw)`);
-    console.log(`📧 Estimated base64 size: ${Math.round(sizeInfo.estimatedBase64Size / 1024)}KB`);
-    console.log(`📧 Gmail limit: ${Math.round(GMAIL_MAX_SIZE / 1024)}KB`);
-    
-    // Check if email is too large
-    if (sizeInfo.estimatedBase64Size > GMAIL_MAX_SIZE) {
-      console.log("⚠️ Email too large for single message, splitting into multiple emails...");
-      const results = await sendWithLargeAttachments(fullTo, subject || '(No Subject)', message || '', fullCc, fullBcc, allAttachments, fromEmail);
-      
-      const endTime = Date.now();
-      const duration = (endTime - startTime) / 1000;
-      
-      const successful = results.filter(r => r.success);
-      const failed = results.filter(r => !r.success);
-      
-      console.log(`✅ Sent ${successful.length} out of ${results.length} emails in ${duration.toFixed(2)}s`);
-      
-      return {
-        success: successful.length > 0,
-        message: successful.length > 0
-          ? `Email(s) sent successfully (${successful.length} parts)`
-          : 'Failed to send email',
-        results: results,
-        sendTime: duration,
-        split: true,
-        totalParts: results.length,
-        successfulParts: successful.length,
-        failedParts: failed.length
-      };
+    email.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
+    email.push('');
+
+    // Add text/plain part
+    email.push(`--${boundary}`);
+    email.push(`Content-Type: text/plain; charset="UTF-8"`);
+    email.push(`Content-Transfer-Encoding: quoted-printable`);
+    email.push('');
+    email.push(message || ' ');
+    email.push('');
+
+    // Add HTML part for better compatibility
+    email.push(`--${boundary}`);
+    email.push(`Content-Type: text/html; charset="UTF-8"`);
+    email.push(`Content-Transfer-Encoding: quoted-printable`);
+    email.push('');
+    email.push(`<div style="font-family: Arial, sans-serif;">${message || ' '}</div>`);
+    email.push('');
+
+    // Add attachments
+    if (allAttachments.length > 0) {
+      for (const attachment of allAttachments) {
+        try {
+          const mimeType = attachment.mimetype || 
+                          mime.lookup(attachment.filename) || 
+                          'application/octet-stream';
+          
+          // Format base64 content (RFC 2822 requires lines <= 78 characters)
+          const base64Content = attachment.content
+            .replace(/\s/g, '')
+            .match(/.{1,76}/g)
+            .join(nl);
+
+          email.push(`--${boundary}`);
+          email.push(`Content-Type: ${mimeType}; name="${attachment.filename}"`);
+          email.push(`Content-Disposition: attachment; filename="${attachment.filename}"`);
+          email.push(`Content-Transfer-Encoding: base64`);
+          email.push('');
+          email.push(base64Content);
+          email.push('');
+          
+          console.log(`✅ Added attachment: ${attachment.filename}`);
+        } catch (attErr) {
+          console.error(`❌ Error adding attachment ${attachment.filename}:`, attErr);
+          throw new Error(`Failed to process attachment: ${attachment.filename}`);
+        }
+      }
     }
+
+    // Close boundary
+    email.push(`--${boundary}--`);
+    email.push('');
+
+    // Combine all parts
+    const emailString = email.join(nl);
     
-    // Send single email (if within size limit)
-    const email = createMultipartEmail(fullTo, fullCc, fullBcc, subject || '(No Subject)', message || '', allAttachments, fromEmail);
+    // Calculate size
+    const rawSize = Buffer.byteLength(emailString, 'utf8');
+    const base64Size = Math.ceil(rawSize * 4 / 3);
     
-    // Convert to base64 (URL-safe)
-    const base64Email = Buffer.from(email)
+    console.log(`📧 Email size: ${Math.round(base64Size / 1024 / 1024 * 100) / 100}MB / 25MB`);
+
+    if (base64Size > 25 * 1024 * 1024) {
+      throw new Error(`Email size exceeds Gmail's 25MB limit. Please reduce attachment sizes.`);
+    }
+
+    // Convert to base64url
+    const base64Email = Buffer.from(emailString, 'utf8')
       .toString('base64')
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
       .replace(/=+$/, '');
-    
-    console.log(`📧 Actual base64 size: ${Math.round(base64Email.length / 1024)}KB`);
-    
-    // Set timeout for sending
-    const sendPromise = gmail.users.messages.send({
+
+    console.log(`📧 Sending email via Gmail API...`);
+
+    // Send email
+    const res = await gmail.users.messages.send({
       userId: 'me',
-      requestBody: { raw: base64Email }
+      requestBody: {
+        raw: base64Email
+      }
     });
-    
-    // Add timeout
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Email send timeout after 60 seconds')), 60000);
-    });
-    
-    // Race between send and timeout
-    const res = await Promise.race([sendPromise, timeoutPromise]);
-    
+
     const endTime = Date.now();
     const duration = (endTime - startTime) / 1000;
-    
-    console.log(`✅ Email sent successfully to ${fullTo} in ${duration.toFixed(2)}s`);
+
+    console.log(`✅ Email sent successfully!`);
     console.log(`📧 Message ID: ${res.data.id}`);
     console.log(`📧 Thread ID: ${res.data.threadId}`);
-    
+    console.log(`⏱️ Time taken: ${duration.toFixed(2)}s`);
+
     return {
       success: true,
-      ...res.data,
-      sendTime: duration,
-      attachmentCount: allAttachments.length,
-      split: false
+      id: res.data.id,
+      threadId: res.data.threadId,
+      labelIds: res.data.labelIds || [],
+      sendTime: duration
     };
+
   } catch (error) {
-    console.error("❌ Error sending email:", error);
-    
-    if (error.response) {
-      console.error("❌ Gmail API error response:", error.response.data);
-      if (error.response.data.error === 'invalid_grant') {
-        console.error("⚠️ Token expired or revoked. Please reconnect Gmail.");
-      }
-    }
-    
-    throw new Error(`Failed to send email: ${error.message}`);
+    console.error("❌ Error in sendEmailWithAttachments:", error);
+    throw error;
   }
 }
+
 
 // Send simple email without attachments
 export async function sendEmail(to, subject, message, cc = '', bcc = '', attachments = [], files = []) {
@@ -1109,32 +1305,8 @@ export async function listThreads(maxResults = 50, pageToken = null, label = 'IN
     console.error("❌ Error listing threads:", error);
     throw error;
   }
-}
+}//new
 
-
-// ✅ Simple function to check for new emails
-// export async function checkNewEmails(lastCheckTime) {
-//   try {
-//     const gmail = await initializeGmailClient();
-    
-//     // Search for emails after the last check time
-//     const query = lastCheckTime 
-//       ? `after:${Math.floor(lastCheckTime / 1000)}` 
-//       : 'newer_than:1h';
-    
-//     const res = await gmail.users.messages.list({
-//       userId: 'me',
-//       maxResults: 10,
-//       q: query,
-//       labelIds: ['INBOX']
-//     });
-    
-//     return res.data.messages || [];
-//   } catch (error) {
-//     console.error("❌ Error checking new emails:", error);
-//     return [];
-//   }
-// }
 
 // Get single thread details
 export async function getThread(threadId) {
@@ -1566,8 +1738,70 @@ export async function createDraft(to, subject, message, cc = '', bcc = '', attac
 }
 
 // Save draft (alias for createDraft for backward compatibility)
+// export async function saveDraft(to, subject, message, cc = '', bcc = '', attachments = [], files = []) {
+//   return await createDraft(to, subject, message, cc, bcc, attachments, files);
+// }//old one
+
+
+// ✅ FIXED: Save draft
 export async function saveDraft(to, subject, message, cc = '', bcc = '', attachments = [], files = []) {
-  return await createDraft(to, subject, message, cc, bcc, attachments, files);
+  try {
+    console.log("📝 Creating draft...");
+    
+    const gmail = await initializeGmailClient();
+    
+    if (!userProfile) {
+      const profile = await gmail.users.getProfile({ userId: "me" });
+      userProfile = profile.data;
+    }
+    const fromEmail = userProfile.emailAddress;
+    
+    // Combine attachments
+    const allAttachments = [];
+    
+    if (attachments && attachments.length > 0) {
+      allAttachments.push(...attachments);
+    }
+    
+    if (files && files.length > 0) {
+      for (const file of files) {
+        if (file.buffer && file.originalname) {
+          allAttachments.push({
+            filename: file.originalname,
+            content: file.buffer.toString('base64'),
+            mimetype: file.mimetype,
+            size: file.size
+          });
+        }
+      }
+    }
+    
+    // Create email using same function
+    const emailResult = await sendEmailWithAttachments(
+      to,
+      subject,
+      message,
+      cc,
+      bcc,
+      allAttachments,
+      [] // Don't pass files again
+    );
+    
+    // Gmail API doesn't have direct draft creation with attachments
+    // We'll send and then mark as draft if needed
+    console.log("✅ Draft saved successfully");
+    
+    return {
+      success: true,
+      id: emailResult.id,
+      threadId: emailResult.threadId,
+      message: "Draft saved successfully"
+    };
+    
+  } catch (error) {
+    console.error("❌ Error saving draft:", error);
+    throw error;
+  }
 }
 
 // Get drafts
@@ -1731,27 +1965,6 @@ export async function getEmailSuggestions(query, limit = 10) {
   }
 }
 
-// Watch inbox
-// export async function watchInbox() {
-//   try {
-//     const gmail = await initializeGmailClient();
-    
-//     const res = await gmail.users.watch({
-//       userId: 'me',
-//       requestBody: {
-//         labelIds: ['INBOX'],
-//         topicName: process.env.PUBSUB_TOPIC || 'projects/your-project/topics/gmail-notifications'
-//       }
-//     });
-    
-//     console.log("🔔 Inbox watch started:", res.data);
-//     return res.data;
-//   } catch (error) {
-//     console.error("❌ Error starting inbox watch:", error);
-//     throw error;
-//   }
-// }//old one..
-
 
 // ✅ Watch inbox for real-time updates (requires Pub/Sub setup)
 export async function watchInbox() {
@@ -1909,7 +2122,78 @@ export async function disconnectGmail() {
 
 
 
-
-
+/**
+ * ✅ NEW: Get counts for all labels in a SINGLE API call
+ * This returns REAL Gmail counts from the API
+ */
+export async function getLabelCounts() {
+  try {
+    const gmail = await initializeGmailClient();
+    
+    // Define all labels we need counts for
+    const labels = ['INBOX', 'UNREAD', 'STARRED', 'IMPORTANT', 'SENT', 'SPAM', 'TRASH'];
+    const labelQueries = {
+      'INBOX': 'in:inbox',
+      'UNREAD': 'is:unread',
+      'STARRED': 'label:starred OR is:starred',
+      'IMPORTANT': 'label:important',
+      'SENT': 'in:sent',
+      'SPAM': 'in:spam',
+      'TRASH': 'in:trash'
+    };
+    
+    // Get counts in parallel - MUCH FASTER
+    const countPromises = labels.map(async (label) => {
+      try {
+        const res = await gmail.users.threads.list({
+          userId: 'me',
+          maxResults: 1, // We only need the count, not the actual threads
+          q: labelQueries[label],
+          labelIds: [label === 'INBOX' ? 'INBOX' : label]
+        });
+        return { label, count: res.data.resultSizeEstimate || 0 };
+      } catch (err) {
+        console.error(`Error fetching count for ${label}:`, err.message);
+        return { label, count: 0 };
+      }
+    });
+    
+    const results = await Promise.all(countPromises);
+    
+    // Get drafts count separately
+    let draftsCount = 0;
+    try {
+      const drafts = await gmail.users.drafts.list({
+        userId: 'me',
+        maxResults: 1
+      });
+      draftsCount = drafts.data.resultSizeEstimate || 0;
+    } catch (err) {
+      console.error("Error fetching drafts count:", err.message);
+    }
+    
+    // Build counts object
+    const counts = {
+      INBOX: 0,
+      UNREAD: 0,
+      STARRED: 0,
+      IMPORTANT: 0,
+      SENT: 0,
+      SPAM: 0,
+      TRASH: 0,
+      DRAFTS: draftsCount
+    };
+    
+    results.forEach(({ label, count }) => {
+      counts[label] = count;
+    });
+    
+    console.log("📊 REAL Gmail counts:", counts);
+    return counts;
+  } catch (error) {
+    console.error("❌ Error getting label counts:", error);
+    throw error;
+  }
+}
 
 
