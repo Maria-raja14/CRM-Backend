@@ -13,9 +13,23 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// const CLIENT_ID = process.env.GMAIL_CLIENT_ID;
+// const CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
+// const REDIRECT_URI = process.env.GMAIL_REDIRECT_URI || "http://localhost:5000/api/gmail/oauth2callback";
+
+
+// ✅ Detect environment
+const isProduction = process.env.NODE_ENV === 'production';
+console.log(`📧 Gmail Service running in ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'} mode`);
+
+// ✅ Use the correct redirect URI based on environment
 const CLIENT_ID = process.env.GMAIL_CLIENT_ID;
 const CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
-const REDIRECT_URI = process.env.GMAIL_REDIRECT_URI || "http://localhost:5000/api/gmail/oauth2callback";
+const REDIRECT_URI = isProduction 
+  ? process.env.GMAIL_LIVE_REDIRECT_URI 
+  : process.env.GMAIL_REDIRECT_URI;
+
+console.log(`📧 Using redirect URI: ${REDIRECT_URI}`);
 
 // Validate required environment variables
 if (!CLIENT_ID || !CLIENT_SECRET) {
@@ -84,9 +98,9 @@ export async function initializeGmailClient() {
     oauth2ClientWithTokens.setCredentials(tokens);
     
     // Create Gmail client with authenticated OAuth2 client
-    gmailClient = google.gmail({ 
-      version: "v1", 
-      auth: oauth2ClientWithTokens 
+    gmailClient = google.gmail({
+      version: "v1",
+      auth: oauth2ClientWithTokens
     });
     
     // Also update the global oauth2Client
@@ -602,11 +616,11 @@ async function sendWithLargeAttachments(to, cc, bcc, subject, message, attachmen
         requestBody: { raw: base64AttachmentEmail }
       });
       
-      results.push({ 
-        type: 'attachments', 
-        group: i + 1, 
+      results.push({
+        type: 'attachments',
+        group: i + 1,
         totalGroups: attachmentGroups.length,
-        success: true, 
+        success: true,
         id: attachmentResult.data.id,
         fileCount: group.length
       });
@@ -614,11 +628,11 @@ async function sendWithLargeAttachments(to, cc, bcc, subject, message, attachmen
       console.log(`✅ Attachment group ${i + 1}/${attachmentGroups.length} sent: ${attachmentResult.data.id}`);
     } catch (error) {
       console.error(`❌ Failed to send attachment group ${i + 1}:`, error.message);
-      results.push({ 
-        type: 'attachments', 
-        group: i + 1, 
-        success: false, 
-        error: error.message 
+      results.push({
+        type: 'attachments',
+        group: i + 1,
+        success: false,
+        error: error.message
       });
     }
   }
@@ -737,8 +751,8 @@ export async function sendEmailWithAttachments(to, subject, message, cc = '', bc
       
       return {
         success: successful.length > 0,
-        message: successful.length > 0 
-          ? `Email(s) sent successfully (${successful.length} parts)` 
+        message: successful.length > 0
+          ? `Email(s) sent successfully (${successful.length} parts)`
           : 'Failed to send email',
         results: results,
         sendTime: duration,
@@ -934,61 +948,191 @@ export async function deleteEmail(messageId) {
 }
 
 // Get threads with pagination
+// export async function listThreads(maxResults = 50, pageToken = null, label = 'INBOX') {
+//   try {
+//     const gmail = await initializeGmailClient();
+    
+//     let q = '';
+//     switch(label) {
+//       case 'INBOX':
+//         q = 'in:inbox';
+//         break;
+//       case 'UNREAD':
+//         q = 'is:unread';
+//         break;
+//       case 'STARRED':
+//         q = 'label:starred OR is:starred';
+//         break;
+//       case 'SENT':
+//         q = 'in:sent';
+//         break;
+//       case 'DRAFTS':
+//         q = 'in:drafts';
+//         break;
+//       case 'SPAM':
+//         q = 'in:spam';
+//         break;
+//       case 'TRASH':
+//         q = 'in:trash';
+//         break;
+//       default:
+//         q = `in:${label}`;
+//     }
+    
+//     const res = await gmail.users.threads.list({
+//       userId: "me",
+//       maxResults: maxResults,
+//       pageToken: pageToken,
+//       q: q
+//     });
+    
+//     const threads = res.data.threads || [];
+//     console.log(`✅ Fetched ${threads.length} threads from ${label}`);
+    
+//     // Get basic thread info (optimized)
+//     const basicThreads = threads.map(thread => ({
+//       id: thread.id,
+//       snippet: thread.snippet
+//     }));
+    
+//     return {
+//       threads: basicThreads,
+//       nextPageToken: res.data.nextPageToken,
+//       resultSizeEstimate: res.data.resultSizeEstimate
+//     };
+//   } catch (error) {
+//     console.error("❌ Error listing threads:", error);
+//     throw error;
+//   }
+// }//old one,.,
+
+// ✅ Get threads with pagination - LATEST FIRST
 export async function listThreads(maxResults = 50, pageToken = null, label = 'INBOX') {
   try {
     const gmail = await initializeGmailClient();
     
     let q = '';
     switch(label) {
-      case 'INBOX':
-        q = 'in:inbox';
-        break;
-      case 'UNREAD':
-        q = 'is:unread';
-        break;
-      case 'STARRED':
-        q = 'label:starred OR is:starred';
-        break;
-      case 'SENT':
-        q = 'in:sent';
-        break;
-      case 'DRAFTS':
-        q = 'in:drafts';
-        break;
-      case 'SPAM':
-        q = 'in:spam';
-        break;
-      case 'TRASH':
-        q = 'in:trash';
-        break;
-      default:
-        q = `in:${label}`;
+      case 'INBOX': q = 'in:inbox'; break;
+      case 'UNREAD': q = 'is:unread'; break;
+      case 'STARRED': q = 'label:starred OR is:starred'; break;
+      case 'SENT': q = 'in:sent'; break;
+      case 'DRAFTS': q = 'in:drafts'; break;
+      case 'SPAM': q = 'in:spam'; break;
+      case 'TRASH': q = 'in:trash'; break;
+      default: q = `in:${label}`;
     }
     
+    // IMPORTANT: Add sort order - newest first
     const res = await gmail.users.threads.list({
       userId: "me",
       maxResults: maxResults,
       pageToken: pageToken,
-      q: q
+      q: q,
+      labelIds: [label === 'INBOX' ? 'INBOX' : label],
+      includeSpamTrash: label === 'SPAM' || label === 'TRASH'
     });
     
     const threads = res.data.threads || [];
     console.log(`✅ Fetched ${threads.length} threads from ${label}`);
     
-    // Get basic thread info (optimized)
-    const basicThreads = threads.map(thread => ({
-      id: thread.id,
-      snippet: thread.snippet
-    }));
+    // Get thread details to include date for sorting
+    const detailedThreads = [];
+    
+    for (const thread of threads.slice(0, 20)) { // Limit to 20 for performance
+      try {
+        const threadRes = await gmail.users.threads.get({
+          userId: 'me',
+          id: thread.id,
+          format: 'metadata',
+          metadataHeaders: ['Subject', 'From', 'Date']
+        });
+        
+        const messages = threadRes.data.messages || [];
+        const firstMessage = messages[0];
+        const headers = firstMessage?.payload?.headers || [];
+        
+        const subject = headers.find(h => h.name === 'Subject')?.value || 'No Subject';
+        const from = headers.find(h => h.name === 'From')?.value || 'Unknown';
+        const date = headers.find(h => h.name === 'Date')?.value || '';
+        
+        // Parse date for sorting
+        let timestamp = 0;
+        if (date) {
+          timestamp = new Date(date).getTime();
+        }
+        
+        const labelIds = firstMessage?.labelIds || [];
+        
+        detailedThreads.push({
+          id: thread.id,
+          snippet: thread.snippet || '',
+          subject,
+          from,
+          date,
+          timestamp, // For sorting
+          unread: labelIds.includes('UNREAD'),
+          starred: labelIds.includes('STARRED'),
+          important: labelIds.includes('IMPORTANT'),
+          spam: labelIds.includes('SPAM'),
+          trash: labelIds.includes('TRASH'),
+          messagesCount: messages.length
+        });
+      } catch (err) {
+        console.error(`Error fetching thread ${thread.id}:`, err.message);
+        detailedThreads.push({
+          id: thread.id,
+          snippet: thread.snippet || '',
+          subject: 'No Subject',
+          from: 'Unknown',
+          date: '',
+          timestamp: 0,
+          unread: false,
+          starred: false,
+          important: false,
+          spam: false,
+          trash: false,
+          messagesCount: 0
+        });
+      }
+    }
+    
+    // ✅ SORT BY LATEST FIRST (newest on top)
+    detailedThreads.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     
     return {
-      threads: basicThreads,
+      threads: detailedThreads,
       nextPageToken: res.data.nextPageToken,
       resultSizeEstimate: res.data.resultSizeEstimate
     };
   } catch (error) {
     console.error("❌ Error listing threads:", error);
     throw error;
+  }
+}
+
+
+// ✅ Simple function to check for new emails
+export async function checkNewEmails(lastCheckTime) {
+  try {
+    const gmail = await initializeGmailClient();
+    
+    // Search for emails after the last check time
+    const query = lastCheckTime 
+      ? `after:${Math.floor(lastCheckTime / 1000)}` 
+      : 'newer_than:1h';
+    
+    const res = await gmail.users.messages.list({
+      userId: 'me',
+      maxResults: 10,
+      q: query,
+      labelIds: ['INBOX']
+    });
+    
+    return res.data.messages || [];
+  } catch (error) {
+    console.error("❌ Error checking new emails:", error);
+    return [];
   }
 }
 
@@ -1575,7 +1719,7 @@ export async function getEmailSuggestions(query, limit = 10) {
     let suggestions = Array.from(emailSet);
     if (query) {
       const lowerQuery = query.toLowerCase();
-      suggestions = suggestions.filter(email => 
+      suggestions = suggestions.filter(email =>
         email.toLowerCase().includes(lowerQuery)
       );
     }
@@ -1588,20 +1732,36 @@ export async function getEmailSuggestions(query, limit = 10) {
 }
 
 // Watch inbox
+// export async function watchInbox() {
+//   try {
+//     const gmail = await initializeGmailClient();
+    
+//     const res = await gmail.users.watch({
+//       userId: 'me',
+//       requestBody: {
+//         labelIds: ['INBOX'],
+//         topicName: process.env.PUBSUB_TOPIC || 'projects/your-project/topics/gmail-notifications'
+//       }
+//     });
+    
+//     console.log("🔔 Inbox watch started:", res.data);
+//     return res.data;
+//   } catch (error) {
+//     console.error("❌ Error starting inbox watch:", error);
+//     throw error;
+//   }
+// }//old one..
+
+
+// ✅ Watch inbox for real-time updates (requires Pub/Sub setup)
 export async function watchInbox() {
   try {
     const gmail = await initializeGmailClient();
     
-    const res = await gmail.users.watch({
-      userId: 'me',
-      requestBody: {
-        labelIds: ['INBOX'],
-        topicName: process.env.PUBSUB_TOPIC || 'projects/your-project/topics/gmail-notifications'
-      }
-    });
-    
-    console.log("🔔 Inbox watch started:", res.data);
-    return res.data;
+    // This requires Google Cloud Pub/Sub setup
+    // For simplicity, we'll rely on polling instead
+    console.log("🔔 Using polling for real-time updates");
+    return { historyId: Date.now().toString() };
   } catch (error) {
     console.error("❌ Error starting inbox watch:", error);
     throw error;
@@ -1744,3 +1904,12 @@ export async function disconnectGmail() {
     throw error;
   }
 }//all come correctly without error..
+
+
+
+
+
+
+
+
+
