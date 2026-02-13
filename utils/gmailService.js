@@ -1123,7 +1123,9 @@ export async function deleteThread(threadId) {
     console.error("❌ Error deleting thread:", error);
     throw error;
   }
-}
+}//old one
+
+
 
 // Delete email function
 export async function deleteEmail(messageId) {
@@ -1202,46 +1204,69 @@ export async function deleteEmail(messageId) {
 //   }
 // }//old one,.,
 
-// ✅ Get threads with pagination - LATEST FIRST
-export async function listThreads(maxResults = 50, pageToken = null, label = 'INBOX') {
+
+
+
+
+export async function listThreads(maxResults = 20, pageToken = null, label = 'INBOX') {
   try {
     const gmail = await initializeGmailClient();
     
-    let q = '';
-    switch(label) {
-      case 'INBOX': q = 'in:inbox'; break;
-      case 'UNREAD': q = 'is:unread'; break;
-      case 'STARRED': q = 'label:starred OR is:starred'; break;
-      case 'SENT': q = 'in:sent'; break;
-      case 'DRAFTS': q = 'in:drafts'; break;
-      case 'SPAM': q = 'in:spam'; break;
-      case 'TRASH': q = 'in:trash'; break;
-      default: q = `in:${label}`;
-    }
-    
-    // IMPORTANT: Add sort order - newest first
-    const res = await gmail.users.threads.list({
+    let params = {
       userId: "me",
       maxResults: maxResults,
       pageToken: pageToken,
-      q: q,
-      labelIds: [label === 'INBOX' ? 'INBOX' : label],
       includeSpamTrash: label === 'SPAM' || label === 'TRASH'
-    });
+    };
+    
+    // Set labelIds based on label for ACCURATE filtering
+    switch(label) {
+      case 'INBOX':
+        params.labelIds = ['INBOX'];
+        break;
+      case 'UNREAD':
+        params.labelIds = ['INBOX', 'UNREAD'];
+        params.q = 'is:unread';
+        break;
+      case 'STARRED':
+        params.labelIds = ['STARRED'];
+        break;
+      case 'IMPORTANT':
+        params.labelIds = ['IMPORTANT'];
+        break;
+      case 'SENT':
+        params.labelIds = ['SENT'];
+        break;
+      case 'SPAM':
+        params.labelIds = ['SPAM'];
+        break;
+      case 'TRASH':
+        params.labelIds = ['TRASH'];
+        break;
+      case 'DRAFTS':
+        params.labelIds = ['DRAFT'];
+        break;
+      default:
+        params.labelIds = [label];
+    }
+    
+    const res = await gmail.users.threads.list(params);
     
     const threads = res.data.threads || [];
-    console.log(`✅ Fetched ${threads.length} threads from ${label}`);
+    console.log(`✅ Fetched ${threads.length} threads from ${label} (Total: ${res.data.resultSizeEstimate})`);
     
-    // Get thread details to include date for sorting
+    // Get thread details efficiently (limit to first 20 for performance)
     const detailedThreads = [];
+    const threadsToProcess = threads.slice(0, maxResults);
     
-    for (const thread of threads.slice(0, 20)) { // Limit to 20 for performance
+    for (const thread of threadsToProcess) {
       try {
+        // Use format: 'metadata' which is faster than 'full'
         const threadRes = await gmail.users.threads.get({
           userId: 'me',
           id: thread.id,
           format: 'metadata',
-          metadataHeaders: ['Subject', 'From', 'Date']
+          metadataHeaders: ['Subject', 'From', 'Date', 'To']
         });
         
         const messages = threadRes.data.messages || [];
@@ -1250,28 +1275,34 @@ export async function listThreads(maxResults = 50, pageToken = null, label = 'IN
         
         const subject = headers.find(h => h.name === 'Subject')?.value || 'No Subject';
         const from = headers.find(h => h.name === 'From')?.value || 'Unknown';
+        const to = headers.find(h => h.name === 'To')?.value || '';
         const date = headers.find(h => h.name === 'Date')?.value || '';
         
-        // Parse date for sorting
+        // Get REAL label IDs to determine unread status
+        const labelIds = firstMessage?.labelIds || [];
+        
+        // UNREAD is determined by the presence of 'UNREAD' label
+        const isUnread = labelIds.includes('UNREAD');
+        
         let timestamp = 0;
         if (date) {
           timestamp = new Date(date).getTime();
         }
-        
-        const labelIds = firstMessage?.labelIds || [];
         
         detailedThreads.push({
           id: thread.id,
           snippet: thread.snippet || '',
           subject,
           from,
+          to,
           date,
-          timestamp, // For sorting
-          unread: labelIds.includes('UNREAD'),
+          timestamp,
+          unread: isUnread, // ACCURATE unread status
           starred: labelIds.includes('STARRED'),
           important: labelIds.includes('IMPORTANT'),
           spam: labelIds.includes('SPAM'),
           trash: labelIds.includes('TRASH'),
+          drafts: labelIds.includes('DRAFT'),
           messagesCount: messages.length
         });
       } catch (err) {
@@ -1281,6 +1312,7 @@ export async function listThreads(maxResults = 50, pageToken = null, label = 'IN
           snippet: thread.snippet || '',
           subject: 'No Subject',
           from: 'Unknown',
+          to: '',
           date: '',
           timestamp: 0,
           unread: false,
@@ -1288,25 +1320,25 @@ export async function listThreads(maxResults = 50, pageToken = null, label = 'IN
           important: false,
           spam: false,
           trash: false,
+          drafts: false,
           messagesCount: 0
         });
       }
     }
     
-    // ✅ SORT BY LATEST FIRST (newest on top)
+    // Sort by latest first
     detailedThreads.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     
     return {
       threads: detailedThreads,
       nextPageToken: res.data.nextPageToken,
-      resultSizeEstimate: res.data.resultSizeEstimate
+      resultSizeEstimate: res.data.resultSizeEstimate || 0
     };
   } catch (error) {
     console.error("❌ Error listing threads:", error);
     throw error;
   }
-}//new
-
+}
 
 // Get single thread details
 export async function getThread(threadId) {
@@ -1388,7 +1420,11 @@ export async function markAsRead(threadId, read = true) {
     console.error("❌ Error marking thread:", error);
     throw error;
   }
-}
+}//old one
+
+
+
+
 
 // Star/unstar thread
 export async function starThread(threadId, star = true) {
@@ -1597,7 +1633,8 @@ export async function moveToTrash(threadId) {
     console.error("❌ Error moving to trash:", error);
     throw error;
   }
-}
+}//old one
+
 
 // Bulk move to trash
 export async function bulkMoveToTrash(threadIds) {
@@ -2122,57 +2159,59 @@ export async function disconnectGmail() {
 
 
 
+
 /**
- * ✅ NEW: Get counts for all labels in a SINGLE API call
- * This returns REAL Gmail counts from the API
+ * ✅ REAL ACCURATE LABEL COUNTS (MATCHES GMAIL UI)
+ * Uses Gmail internal label statistics
+ */
+// export async function getLabelCounts() {
+//   try {
+//     const gmail = await initializeGmailClient();
+
+//     // Fetch all labels with statistics
+//     const res = await gmail.users.labels.list({
+//       userId: "me",
+//     });
+
+//     const labels = res.data.labels || [];
+
+//     const getCount = (labelId, type = "messagesTotal") => {
+//       const label = labels.find(l => l.id === labelId);
+//       return label ? (label[type] || 0) : 0;
+//     };
+
+//     const counts = {
+//       INBOX: getCount("INBOX", "messagesTotal"),
+//       UNREAD: getCount("INBOX", "messagesUnread"), // IMPORTANT FIX
+//       STARRED: getCount("STARRED", "messagesTotal"),
+//       IMPORTANT: getCount("IMPORTANT", "messagesTotal"),
+//       SENT: getCount("SENT", "messagesTotal"),
+//       SPAM: getCount("SPAM", "messagesTotal"),
+//       TRASH: getCount("TRASH", "messagesTotal"),
+//       DRAFTS: getCount("DRAFT", "messagesTotal"),
+//     };
+
+//     console.log("📊 Accurate Gmail Counts:", counts);
+
+//     return counts;
+
+//   } catch (error) {
+//     console.error("❌ Error getting label counts:", error.message);
+//     throw error;
+//   }
+// }//old one
+
+
+
+/**
+ * ✅ FIXED: Get REAL counts for each label
+ * Uses labelIds and q parameter correctly to get accurate counts
  */
 export async function getLabelCounts() {
   try {
     const gmail = await initializeGmailClient();
     
-    // Define all labels we need counts for
-    const labels = ['INBOX', 'UNREAD', 'STARRED', 'IMPORTANT', 'SENT', 'SPAM', 'TRASH'];
-    const labelQueries = {
-      'INBOX': 'in:inbox',
-      'UNREAD': 'is:unread',
-      'STARRED': 'label:starred OR is:starred',
-      'IMPORTANT': 'label:important',
-      'SENT': 'in:sent',
-      'SPAM': 'in:spam',
-      'TRASH': 'in:trash'
-    };
-    
-    // Get counts in parallel - MUCH FASTER
-    const countPromises = labels.map(async (label) => {
-      try {
-        const res = await gmail.users.threads.list({
-          userId: 'me',
-          maxResults: 1, // We only need the count, not the actual threads
-          q: labelQueries[label],
-          labelIds: [label === 'INBOX' ? 'INBOX' : label]
-        });
-        return { label, count: res.data.resultSizeEstimate || 0 };
-      } catch (err) {
-        console.error(`Error fetching count for ${label}:`, err.message);
-        return { label, count: 0 };
-      }
-    });
-    
-    const results = await Promise.all(countPromises);
-    
-    // Get drafts count separately
-    let draftsCount = 0;
-    try {
-      const drafts = await gmail.users.drafts.list({
-        userId: 'me',
-        maxResults: 1
-      });
-      draftsCount = drafts.data.resultSizeEstimate || 0;
-    } catch (err) {
-      console.error("Error fetching drafts count:", err.message);
-    }
-    
-    // Build counts object
+    // Get counts using users.labels.get() - THIS IS THE CORRECT WAY
     const counts = {
       INBOX: 0,
       UNREAD: 0,
@@ -2181,19 +2220,105 @@ export async function getLabelCounts() {
       SENT: 0,
       SPAM: 0,
       TRASH: 0,
-      DRAFTS: draftsCount
+      DRAFTS: 0
     };
-    
-    results.forEach(({ label, count }) => {
-      counts[label] = count;
-    });
-    
+
+    try {
+      // ✅ CORRECT: Get INBOX count using label API
+      const inboxLabel = await gmail.users.labels.get({
+        userId: 'me',
+        id: 'INBOX'
+      });
+      counts.INBOX = inboxLabel.data.threadsTotal || 0;
+    } catch (err) {
+      console.error("Error fetching INBOX count:", err.message);
+    }
+
+    try {
+      // ✅ CORRECT: Get UNREAD count - use threads.list with proper query
+      const unreadRes = await gmail.users.threads.list({
+        userId: 'me',
+        maxResults: 1,
+        q: 'is:unread',
+        labelIds: ['INBOX', 'UNREAD']
+      });
+      counts.UNREAD = unreadRes.data.resultSizeEstimate || 0;
+    } catch (err) {
+      console.error("Error fetching UNREAD count:", err.message);
+    }
+
+    try {
+      // ✅ CORRECT: Get STARRED count
+      const starredRes = await gmail.users.threads.list({
+        userId: 'me',
+        maxResults: 1,
+        labelIds: ['STARRED']
+      });
+      counts.STARRED = starredRes.data.resultSizeEstimate || 0;
+    } catch (err) {
+      console.error("Error fetching STARRED count:", err.message);
+    }
+
+    try {
+      // ✅ CORRECT: Get IMPORTANT count
+      const importantRes = await gmail.users.threads.list({
+        userId: 'me',
+        maxResults: 1,
+        labelIds: ['IMPORTANT']
+      });
+      counts.IMPORTANT = importantRes.data.resultSizeEstimate || 0;
+    } catch (err) {
+      console.error("Error fetching IMPORTANT count:", err.message);
+    }
+
+    try {
+      // ✅ CORRECT: Get SENT count
+      const sentLabel = await gmail.users.labels.get({
+        userId: 'me',
+        id: 'SENT'
+      });
+      counts.SENT = sentLabel.data.threadsTotal || 0;
+    } catch (err) {
+      console.error("Error fetching SENT count:", err.message);
+    }
+
+    try {
+      // ✅ CORRECT: Get SPAM count
+      const spamLabel = await gmail.users.labels.get({
+        userId: 'me',
+        id: 'SPAM'
+      });
+      counts.SPAM = spamLabel.data.threadsTotal || 0;
+    } catch (err) {
+      console.error("Error fetching SPAM count:", err.message);
+    }
+
+    try {
+      // ✅ CORRECT: Get TRASH count
+      const trashLabel = await gmail.users.labels.get({
+        userId: 'me',
+        id: 'TRASH'
+      });
+      counts.TRASH = trashLabel.data.threadsTotal || 0;
+    } catch (err) {
+      console.error("Error fetching TRASH count:", err.message);
+    }
+
+    try {
+      // ✅ CORRECT: Get DRAFTS count
+      const draftsRes = await gmail.users.drafts.list({
+        userId: 'me',
+        maxResults: 1
+      });
+      counts.DRAFTS = draftsRes.data.resultSizeEstimate || 0;
+    } catch (err) {
+      console.error("Error fetching DRAFTS count:", err.message);
+    }
+
     console.log("📊 REAL Gmail counts:", counts);
     return counts;
   } catch (error) {
     console.error("❌ Error getting label counts:", error);
     throw error;
   }
-}
-
-
+}//old one

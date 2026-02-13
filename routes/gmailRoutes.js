@@ -591,6 +591,7 @@ import {
   getEmailSuggestions,
   initializeGmailClient,
   getLabelCounts, // ✅ NEW
+
 } from "../utils/gmailService.js";
 
 const router = express.Router();
@@ -616,20 +617,31 @@ const upload = multer({
  * ✅ NEW: Get all counts in a single API call
  * This replaces 8 separate API calls with 1
  */
+// router.get("/all-counts", async (req, res) => {
+//   try {
+//     console.log("📊 Fetching all Gmail counts...");
+//     const counts = await getLabelCounts();
+//     res.json({
+//       success: true,
+//       counts,
+//       timestamp: new Date().toISOString()
+//     });
+//   } catch (err) {
+//     console.error("❌ Error fetching all counts:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });//old one..
+
 router.get("/all-counts", async (req, res) => {
   try {
-    console.log("📊 Fetching all Gmail counts...");
     const counts = await getLabelCounts();
-    res.json({
-      success: true,
-      counts,
-      timestamp: new Date().toISOString()
-    });
+    res.json({ success: true, counts });
   } catch (err) {
-    console.error("❌ Error fetching all counts:", err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, message: err.message });
   }
 });
+
+
 
 /**
  * ✅ OPTIMIZED: Get threads with caching headers
@@ -839,6 +851,9 @@ router.get("/attachment/:messageId/:attachmentId", async (req, res) => {
 
 
 // ============= SEND EMAIL - COMPLETELY FIXED =============
+
+
+
 router.post("/send", upload.array("attachments", 10), async (req, res) => {
   try {
     console.log("📧 Send email request received");
@@ -1037,7 +1052,9 @@ router.post("/thread/:id/read", async (req, res) => {
     console.error("Error marking thread:", err);
     res.status(500).json({ success: false, error: err.message });
   }
-});
+});//old one
+
+
 
 // 1️⃣3️⃣ Star/unstar thread
 router.post("/thread/:id/star", async (req, res) => {
@@ -1121,7 +1138,12 @@ router.post("/thread/:id/trash", async (req, res) => {
     console.error("Error moving to trash:", err);
     res.status(500).json({ success: false, error: err.message });
   }
-});
+});//old one
+
+
+
+
+
 
 // 1️⃣8️⃣ Get labels
 router.get("/labels", async (req, res) => {
@@ -1147,7 +1169,10 @@ router.post("/thread/:id/label", async (req, res) => {
     console.error("Error applying label:", err);
     res.status(500).json({ success: false, error: err.message });
   }
-});
+});//old one
+
+
+
 
 // 2️⃣0️⃣ Save draft
 // router.post("/draft", upload.array("attachments", 10), async (req, res) => {
@@ -1310,32 +1335,8 @@ router.get("/test", (req, res) => {
   });
 });
 
-/**
- * ✅ NEW: Get all counts in a single API call
- * This replaces 8 separate API calls with 1
- * Returns REAL Gmail counts, not placeholders
- */
-router.get("/all-counts", async (req, res) => {
-  try {
-    console.log("📊 Fetching all Gmail counts...");
-    const counts = await getLabelCounts();
-    console.log("✅ REAL Gmail counts:", counts);
-    res.json({
-      success: true,
-      counts,
-      timestamp: new Date().toISOString()
-    });
-  } catch (err) {
-    console.error("❌ Error fetching all counts:", err);
-    res.status(500).json({ 
-      success: false, 
-      error: err.message,
-      counts: {
-        INBOX: 0, UNREAD: 0, STARRED: 0, IMPORTANT: 0, 
-        SENT: 0, SPAM: 0, TRASH: 0, DRAFTS: 0
-      }
-    });
-  }
-});
 
-export default router;
+
+
+
+export default router;//come correctly
