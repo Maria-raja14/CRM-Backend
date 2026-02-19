@@ -191,7 +191,31 @@ export async function initializeGmailClient(email = null) {
 /**
  * Generate Google OAuth URL
  */
-export function generateAuthUrl() {
+// export function generateAuthUrl() {
+//   if (!CLIENT_ID || !CLIENT_SECRET) {
+//     throw new Error("Gmail OAuth credentials not configured");
+//   }
+
+//   const scopes = [
+//     "https://mail.google.com/",
+//     "https://www.googleapis.com/auth/gmail.modify",
+//     "https://www.googleapis.com/auth/gmail.compose",
+//     "https://www.googleapis.com/auth/gmail.readonly",
+//   ];
+
+//   const authUrl = oauth2Client.generateAuthUrl({
+//     access_type: "offline",
+//     prompt: "consent",
+//     scope: scopes,
+//   });
+
+//   console.log("🔗 Generated auth URL");
+//   return authUrl;
+// }//old one..
+
+
+
+export function generateAuthUrl(redirectUri) {
   if (!CLIENT_ID || !CLIENT_SECRET) {
     throw new Error("Gmail OAuth credentials not configured");
   }
@@ -203,13 +227,20 @@ export function generateAuthUrl() {
     "https://www.googleapis.com/auth/gmail.readonly",
   ];
 
-  const authUrl = oauth2Client.generateAuthUrl({
+  // Create a temporary OAuth2 client with the correct redirect URI
+  const tempOAuth2Client = new google.auth.OAuth2(
+    CLIENT_ID,
+    CLIENT_SECRET,
+    redirectUri
+  );
+
+  const authUrl = tempOAuth2Client.generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
     scope: scopes,
   });
 
-  console.log("🔗 Generated auth URL");
+  console.log(`🔗 Generated auth URL with redirect: ${redirectUri}`);
   return authUrl;
 }
 
@@ -304,17 +335,45 @@ export async function saveTokens(tokens) {
 /**
  * Exchange authorization code for tokens
  */
-export async function exchangeCodeForTokens(code) {
+// export async function exchangeCodeForTokens(code) {
+//   try {
+//     console.log("🔄 Exchanging code for tokens...");
+//     const { tokens } = await oauth2Client.getToken(code);
+//     console.log("✅ Received tokens from Google");
+
+//     // Save tokens to database
+//     const result = await saveTokens(tokens);
+
+//     console.log(
+//       `✅ Tokens exchanged and saved successfully for ${result.email}`,
+//     );
+//     return { ...tokens, email: result.email };
+//   } catch (error) {
+//     console.error("❌ Error exchanging code for tokens:", error);
+//     console.error("Full error:", error.response?.data || error.message);
+//     throw new Error(`Failed to exchange code for tokens: ${error.message}`);
+//   }
+// }//old one
+
+export async function exchangeCodeForTokens(code, redirectUri) {
   try {
     console.log("🔄 Exchanging code for tokens...");
-    const { tokens } = await oauth2Client.getToken(code);
+
+    // Create a temporary OAuth2 client with the correct redirect URI
+    const tempOAuth2Client = new google.auth.OAuth2(
+      CLIENT_ID,
+      CLIENT_SECRET,
+      redirectUri
+    );
+
+    const { tokens } = await tempOAuth2Client.getToken(code);
     console.log("✅ Received tokens from Google");
 
-    // Save tokens to database
+    // Save tokens to database (your existing saveTokens function)
     const result = await saveTokens(tokens);
 
     console.log(
-      `✅ Tokens exchanged and saved successfully for ${result.email}`,
+      `✅ Tokens exchanged and saved successfully for ${result.email}`
     );
     return { ...tokens, email: result.email };
   } catch (error) {
@@ -323,6 +382,7 @@ export async function exchangeCodeForTokens(code) {
     throw new Error(`Failed to exchange code for tokens: ${error.message}`);
   }
 }
+
 
 /**
  * Check authentication status
