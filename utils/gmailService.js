@@ -46,8 +46,6 @@ let currentGmailClient = null;
 let currentUserEmail = null;
 let tokenRefreshInProgress = false;
 
-
-
 // Gmail API has a 25MB limit for the entire message
 const GMAIL_MAX_SIZE = 25 * 1024 * 1024; // 25MB in bytes
 const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30MB per file limit for frontend
@@ -65,7 +63,6 @@ export const upload = multer({
     if (req.headers["content-length"] > MAX_FILE_SIZE * 10) {
       return cb(new Error("Total files size exceeds 300MB limit"));
     }
-
     // Allow all file types
     cb(null, true);
   },
@@ -79,14 +76,20 @@ export async function initializeGmailClient(email = null) {
     console.log("🔄 Initializing Gmail client...");
 
     // If we have a current client and it's for the requested email, return it
-    if (currentGmailClient && currentUserEmail && (!email || currentUserEmail === email)) {
+    if (
+      currentGmailClient &&
+      currentUserEmail &&
+      (!email || currentUserEmail === email)
+    ) {
       console.log(`✅ Using existing Gmail client for ${currentUserEmail}`);
       return currentGmailClient;
     }
 
     // Find active token in database
     const tokenQuery = email ? { email, is_active: true } : { is_active: true };
-    const tokenDoc = await GmailToken.findOne(tokenQuery).sort({ last_connected: -1 });
+    const tokenDoc = await GmailToken.findOne(tokenQuery).sort({
+      last_connected: -1,
+    });
 
     if (!tokenDoc) {
       console.log("❌ No active Gmail tokens found in database");
@@ -98,7 +101,7 @@ export async function initializeGmailClient(email = null) {
     // Check if token is expired
     const now = new Date();
     const expiryDate = new Date(tokenDoc.expiry_date);
-    
+
     let tokens = {
       access_token: tokenDoc.access_token,
       refresh_token: tokenDoc.refresh_token,
@@ -119,18 +122,19 @@ export async function initializeGmailClient(email = null) {
     // Check if token needs refresh
     if (now > expiryDate) {
       console.log(`🔄 Token expired for ${tokenDoc.email}, refreshing...`);
-      
+
       if (tokenRefreshInProgress) {
         console.log("⏳ Token refresh already in progress, waiting...");
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise((resolve) => setTimeout(resolve, 2000));
         return initializeGmailClient(email);
       }
 
       tokenRefreshInProgress = true;
-      
+
       try {
-        const { credentials } = await oauth2ClientWithTokens.refreshAccessToken();
-        
+        const { credentials } =
+          await oauth2ClientWithTokens.refreshAccessToken();
+
         // Update tokens in database
         tokenDoc.access_token = credentials.access_token;
         tokenDoc.expiry_date = new Date(credentials.expiry_date);
@@ -144,12 +148,17 @@ export async function initializeGmailClient(email = null) {
 
         // Update OAuth2 client with new tokens
         oauth2ClientWithTokens.setCredentials(credentials);
-        
+
         tokenRefreshInProgress = false;
       } catch (refreshError) {
         tokenRefreshInProgress = false;
-        console.error(`❌ Failed to refresh token for ${tokenDoc.email}:`, refreshError.message);
-        throw new Error("Token expired and could not be refreshed. Please reconnect Gmail.");
+        console.error(
+          `❌ Failed to refresh token for ${tokenDoc.email}:`,
+          refreshError.message,
+        );
+        throw new Error(
+          "Token expired and could not be refreshed. Please reconnect Gmail.",
+        );
       }
     }
 
@@ -164,15 +173,17 @@ export async function initializeGmailClient(email = null) {
     // Also update the global oauth2Client
     oauth2Client.setCredentials(tokens);
 
-    console.log(`✅ Gmail client initialized successfully for ${currentUserEmail}`);
+    console.log(
+      `✅ Gmail client initialized successfully for ${currentUserEmail}`,
+    );
     return currentGmailClient;
   } catch (error) {
     console.error("❌ Error initializing Gmail client:", error.message);
-    
+
     // Reset current client on error
     currentGmailClient = null;
     currentUserEmail = null;
-    
+
     throw new Error(`Failed to initialize Gmail client: ${error.message}`);
   }
 }
@@ -246,7 +257,7 @@ export async function saveTokens(tokens) {
       existingToken.scope = tokens.scope || "";
       existingToken.is_active = true;
       existingToken.last_connected = new Date();
-      
+
       await existingToken.save();
       console.log(`✅ Updated existing token for ${email}`);
     } else {
@@ -261,7 +272,7 @@ export async function saveTokens(tokens) {
         is_active: true,
         last_connected: new Date(),
       });
-      
+
       await newToken.save();
       console.log(`✅ Created new token for ${email}`);
     }
@@ -269,14 +280,11 @@ export async function saveTokens(tokens) {
     // Deactivate any other tokens for this email (shouldn't happen, but just in case)
     await GmailToken.updateMany(
       { email, is_active: true },
-      { is_active: false }
+      { is_active: false },
     );
-    
+
     // Reactivate this one
-    await GmailToken.updateOne(
-      { email },
-      { is_active: true }
-    );
+    await GmailToken.updateOne({ email }, { is_active: true });
 
     // Set credentials on the global oauth2Client
     oauth2Client.setCredentials(tokens);
@@ -305,7 +313,9 @@ export async function exchangeCodeForTokens(code) {
     // Save tokens to database
     const result = await saveTokens(tokens);
 
-    console.log(`✅ Tokens exchanged and saved successfully for ${result.email}`);
+    console.log(
+      `✅ Tokens exchanged and saved successfully for ${result.email}`,
+    );
     return { ...tokens, email: result.email };
   } catch (error) {
     console.error("❌ Error exchanging code for tokens:", error);
@@ -323,7 +333,9 @@ export async function checkAuth(email = null) {
 
     // Find active token in database
     const tokenQuery = email ? { email, is_active: true } : { is_active: true };
-    const tokenDoc = await GmailToken.findOne(tokenQuery).sort({ last_connected: -1 });
+    const tokenDoc = await GmailToken.findOne(tokenQuery).sort({
+      last_connected: -1,
+    });
 
     if (!tokenDoc) {
       console.log("❌ No active Gmail tokens found");
@@ -337,12 +349,12 @@ export async function checkAuth(email = null) {
     // Try to initialize client
     try {
       const gmail = await initializeGmailClient(tokenDoc.email);
-      
+
       // Verify by getting profile
       const profile = await gmail.users.getProfile({ userId: "me" });
-      
+
       console.log(`✅ Auth check successful for ${tokenDoc.email}`);
-      
+
       return {
         authenticated: true,
         message: "Gmail is connected",
@@ -351,11 +363,11 @@ export async function checkAuth(email = null) {
       };
     } catch (error) {
       console.error("❌ Auth check failed:", error.message);
-      
+
       // Token might be invalid, deactivate it
       tokenDoc.is_active = false;
       await tokenDoc.save();
-      
+
       return {
         authenticated: false,
         message: `Authentication failed: ${error.message}`,
@@ -399,18 +411,13 @@ export async function disconnectGmail(email = null) {
       success: true,
       message: tokenDoc
         ? `Gmail disconnected for ${tokenDoc.email}`
-        : "Gmail disconnected successfully"
+        : "Gmail disconnected successfully",
     };
   } catch (error) {
     console.error("❌ Error disconnecting Gmail:", error);
     throw error;
   }
 }
-
-
-
-
-
 
 export async function getLabelCounts() {
   try {
@@ -424,7 +431,7 @@ export async function getLabelCounts() {
       "SENT",
       "SPAM",
       "TRASH",
-      "DRAFT"
+      "DRAFT",
     ];
 
     const counts = {};
@@ -438,7 +445,6 @@ export async function getLabelCounts() {
 
         counts[labelId === "DRAFT" ? "DRAFTS" : labelId] =
           res.data.threadsTotal || 0;
-
       } catch (err) {
         console.error(`Error fetching ${labelId}:`, err.message);
         counts[labelId] = 0;
@@ -447,23 +453,21 @@ export async function getLabelCounts() {
 
     console.log("📊 FINAL Gmail counts:", counts);
     return counts;
-
   } catch (error) {
     console.error("❌ Error getting label counts:", error);
     throw error;
   }
-}//old new one..
-
-
-
-
-
+}
 
 /**
  * List threads with OPTIMIZED fetching - MUCH FASTER
  * Uses batch requests and minimal data
  */
-export async function listThreads(maxResults = 20, pageToken = null, label = "INBOX") {
+export async function listThreads(
+  maxResults = 20,
+  pageToken = null,
+  label = "INBOX",
+) {
   try {
     const gmail = await initializeGmailClient();
     const startTime = Date.now();
@@ -507,49 +511,55 @@ export async function listThreads(maxResults = 20, pageToken = null, label = "IN
           maxResults: maxResults,
           pageToken: pageToken,
         });
-        
+
         const drafts = draftsRes.data.drafts || [];
         const draftThreads = [];
-        
+
         // Process drafts in parallel for speed
         const draftPromises = drafts.map(async (draft) => {
           try {
             const message = draft.message;
             const headers = message?.payload?.headers || [];
-            
+
             return {
               id: draft.id,
               threadId: message?.threadId || draft.id,
               snippet: message?.snippet || "",
-              subject: headers.find(h => h.name === "Subject")?.value || "No Subject",
-              from: headers.find(h => h.name === "From")?.value || "Unknown",
-              to: headers.find(h => h.name === "To")?.value || "",
-              date: headers.find(h => h.name === "Date")?.value || new Date().toISOString(),
+              subject:
+                headers.find((h) => h.name === "Subject")?.value ||
+                "No Subject",
+              from: headers.find((h) => h.name === "From")?.value || "Unknown",
+              to: headers.find((h) => h.name === "To")?.value || "",
+              date:
+                headers.find((h) => h.name === "Date")?.value ||
+                new Date().toISOString(),
               timestamp: Date.now(),
               unread: false,
               starred: false,
               important: false,
               spam: false,
               trash: false,
-              drafts: true,
+              isDraft: true, // FIX: mark as draft
               messagesCount: 1,
             };
           } catch (err) {
             return null;
           }
         });
-        
+
         const draftResults = await Promise.all(draftPromises);
-        const validDrafts = draftResults.filter(d => d !== null);
-        
-        console.log(`✅ Fetched ${validDrafts.length} drafts in ${Date.now() - startTime}ms`);
-        
+        const validDrafts = draftResults.filter((d) => d !== null);
+
+        console.log(
+          `✅ Fetched ${validDrafts.length} drafts in ${Date.now() - startTime}ms`,
+        );
+
         return {
           threads: validDrafts,
           nextPageToken: draftsRes.data.nextPageToken,
           resultSizeEstimate: validDrafts.length,
         };
-        
+
       default:
         params.labelIds = [label];
     }
@@ -557,8 +567,10 @@ export async function listThreads(maxResults = 20, pageToken = null, label = "IN
     // Get thread list (this is fast - just IDs)
     const res = await gmail.users.threads.list(params);
     const threads = res.data.threads || [];
-    
-    console.log(`📋 Got ${threads.length} thread IDs from ${label} (Total: ${res.data.resultSizeEstimate || 0})`);
+
+    console.log(
+      `📋 Got ${threads.length} thread IDs from ${label} (Total: ${res.data.resultSizeEstimate || 0})`,
+    );
 
     // If no threads, return empty
     if (threads.length === 0) {
@@ -570,10 +582,8 @@ export async function listThreads(maxResults = 20, pageToken = null, label = "IN
     }
 
     // OPTIMIZATION: Fetch all thread details in PARALLEL
-    // This is MUCH faster than sequential fetching
     const detailedThreads = [];
-    
-    // Use Promise.all for parallel processing
+
     const threadPromises = threads.map(async (thread) => {
       try {
         // Use format: 'metadata' which is faster than 'full'
@@ -586,12 +596,13 @@ export async function listThreads(maxResults = 20, pageToken = null, label = "IN
 
         const messages = threadRes.data.messages || [];
         const firstMessage = messages[0];
-        
+
         if (!firstMessage) return null;
-        
+
         const headers = firstMessage?.payload?.headers || [];
 
-        const subject = headers.find((h) => h.name === "Subject")?.value || "No Subject";
+        const subject =
+          headers.find((h) => h.name === "Subject")?.value || "No Subject";
         const from = headers.find((h) => h.name === "From")?.value || "Unknown";
         const to = headers.find((h) => h.name === "To")?.value || "";
         const date = headers.find((h) => h.name === "Date")?.value || "";
@@ -641,21 +652,17 @@ export async function listThreads(maxResults = 20, pageToken = null, label = "IN
       }
     });
 
-    // Wait for all promises to resolve
     const results = await Promise.all(threadPromises);
-    
-    // Filter out nulls
     for (const result of results) {
-      if (result) {
-        detailedThreads.push(result);
-      }
+      if (result) detailedThreads.push(result);
     }
 
-    // Sort by latest first
     detailedThreads.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
     const duration = Date.now() - startTime;
-    console.log(`✅ Fetched ${detailedThreads.length} threads in ${duration}ms`);
+    console.log(
+      `✅ Fetched ${detailedThreads.length} threads in ${duration}ms`,
+    );
 
     return {
       threads: detailedThreads,
@@ -666,9 +673,7 @@ export async function listThreads(maxResults = 20, pageToken = null, label = "IN
     console.error("❌ Error listing threads:", error);
     throw error;
   }
-}//old one..
-
-
+}
 
 /**
  * Mark thread as read/unread
@@ -692,7 +697,7 @@ export async function markAsRead(threadId, read = true) {
     console.error("❌ Error marking thread:", error);
     throw error;
   }
-}//old one..
+}
 
 /**
  * Send email with attachments (FIXED)
@@ -1072,6 +1077,57 @@ export async function getDrafts(maxResults = 20) {
   }
 }
 
+// ============= NEW FUNCTION: Get a single draft =============
+/**
+ * Get a single draft with full content
+ */
+export async function getDraft(draftId) {
+  try {
+    const gmail = await initializeGmailClient();
+    const res = await gmail.users.drafts.get({
+      userId: "me",
+      id: draftId,
+      format: "full",
+    });
+
+    const message = res.data.message;
+    const headers = message?.payload?.headers || [];
+    const subject = headers.find((h) => h.name === "Subject")?.value || "No Subject";
+    const from = headers.find((h) => h.name === "From")?.value || "Unknown";
+    const to = headers.find((h) => h.name === "To")?.value || "";
+    const date = headers.find((h) => h.name === "Date")?.value || "";
+    const cc = headers.find((h) => h.name === "Cc")?.value || "";
+    const bcc = headers.find((h) => h.name === "Bcc")?.value || "";
+
+    const content = extractContent(message?.payload?.parts || [message?.payload]);
+
+    const processedMessage = {
+      id: message.id,
+      snippet: message.snippet,
+      subject,
+      from,
+      to,
+      cc,
+      bcc,
+      date,
+      body: content.text,
+      htmlBody: content.html,
+      attachments: content.attachments,
+      hasAttachments: content.attachments.length > 0,
+      labelIds: message.labelIds || [],
+      isDraft: true,
+    };
+
+    // Return in same structure as getThread for frontend consistency
+    return {
+      messages: [processedMessage],
+    };
+  } catch (error) {
+    console.error("❌ Error getting draft:", error);
+    throw error;
+  }
+}
+
 /**
  * Get single thread with full content
  */
@@ -1445,9 +1501,7 @@ export async function bulkDeleteThreads(threadIds) {
       (r) => r.status === "fulfilled" && r.value.success,
     );
 
-    console.log(
-      `✅ Bulk delete completed: ${successful.length} successful`,
-    );
+    console.log(`✅ Bulk delete completed: ${successful.length} successful`);
 
     return {
       success: successful.length > 0,
@@ -1832,8 +1886,10 @@ function extractAllEmails(str) {
  */
 export async function getAllActiveAccounts() {
   try {
-    const accounts = await GmailToken.find({ is_active: true }).sort({ last_connected: -1 });
-    return accounts.map(account => ({
+    const accounts = await GmailToken.find({ is_active: true }).sort({
+      last_connected: -1,
+    });
+    return accounts.map((account) => ({
       email: account.email,
       last_connected: account.last_connected,
     }));
@@ -1854,7 +1910,7 @@ export async function switchAccount(email) {
 
     // Initialize with new email
     const gmail = await initializeGmailClient(email);
-    
+
     return {
       success: true,
       email: email,
@@ -1864,10 +1920,22 @@ export async function switchAccount(email) {
     console.error("❌ Error switching account:", error);
     throw error;
   }
-}//db token correctly saved all worked correctly..
+}
 
-
-
-
-
-
+/**
+ * Delete a draft
+ */
+export async function deleteDraft(draftId) {
+  try {
+    const gmail = await initializeGmailClient();
+    await gmail.users.drafts.delete({
+      userId: 'me',
+      id: draftId,
+    });
+    console.log(`✅ Draft ${draftId} deleted`);
+    return { success: true };
+  } catch (error) {
+    console.error('❌ Error deleting draft:', error);
+    throw error;
+  }
+}

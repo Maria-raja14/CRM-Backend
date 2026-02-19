@@ -26,12 +26,14 @@ import {
   applyLabel,
   saveDraft,
   getDrafts,
+  getDraft,                // ✅ ADD THIS IMPORT
   getEmailSuggestions,
   initializeGmailClient,
   getLabelCounts,
   disconnectGmail,
   getAllActiveAccounts,
   switchAccount,
+    deleteDraft, 
 } from "../utils/gmailService.js";
 
 const router = express.Router();
@@ -794,4 +796,34 @@ router.get("/test", (req, res) => {
   });
 });
 
-export default router;//all routes work
+// ============= SINGLE DRAFT ROUTE (FIXED) =============
+
+/**
+ * Get a single draft
+ */
+router.get('/draft/:draftId', async (req, res) => {
+  try {
+    const { draftId } = req.params;
+    const draft = await getDraft(draftId);   // ✅ Use imported getDraft directly
+    res.json({ success: true, data: draft });
+  } catch (error) {
+    console.error('Error fetching draft:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * Delete a draft
+ */
+router.delete('/draft/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await deleteDraft(id);
+    res.json({ success: true, message: 'Draft deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting draft:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+export default router;

@@ -10,7 +10,7 @@ import dealsController from "./deals.controller.js";
 import adminDashboardController from "./adminDashboard.controller.js";
 import salesReportsController from "./salesReports.controller.js"
 import googleAuthController from './googleAuth.controller.js';
-
+import whatsappController from './whatsapp.controller.js';  // Add this line
 
 export default {
   usersController,
@@ -22,6 +22,7 @@ export default {
   proposalController,
   adminDashboardController,
   salesReportsController,
- googleAuthController 
+  googleAuthController,
+ whatsappController
   
 };

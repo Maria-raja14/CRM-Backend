@@ -16,6 +16,8 @@ import { startActivityReminderCron } from "./controllers/activityReminder.cron.j
 import { startProposalFollowUpCron } from "./controllers/proposalFollowUpCron.controller.js";
 import gmailRoutes from "./routes/gmailRoutes.js";
 import googleAuthRoutes from "./routes/googleAuthRoutes.js"; // Add this import
+// Add this with other route imports
+import whatsappRoutes from './routes/whatsapp.routes.js';
 
 dotenv.config();
 
@@ -80,6 +82,8 @@ app.use("/api", routes);
 app.use("/api/files", fileRoutes);
 app.use("/api/gmail", gmailRoutes);
 app.use("/api/google-auth", googleAuthRoutes); // Add this line
+app.use('/api/whatsapp', whatsappRoutes);
+
 
 app.get("/api/auth/google/callback", (req, res) => {
   console.log("📝 Redirecting old callback URL to new one...");
