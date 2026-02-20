@@ -1576,6 +1576,755 @@
 
 
 
+// import express from "express";
+// import multer from "multer";
+// import {
+//   generateAuthUrl,
+//   exchangeCodeForTokens,
+//   listThreads,
+//   listAllThreads,
+//   getThread,
+//   checkAuth,
+//   sendEmail,
+//   sendEmailWithAttachments,
+//   deleteEmail,
+//   deleteThread,
+//   getAttachment,
+//   watchInbox,
+//   stopWatch,
+//   markAsRead,
+//   starThread,
+//   bulkStarThreads,
+//   markAsSpam,
+//   markAsImportant,
+//   moveToTrash,
+//   bulkMoveToTrash,
+//   bulkDeleteThreads,
+//   getLabels,
+//   applyLabel,
+//   saveDraft,
+//   getDrafts,
+//   getDraft,
+//   getEmailSuggestions,
+//   initializeGmailClient,
+//   getLabelCounts,
+//   disconnectGmail,
+//   getAllActiveAccounts,
+//   switchAccount,
+//   deleteDraft,
+// } from "../utils/gmailService.js";
+
+// const router = express.Router();
+
+// // Configure multer for file uploads
+// const storage = multer.memoryStorage();
+// const upload = multer({
+//   storage: storage,
+//   limits: { fileSize: 30 * 1024 * 1024, files: 10 },
+//   fileFilter: (req, file, cb) => cb(null, true),
+// });
+
+// // ============= ACCOUNT MANAGEMENT =============
+
+// router.get("/accounts", async (req, res) => {
+//   try {
+//     const accounts = await getAllActiveAccounts();
+//     res.json({ 
+//       success: true, 
+//       accounts,
+//       current: accounts.length > 0 ? accounts[0] : null
+//     });
+//   } catch (err) {
+//     console.error("Error fetching accounts:", err);
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// });
+
+// router.post("/switch-account", async (req, res) => {
+//   try {
+//     const { email } = req.body;
+//     if (!email) {
+//       return res.status(400).json({ 
+//         success: false, 
+//         message: "Email is required" 
+//       });
+//     }
+//     const result = await switchAccount(email);
+//     res.json(result);
+//   } catch (err) {
+//     console.error("Error switching account:", err);
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// });
+
+// // ============= COUNT ENDPOINTS =============
+
+// router.get("/all-counts", async (req, res) => {
+//   try {
+//     const { email } = req.query; // 👈 get email
+//     const counts = await getLabelCounts(email);
+//     res.json({ success: true, counts });
+//   } catch (err) {
+//     console.error("Error getting counts:", err);
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// });
+
+// // ============= THREAD ENDPOINTS =============
+
+// router.get("/threads", async (req, res) => {
+//   try {
+//     const maxResults = parseInt(req.query.maxResults) || 20;
+//     const pageToken = req.query.pageToken || null;
+//     const label = req.query.label || "INBOX";
+//     const email = req.query.email; // 👈 get email
+
+//     const result = await listThreads(maxResults, pageToken, label, email);
+//     res.set('Cache-Control', 'private, max-age=60');
+//     res.json({
+//       success: true,
+//       data: result.threads,
+//       nextPageToken: result.nextPageToken,
+//       totalEstimate: result.resultSizeEstimate,
+//       label: label,
+//     });
+//   } catch (err) {
+//     console.error("Error fetching threads:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// router.get("/all-threads", async (req, res) => {
+//   try {
+//     console.log("🔄 Fetching all threads...");
+//     const threads = await listAllThreads();
+//     res.json({ success: true, data: threads });
+//   } catch (err) {
+//     console.error("Error fetching all threads:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// router.get("/thread/:id", async (req, res) => {
+//   try {
+//     const { email } = req.query; // 👈 get email
+//     const thread = await getThread(req.params.id, email);
+//     res.json({ success: true, data: thread });
+//   } catch (err) {
+//     console.error("Error fetching thread:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// router.delete("/thread/:id", async (req, res) => {
+//   try {
+//     const { email } = req.body; // 👈 get email
+//     await deleteThread(req.params.id, email);
+//     res.json({ success: true, message: "Thread deleted successfully" });
+//   } catch (err) {
+//     console.error("Error deleting thread:", err);
+//     if (err.message.includes("insufficientPermissions")) {
+//       return res.status(403).json({
+//         success: false,
+//         error: "Insufficient permissions. Please reconnect Gmail with proper permissions.",
+//       });
+//     }
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// router.post("/thread/:id/read", async (req, res) => {
+//   try {
+//     const { read, email } = req.body; // 👈 get email
+//     await markAsRead(req.params.id, read !== false, email);
+//     res.json({
+//       success: true,
+//       message: `Thread marked as ${read !== false ? "read" : "unread"}`,
+//     });
+//   } catch (err) {
+//     console.error("Error marking thread:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// router.post("/thread/:id/star", async (req, res) => {
+//   try {
+//     const { star, email } = req.body; // 👈 get email
+//     await starThread(req.params.id, star !== false, email);
+//     res.json({
+//       success: true,
+//       message: `Thread ${star !== false ? "starred" : "unstarred"}`,
+//     });
+//   } catch (err) {
+//     console.error("Error starring thread:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// router.post("/thread/:id/spam", async (req, res) => {
+//   try {
+//     const { spam, email } = req.body; // 👈 get email
+//     await markAsSpam(req.params.id, spam !== false, email);
+//     res.json({
+//       success: true,
+//       message: `Thread ${spam !== false ? "marked as spam" : "removed from spam"}`,
+//     });
+//   } catch (err) {
+//     console.error("Error marking as spam:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// router.post("/thread/:id/important", async (req, res) => {
+//   try {
+//     const { important, email } = req.body; // 👈 get email
+//     await markAsImportant(req.params.id, important !== false, email);
+//     res.json({
+//       success: true,
+//       message: `Thread ${important !== false ? "marked as important" : "removed from important"}`,
+//     });
+//   } catch (err) {
+//     console.error("Error marking as important:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// router.post("/thread/:id/trash", async (req, res) => {
+//   try {
+//     const { email } = req.body; // 👈 get email
+//     await moveToTrash(req.params.id, email);
+//     res.json({
+//       success: true,
+//       message: "Thread moved to trash",
+//     });
+//   } catch (err) {
+//     console.error("Error moving to trash:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// router.post("/thread/:id/label", async (req, res) => {
+//   try {
+//     const { labelId, email } = req.body; // 👈 get email
+//     await applyLabel(req.params.id, labelId, email);
+//     res.json({
+//       success: true,
+//       message: "Label applied successfully",
+//     });
+//   } catch (err) {
+//     console.error("Error applying label:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// // ============= BULK OPERATIONS =============
+
+// router.post("/bulk-delete", async (req, res) => {
+//   try {
+//     const { threadIds, permanent = false, email } = req.body; // 👈 get email
+
+//     if (!threadIds || !Array.isArray(threadIds) || threadIds.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "No thread IDs provided",
+//       });
+//     }
+
+//     let result;
+//     if (permanent) {
+//       result = await bulkDeleteThreads(threadIds, email);
+//     } else {
+//       result = await bulkMoveToTrash(threadIds, email);
+//     }
+
+//     res.json({
+//       success: true,
+//       message: result.message,
+//       data: result,
+//     });
+//   } catch (err) {
+//     console.error("Error in bulk delete:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// router.post("/bulk-star", async (req, res) => {
+//   try {
+//     const { threadIds, star, email } = req.body; // 👈 get email
+
+//     if (!threadIds || !Array.isArray(threadIds) || threadIds.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "No thread IDs provided",
+//       });
+//     }
+
+//     const result = await bulkStarThreads(threadIds, star !== false, email);
+//     res.json({
+//       success: true,
+//       message: result.message,
+//       data: result,
+//     });
+//   } catch (err) {
+//     console.error("Error in bulk star:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// router.post("/bulk-trash", async (req, res) => {
+//   try {
+//     const { threadIds, email } = req.body; // 👈 get email
+
+//     if (!threadIds || !Array.isArray(threadIds) || threadIds.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "No thread IDs provided",
+//       });
+//     }
+
+//     const result = await bulkMoveToTrash(threadIds, email);
+//     res.json({
+//       success: true,
+//       message: result.message,
+//       data: result,
+//     });
+//   } catch (err) {
+//     console.error("Error in bulk trash:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// // ============= EMAIL OPERATIONS =============
+
+// router.post("/send", upload.array("attachments", 10), async (req, res) => {
+//   try {
+//     console.log("📧 Send email request received");
+
+//     const { to, cc, bcc, subject, message, email } = req.body; // 👈 get email
+
+//     if (!to) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Recipient email address is required",
+//       });
+//     }
+
+//     if (!to.includes('@')) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Invalid email address format",
+//       });
+//     }
+
+//     const attachments = [];
+//     if (req.files && req.files.length > 0) {
+//       console.log(`📎 Processing ${req.files.length} attachments...`);
+//       for (const file of req.files) {
+//         try {
+//           if (file.size > 25 * 1024 * 1024) {
+//             throw new Error(`File ${file.originalname} exceeds 25MB limit`);
+//           }
+//           attachments.push({
+//             filename: file.originalname,
+//             content: file.buffer.toString('base64'),
+//             mimetype: file.mimetype,
+//             size: file.size
+//           });
+//           console.log(`✅ Processed: ${file.originalname} (${file.size} bytes)`);
+//         } catch (fileErr) {
+//           console.error(`❌ Error processing file ${file.originalname}:`, fileErr);
+//           return res.status(400).json({
+//             success: false,
+//             error: fileErr.message
+//           });
+//         }
+//       }
+//     }
+
+//     console.log(`📧 Sending email to: ${to}`);
+//     console.log(`📧 Subject: ${subject || '(No Subject)'}`);
+//     console.log(`📧 Attachments: ${attachments.length}`);
+
+//     const result = await sendEmailWithAttachments(
+//       to,
+//       subject || '(No Subject)',
+//       message || '',
+//       cc || '',
+//       bcc || '',
+//       attachments,
+//       [], // files array (already processed)
+//       email // 👈 pass email
+//     );
+
+//     console.log("✅ Email sent successfully:", result.id);
+    
+//     res.json({
+//       success: true,
+//       data: {
+//         id: result.id,
+//         threadId: result.threadId,
+//         labelIds: result.labelIds
+//       },
+//       message: `Email sent successfully${attachments.length ? ` with ${attachments.length} attachment(s)` : ''}`,
+//       sendTime: result.sendTime
+//     });
+
+//   } catch (err) {
+//     console.error("❌ Error sending email:", err);
+    
+//     let errorMessage = err.message;
+//     let statusCode = 500;
+    
+//     if (err.message.includes('Invalid recipient')) {
+//       statusCode = 400;
+//       errorMessage = "Invalid recipient email address";
+//     } else if (err.message.includes('exceeds limit')) {
+//       statusCode = 400;
+//       errorMessage = "Email size exceeds Gmail's 25MB limit";
+//     } else if (err.message.includes('authentication')) {
+//       statusCode = 401;
+//       errorMessage = "Gmail authentication failed. Please reconnect.";
+//     } else if (err.message.includes('quota')) {
+//       statusCode = 429;
+//       errorMessage = "Gmail sending quota exceeded. Please try again later.";
+//     }
+    
+//     res.status(statusCode).json({
+//       success: false,
+//       error: errorMessage,
+//       details: err.response?.data || null
+//     });
+//   }
+// });
+
+// router.delete("/message/:id", async (req, res) => {
+//   try {
+//     const { email } = req.body; // 👈 get email
+//     await deleteEmail(req.params.id, email);
+//     res.json({ success: true, message: "Email deleted successfully" });
+//   } catch (err) {
+//     console.error("Error deleting email:", err);
+//     if (err.message.includes("insufficientPermissions")) {
+//       return res.status(403).json({
+//         success: false,
+//         error: "Insufficient permissions. Please reconnect Gmail with proper permissions.",
+//       });
+//     }
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// // ============= DRAFT OPERATIONS =============
+
+// router.post("/draft", upload.array("attachments", 10), async (req, res) => {
+//   try {
+//     console.log("📝 Save draft request received");
+//     const { to, cc, bcc, subject, message, email } = req.body; // 👈 get email
+
+//     if (!to) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Recipient email address is required",
+//       });
+//     }
+
+//     const attachments = [];
+//     if (req.files && req.files.length > 0) {
+//       console.log(`📎 Processing ${req.files.length} attachments for draft...`);
+//       for (const file of req.files) {
+//         attachments.push({
+//           filename: file.originalname,
+//           content: file.buffer.toString('base64'),
+//           mimetype: file.mimetype,
+//           size: file.size
+//         });
+//       }
+//     }
+
+//     const result = await saveDraft(
+//       to,
+//       subject || '(No Subject)',
+//       message || '',
+//       cc || '',
+//       bcc || '',
+//       attachments,
+//       [], // files array
+//       email // 👈 pass email
+//     );
+    
+//     console.log("✅ Draft saved successfully:", result.id);
+    
+//     res.json({ 
+//       success: true, 
+//       data: result,
+//       message: "Draft saved successfully" 
+//     });
+    
+//   } catch (err) {
+//     console.error("❌ Error saving draft:", err);
+//     res.status(500).json({ 
+//       success: false, 
+//       error: err.message 
+//     });
+//   }
+// });
+
+// router.get("/drafts", async (req, res) => {
+//   try {
+//     const maxResults = parseInt(req.query.maxResults) || 20;
+//     const { email } = req.query; // 👈 get email
+//     const drafts = await getDrafts(maxResults, email);
+//     res.json({ 
+//       success: true, 
+//       data: drafts,
+//       totalCount: drafts.length 
+//     });
+//   } catch (err) {
+//     console.error("Error getting drafts:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// router.get("/drafts/count", async (req, res) => {
+//   try {
+//     const { email } = req.query; // 👈 get email
+//     const drafts = await getDrafts(1, email);
+//     res.json({
+//       success: true,
+//       count: drafts.length || 0
+//     });
+//   } catch (err) {
+//     console.error("Error getting drafts count:", err);
+//     res.json({ success: true, count: 0 });
+//   }
+// });
+
+// // ============= ATTACHMENT OPERATIONS =============
+
+// router.get("/attachment/:messageId/:attachmentId", async (req, res) => {
+//   try {
+//     const { messageId, attachmentId } = req.params;
+//     const { email } = req.query; // 👈 get email
+//     const attachment = await getAttachment(messageId, attachmentId, email);
+//     res.json({ success: true, data: attachment });
+//   } catch (err) {
+//     console.error("Error fetching attachment:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// // ============= AUTHENTICATION =============
+
+// /**
+//  * Get Google OAuth URL – now uses dynamic redirect URI
+//  */
+// router.get("/auth-url", (req, res) => {
+//   try {
+//     // Determine correct redirect URI based on request host
+//     const host = req.get('host');
+//     let redirectUri;
+
+//     if (host.includes('localhost') || host.includes('127.0.0.1')) {
+//       redirectUri = process.env.GMAIL_REDIRECT_URI;      // local
+//     } else {
+//       redirectUri = process.env.GMAIL_LIVE_REDIRECT_URI; // live
+//     }
+
+//     console.log(`🔗 Generating auth URL with redirect: ${redirectUri}`);
+//     const authUrl = generateAuthUrl(redirectUri); // pass redirectUri
+
+//     res.json({ success: true, url: authUrl });
+//   } catch (error) {
+//     console.error("❌ Error generating auth URL:", error);
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// });
+
+// /**
+//  * Check authentication status
+//  */
+// router.get("/auth-status", async (req, res) => {
+//   try {
+//     const { email } = req.query;
+//     const authStatus = await checkAuth(email);
+//     res.json(authStatus);
+//   } catch (error) {
+//     console.error("Error checking auth status:", error);
+//     res.status(500).json({
+//       authenticated: false,
+//       message: "Error checking authentication status",
+//     });
+//   }
+// });
+
+// /**
+//  * OAuth2 callback – now uses dynamic frontend URL and redirect URI for token exchange
+//  */
+// router.get("/oauth2callback", async (req, res) => {
+//   const { code, error } = req.query;
+
+//   // Determine frontend URL and redirect URI from request host
+//   const host = req.get('host');
+//   let frontendUrl, redirectUri;
+
+//   if (host.includes('localhost') || host.includes('127.0.0.1')) {
+//     frontendUrl = process.env.FRONTEND_URL_LOCAL || 'http://localhost:5173';
+//     redirectUri = process.env.GMAIL_REDIRECT_URI;
+//   } else {
+//     frontendUrl = process.env.FRONTEND_URL_LIVE || 'https://crm.stagingzar.com';
+//     redirectUri = process.env.GMAIL_LIVE_REDIRECT_URI;
+//   }
+
+//   if (error) {
+//     console.error("OAuth error:", error);
+//     const msg = error === "access_denied"
+//       ? "App not verified. Please contact the developer or check Google Cloud Console settings."
+//       : "Authorization failed.";
+//     return res.redirect(
+//       `${frontendUrl}/emailchat?gmail_error=1&error=${encodeURIComponent(msg)}`
+//     );
+//   }
+
+//   if (!code) {
+//     return res.redirect(
+//       `${frontendUrl}/emailchat?gmail_error=1&error=No authorization code received`
+//     );
+//   }
+
+//   try {
+//     console.log("🔄 Exchanging authorization code for tokens...");
+//     // Pass the redirectUri that was used in the auth URL
+//     const result = await exchangeCodeForTokens(code, redirectUri);
+//     console.log("✅ Gmail connected successfully for:", result.email);
+//     res.redirect(`${frontendUrl}/emailchat?gmail_connected=1&email=${encodeURIComponent(result.email)}`);
+//   } catch (err) {
+//     console.error("❌ OAuth failed:", err);
+//     let msg = err.message;
+//     if (err.message.includes("verification"))
+//       msg = "App verification required. Please ensure app is published or you're added as test user.";
+//     else if (err.message.includes("invalid_grant"))
+//       msg = "Authorization code expired or already used. Please reconnect Gmail.";
+//     res.redirect(
+//       `${frontendUrl}/emailchat?gmail_error=1&error=${encodeURIComponent(msg)}`
+//     );
+//   }
+// });
+
+// /**
+//  * Disconnect Gmail
+//  */
+// router.delete("/disconnect", async (req, res) => {
+//   try {
+//     const { email } = req.body; // 👈 get email
+//     const result = await disconnectGmail(email);
+//     res.json(result);
+//   } catch (err) {
+//     console.error("Error disconnecting Gmail:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// // ============= LABEL OPERATIONS =============
+
+// router.get("/labels", async (req, res) => {
+//   try {
+//     const { email } = req.query; // 👈 get email
+//     const labels = await getLabels(email);
+//     res.json({ success: true, data: labels });
+//   } catch (err) {
+//     console.error("Error getting labels:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// // ============= SUGGESTIONS =============
+
+// router.get("/suggestions", async (req, res) => {
+//   try {
+//     const { query, email } = req.query; // 👈 get email
+//     const suggestions = await getEmailSuggestions(query || "", 10, email);
+//     res.json({ success: true, data: suggestions });
+//   } catch (err) {
+//     console.error("Error getting suggestions:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// // ============= WATCH OPERATIONS =============
+
+// router.post("/watch", async (req, res) => {
+//   try {
+//     const watchResult = await watchInbox();
+//     res.json({
+//       success: true,
+//       message: "Real-time inbox watching started",
+//       historyId: watchResult.historyId,
+//     });
+//   } catch (err) {
+//     console.error("Error starting inbox watch:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// router.post("/stop-watch", async (req, res) => {
+//   try {
+//     await stopWatch("me");
+//     res.json({ success: true, message: "Real-time watching stopped" });
+//   } catch (err) {
+//     console.error("Error stopping inbox watch:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// // ============= UTILITY =============
+
+// router.delete('/clear-cache', async (req, res) => {
+//   try {
+//     res.json({ success: true, message: "Cache cleared" });
+//   } catch (error) {
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// });
+
+// router.get("/test", (req, res) => {
+//   res.json({
+//     success: true,
+//     message: "Gmail routes working fine ✅",
+//     timestamp: new Date().toISOString(),
+//   });
+// });
+
+// // ============= SINGLE DRAFT ROUTE =============
+
+// router.get('/draft/:draftId', async (req, res) => {
+//   try {
+//     const { draftId } = req.params;
+//     const { email } = req.query; // 👈 get email
+//     const draft = await getDraft(draftId, email);
+//     res.json({ success: true, data: draft });
+//   } catch (error) {
+//     console.error('Error fetching draft:', error);
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// });
+
+// router.delete('/draft/:id', async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { email } = req.body; // 👈 get email
+//     await deleteDraft(id, email);
+//     res.json({ success: true, message: 'Draft deleted successfully' });
+//   } catch (err) {
+//     console.error('Error deleting draft:', err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
+
+// export default router;//all live working correctly that user mail only..
+
+
+
+
 import express from "express";
 import multer from "multer";
 import {
@@ -1617,10 +2366,14 @@ import {
 const router = express.Router();
 
 // Configure multer for file uploads
+// Each individual attachment max 25MB (Gmail's limit per attachment)
 const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 30 * 1024 * 1024, files: 10 },
+  limits: {
+    fileSize: 25 * 1024 * 1024, // ✅ 25MB per file (Gmail attachment limit)
+    files: 10,                   // max 10 attachments
+  },
   fileFilter: (req, file, cb) => cb(null, true),
 });
 
@@ -1661,7 +2414,7 @@ router.post("/switch-account", async (req, res) => {
 
 router.get("/all-counts", async (req, res) => {
   try {
-    const { email } = req.query; // 👈 get email
+    const { email } = req.query;
     const counts = await getLabelCounts(email);
     res.json({ success: true, counts });
   } catch (err) {
@@ -1677,7 +2430,7 @@ router.get("/threads", async (req, res) => {
     const maxResults = parseInt(req.query.maxResults) || 20;
     const pageToken = req.query.pageToken || null;
     const label = req.query.label || "INBOX";
-    const email = req.query.email; // 👈 get email
+    const email = req.query.email;
 
     const result = await listThreads(maxResults, pageToken, label, email);
     res.set('Cache-Control', 'private, max-age=60');
@@ -1707,7 +2460,7 @@ router.get("/all-threads", async (req, res) => {
 
 router.get("/thread/:id", async (req, res) => {
   try {
-    const { email } = req.query; // 👈 get email
+    const { email } = req.query;
     const thread = await getThread(req.params.id, email);
     res.json({ success: true, data: thread });
   } catch (err) {
@@ -1718,7 +2471,7 @@ router.get("/thread/:id", async (req, res) => {
 
 router.delete("/thread/:id", async (req, res) => {
   try {
-    const { email } = req.body; // 👈 get email
+    const { email } = req.body;
     await deleteThread(req.params.id, email);
     res.json({ success: true, message: "Thread deleted successfully" });
   } catch (err) {
@@ -1735,7 +2488,7 @@ router.delete("/thread/:id", async (req, res) => {
 
 router.post("/thread/:id/read", async (req, res) => {
   try {
-    const { read, email } = req.body; // 👈 get email
+    const { read, email } = req.body;
     await markAsRead(req.params.id, read !== false, email);
     res.json({
       success: true,
@@ -1749,7 +2502,7 @@ router.post("/thread/:id/read", async (req, res) => {
 
 router.post("/thread/:id/star", async (req, res) => {
   try {
-    const { star, email } = req.body; // 👈 get email
+    const { star, email } = req.body;
     await starThread(req.params.id, star !== false, email);
     res.json({
       success: true,
@@ -1763,7 +2516,7 @@ router.post("/thread/:id/star", async (req, res) => {
 
 router.post("/thread/:id/spam", async (req, res) => {
   try {
-    const { spam, email } = req.body; // 👈 get email
+    const { spam, email } = req.body;
     await markAsSpam(req.params.id, spam !== false, email);
     res.json({
       success: true,
@@ -1777,7 +2530,7 @@ router.post("/thread/:id/spam", async (req, res) => {
 
 router.post("/thread/:id/important", async (req, res) => {
   try {
-    const { important, email } = req.body; // 👈 get email
+    const { important, email } = req.body;
     await markAsImportant(req.params.id, important !== false, email);
     res.json({
       success: true,
@@ -1791,7 +2544,7 @@ router.post("/thread/:id/important", async (req, res) => {
 
 router.post("/thread/:id/trash", async (req, res) => {
   try {
-    const { email } = req.body; // 👈 get email
+    const { email } = req.body;
     await moveToTrash(req.params.id, email);
     res.json({
       success: true,
@@ -1805,7 +2558,7 @@ router.post("/thread/:id/trash", async (req, res) => {
 
 router.post("/thread/:id/label", async (req, res) => {
   try {
-    const { labelId, email } = req.body; // 👈 get email
+    const { labelId, email } = req.body;
     await applyLabel(req.params.id, labelId, email);
     res.json({
       success: true,
@@ -1821,7 +2574,7 @@ router.post("/thread/:id/label", async (req, res) => {
 
 router.post("/bulk-delete", async (req, res) => {
   try {
-    const { threadIds, permanent = false, email } = req.body; // 👈 get email
+    const { threadIds, permanent = false, email } = req.body;
 
     if (!threadIds || !Array.isArray(threadIds) || threadIds.length === 0) {
       return res.status(400).json({
@@ -1850,7 +2603,7 @@ router.post("/bulk-delete", async (req, res) => {
 
 router.post("/bulk-star", async (req, res) => {
   try {
-    const { threadIds, star, email } = req.body; // 👈 get email
+    const { threadIds, star, email } = req.body;
 
     if (!threadIds || !Array.isArray(threadIds) || threadIds.length === 0) {
       return res.status(400).json({
@@ -1873,7 +2626,7 @@ router.post("/bulk-star", async (req, res) => {
 
 router.post("/bulk-trash", async (req, res) => {
   try {
-    const { threadIds, email } = req.body; // 👈 get email
+    const { threadIds, email } = req.body;
 
     if (!threadIds || !Array.isArray(threadIds) || threadIds.length === 0) {
       return res.status(400).json({
@@ -1900,7 +2653,7 @@ router.post("/send", upload.array("attachments", 10), async (req, res) => {
   try {
     console.log("📧 Send email request received");
 
-    const { to, cc, bcc, subject, message, email } = req.body; // 👈 get email
+    const { to, cc, bcc, subject, message, email } = req.body;
 
     if (!to) {
       return res.status(400).json({
@@ -1921,8 +2674,9 @@ router.post("/send", upload.array("attachments", 10), async (req, res) => {
       console.log(`📎 Processing ${req.files.length} attachments...`);
       for (const file of req.files) {
         try {
+          // ✅ Check each attachment individually — 25MB limit per attachment
           if (file.size > 25 * 1024 * 1024) {
-            throw new Error(`File ${file.originalname} exceeds 25MB limit`);
+            throw new Error(`Attachment "${file.originalname}" exceeds 25MB limit (file size: ${(file.size / 1024 / 1024).toFixed(2)}MB). Please reduce the file size.`);
           }
           attachments.push({
             filename: file.originalname,
@@ -1930,7 +2684,7 @@ router.post("/send", upload.array("attachments", 10), async (req, res) => {
             mimetype: file.mimetype,
             size: file.size
           });
-          console.log(`✅ Processed: ${file.originalname} (${file.size} bytes)`);
+          console.log(`✅ Processed attachment: ${file.originalname} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
         } catch (fileErr) {
           console.error(`❌ Error processing file ${file.originalname}:`, fileErr);
           return res.status(400).json({
@@ -1943,7 +2697,7 @@ router.post("/send", upload.array("attachments", 10), async (req, res) => {
 
     console.log(`📧 Sending email to: ${to}`);
     console.log(`📧 Subject: ${subject || '(No Subject)'}`);
-    console.log(`📧 Attachments: ${attachments.length}`);
+    console.log(`📎 Attachments count: ${attachments.length}`);
 
     const result = await sendEmailWithAttachments(
       to,
@@ -1952,8 +2706,8 @@ router.post("/send", upload.array("attachments", 10), async (req, res) => {
       cc || '',
       bcc || '',
       attachments,
-      [], // files array (already processed)
-      email // 👈 pass email
+      [],
+      email
     );
 
     console.log("✅ Email sent successfully:", result.id);
@@ -1978,9 +2732,9 @@ router.post("/send", upload.array("attachments", 10), async (req, res) => {
     if (err.message.includes('Invalid recipient')) {
       statusCode = 400;
       errorMessage = "Invalid recipient email address";
-    } else if (err.message.includes('exceeds limit')) {
+    } else if (err.message.includes('exceeds 25MB')) {
       statusCode = 400;
-      errorMessage = "Email size exceeds Gmail's 25MB limit";
+      errorMessage = err.message;
     } else if (err.message.includes('authentication')) {
       statusCode = 401;
       errorMessage = "Gmail authentication failed. Please reconnect.";
@@ -1999,7 +2753,7 @@ router.post("/send", upload.array("attachments", 10), async (req, res) => {
 
 router.delete("/message/:id", async (req, res) => {
   try {
-    const { email } = req.body; // 👈 get email
+    const { email } = req.body;
     await deleteEmail(req.params.id, email);
     res.json({ success: true, message: "Email deleted successfully" });
   } catch (err) {
@@ -2019,7 +2773,7 @@ router.delete("/message/:id", async (req, res) => {
 router.post("/draft", upload.array("attachments", 10), async (req, res) => {
   try {
     console.log("📝 Save draft request received");
-    const { to, cc, bcc, subject, message, email } = req.body; // 👈 get email
+    const { to, cc, bcc, subject, message, email } = req.body;
 
     if (!to) {
       return res.status(400).json({
@@ -2032,6 +2786,13 @@ router.post("/draft", upload.array("attachments", 10), async (req, res) => {
     if (req.files && req.files.length > 0) {
       console.log(`📎 Processing ${req.files.length} attachments for draft...`);
       for (const file of req.files) {
+        // ✅ 25MB per attachment check
+        if (file.size > 25 * 1024 * 1024) {
+          return res.status(400).json({
+            success: false,
+            error: `Attachment "${file.originalname}" exceeds 25MB limit.`
+          });
+        }
         attachments.push({
           filename: file.originalname,
           content: file.buffer.toString('base64'),
@@ -2048,8 +2809,8 @@ router.post("/draft", upload.array("attachments", 10), async (req, res) => {
       cc || '',
       bcc || '',
       attachments,
-      [], // files array
-      email // 👈 pass email
+      [],
+      email
     );
     
     console.log("✅ Draft saved successfully:", result.id);
@@ -2072,7 +2833,7 @@ router.post("/draft", upload.array("attachments", 10), async (req, res) => {
 router.get("/drafts", async (req, res) => {
   try {
     const maxResults = parseInt(req.query.maxResults) || 20;
-    const { email } = req.query; // 👈 get email
+    const { email } = req.query;
     const drafts = await getDrafts(maxResults, email);
     res.json({ 
       success: true, 
@@ -2087,7 +2848,7 @@ router.get("/drafts", async (req, res) => {
 
 router.get("/drafts/count", async (req, res) => {
   try {
-    const { email } = req.query; // 👈 get email
+    const { email } = req.query;
     const drafts = await getDrafts(1, email);
     res.json({
       success: true,
@@ -2104,7 +2865,7 @@ router.get("/drafts/count", async (req, res) => {
 router.get("/attachment/:messageId/:attachmentId", async (req, res) => {
   try {
     const { messageId, attachmentId } = req.params;
-    const { email } = req.query; // 👈 get email
+    const { email } = req.query;
     const attachment = await getAttachment(messageId, attachmentId, email);
     res.json({ success: true, data: attachment });
   } catch (err) {
@@ -2115,23 +2876,19 @@ router.get("/attachment/:messageId/:attachmentId", async (req, res) => {
 
 // ============= AUTHENTICATION =============
 
-/**
- * Get Google OAuth URL – now uses dynamic redirect URI
- */
 router.get("/auth-url", (req, res) => {
   try {
-    // Determine correct redirect URI based on request host
     const host = req.get('host');
     let redirectUri;
 
     if (host.includes('localhost') || host.includes('127.0.0.1')) {
-      redirectUri = process.env.GMAIL_REDIRECT_URI;      // local
+      redirectUri = process.env.GMAIL_REDIRECT_URI;
     } else {
-      redirectUri = process.env.GMAIL_LIVE_REDIRECT_URI; // live
+      redirectUri = process.env.GMAIL_LIVE_REDIRECT_URI;
     }
 
     console.log(`🔗 Generating auth URL with redirect: ${redirectUri}`);
-    const authUrl = generateAuthUrl(redirectUri); // pass redirectUri
+    const authUrl = generateAuthUrl(redirectUri);
 
     res.json({ success: true, url: authUrl });
   } catch (error) {
@@ -2140,9 +2897,6 @@ router.get("/auth-url", (req, res) => {
   }
 });
 
-/**
- * Check authentication status
- */
 router.get("/auth-status", async (req, res) => {
   try {
     const { email } = req.query;
@@ -2157,13 +2911,9 @@ router.get("/auth-status", async (req, res) => {
   }
 });
 
-/**
- * OAuth2 callback – now uses dynamic frontend URL and redirect URI for token exchange
- */
 router.get("/oauth2callback", async (req, res) => {
   const { code, error } = req.query;
 
-  // Determine frontend URL and redirect URI from request host
   const host = req.get('host');
   let frontendUrl, redirectUri;
 
@@ -2193,7 +2943,6 @@ router.get("/oauth2callback", async (req, res) => {
 
   try {
     console.log("🔄 Exchanging authorization code for tokens...");
-    // Pass the redirectUri that was used in the auth URL
     const result = await exchangeCodeForTokens(code, redirectUri);
     console.log("✅ Gmail connected successfully for:", result.email);
     res.redirect(`${frontendUrl}/emailchat?gmail_connected=1&email=${encodeURIComponent(result.email)}`);
@@ -2210,12 +2959,9 @@ router.get("/oauth2callback", async (req, res) => {
   }
 });
 
-/**
- * Disconnect Gmail
- */
 router.delete("/disconnect", async (req, res) => {
   try {
-    const { email } = req.body; // 👈 get email
+    const { email } = req.body;
     const result = await disconnectGmail(email);
     res.json(result);
   } catch (err) {
@@ -2228,7 +2974,7 @@ router.delete("/disconnect", async (req, res) => {
 
 router.get("/labels", async (req, res) => {
   try {
-    const { email } = req.query; // 👈 get email
+    const { email } = req.query;
     const labels = await getLabels(email);
     res.json({ success: true, data: labels });
   } catch (err) {
@@ -2241,7 +2987,7 @@ router.get("/labels", async (req, res) => {
 
 router.get("/suggestions", async (req, res) => {
   try {
-    const { query, email } = req.query; // 👈 get email
+    const { query, email } = req.query;
     const suggestions = await getEmailSuggestions(query || "", 10, email);
     res.json({ success: true, data: suggestions });
   } catch (err) {
@@ -2299,7 +3045,7 @@ router.get("/test", (req, res) => {
 router.get('/draft/:draftId', async (req, res) => {
   try {
     const { draftId } = req.params;
-    const { email } = req.query; // 👈 get email
+    const { email } = req.query;
     const draft = await getDraft(draftId, email);
     res.json({ success: true, data: draft });
   } catch (error) {
@@ -2311,7 +3057,7 @@ router.get('/draft/:draftId', async (req, res) => {
 router.delete('/draft/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { email } = req.body; // 👈 get email
+    const { email } = req.body;
     await deleteDraft(id, email);
     res.json({ success: true, message: 'Draft deleted successfully' });
   } catch (err) {
