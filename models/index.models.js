@@ -18,9 +18,10 @@ import Admin from "./olduser.model.js";
 import AllDeals from "./alldeals.models.js";
 import Activity from "./activity.models.js";
 import Meeting from './meeting.models.js'
+import GmailToken from "./GmailToken.js";
+import WhatsAppMessage from "./WhatsAppMessage.js";
 
-
-export {User,Role,Admin,AllDeals,Activity,deal,Invoice,lastreason,Meeting };
+export {User,Role,Admin,AllDeals,Activity,deal,Invoice,lastreason,Meeting,GmailToken,WhatsAppMessage  };
 
 
 

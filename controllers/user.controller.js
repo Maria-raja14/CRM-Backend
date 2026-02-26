@@ -212,7 +212,9 @@ export default {
       console.error("Login error:", err);
       res.status(500).json({ message: err.message });
     }
-  },
+  },//old one
+
+
 
   // ✅ FIXED logoutUser
   logoutUser: async (req, res) => {
