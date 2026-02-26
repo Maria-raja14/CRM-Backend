@@ -13,7 +13,7 @@ const ProposalSchema = new mongoose.Schema(
     cc: { type: String },
     content: { type: String, required: false, default: "" },
     image: { type: String },
-    value: { type: String, required: true },
+    value: { type: String, required: 0 },
     // currency: { type: String, required: true },
     companyName: { type: String },
     status: {

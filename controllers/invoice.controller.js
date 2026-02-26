@@ -6,7 +6,7 @@ import fs from "fs";
 import puppeteer from "puppeteer";
 import nodemailer from "nodemailer";
 
-// Keep a global browser instance
+
 let browserInstance = null;
 const getBrowser = async () => {
   if (!browserInstance) {
@@ -26,7 +26,7 @@ const getBrowser = async () => {
 export default {
   createInvoice: async (req, res) => {
     try {
-      // ✅ Only Admin can create invoice
+     
       if (!req.user || !req.user.role || req.user.role.name !== "Admin") {
         return res
           .status(403)
@@ -40,7 +40,7 @@ export default {
         discountValue = 0,
         discountType = "percentage",
         currency = "USD",
-        assignTo, // sales user id
+        assignTo, 
         dueDate,
         ...rest
       } = req.body;
@@ -51,31 +51,28 @@ export default {
           .json({ error: "Invoice must contain at least one item" });
       }
 
-      // ✅ Convert tax and discountValue to numbers
+
       tax = Number(tax) || 0;
       discountValue = Number(discountValue) || 0;
 
-      // ✅ Subtotal calculation with safety
+
       let subtotal = items.reduce((acc, item) => {
         const quantity = Number(item.quantity) || 0;
         const unitPrice = Number(item.unitPrice) || 0;
         return acc + quantity * unitPrice;
       }, 0);
 
-      // ✅ Tax calculation
+
       let taxAmount = taxType === "percentage" ? (subtotal * tax) / 100 : tax;
 
-      // ✅ Discount calculation
       let discount =
         discountType === "percentage"
           ? (subtotal * discountValue) / 100
           : discountValue;
 
-      // ✅ Total calculation
       let total = subtotal + taxAmount - discount;
       if (total < 0) total = 0;
 
-      // ✅ Create invoice document
       const newInvoice = new Invoice({
         items,
         subtotal,
@@ -89,7 +86,7 @@ export default {
         currency,
         assignTo,
         dueDate,
-        createdBy: req.user._id, // track which admin created
+        createdBy: req.user._id, 
         ...rest,
       });
 

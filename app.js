@@ -24,21 +24,12 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// CORS Configuration - UPDATED to include PATCH method
-// const corsOptions = {
-//   origin: process.env.FRONTEND_URL || "http://localhost:5173",
-//   credentials: true,
-//   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-//   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-// };//old one
-
-// In your backend server file (the second code block), update the CORS configuration:
 
 const corsOptions = {
   origin: [
-    process.env.FRONTEND_URL || "http://localhost:5173",
-    "https://crm.stagingzar.com", // Add your live URL
-    "http://localhost:3000", // Optional: for local testing
+    process.env.FRONTEND_URL || "http://localhost:5173","http://localhost:5174",
+    "https://crm.stagingzar.com",
+    "http://localhost:3000", 
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -49,7 +40,7 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Handle preflight requests for all routes
+
 app.options("*", cors(corsOptions));
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -57,7 +48,6 @@ app.use(express.static(path.join(__dirname, "public")));
 
 app.use("/uploads", express.static("uploads"));
 
-// Authentication middleware
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
@@ -75,11 +65,10 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// API routes
 app.use("/api", routes);
 app.use("/api/files", fileRoutes);
 app.use("/api/gmail", gmailRoutes);
-app.use("/api/google-auth", googleAuthRoutes); // Add this line
+app.use("/api/google-auth", googleAuthRoutes); 
 
 app.get("/api/auth/google/callback", (req, res) => {
   console.log("📝 Redirecting old callback URL to new one...");
@@ -88,7 +77,7 @@ app.get("/api/auth/google/callback", (req, res) => {
   res.redirect(redirectUrl);
 });
 
-// Protected file download endpoint
+
 app.get("/api/files/download", authenticateToken, (req, res) => {
   try {
     const { filePath } = req.query;
@@ -129,7 +118,7 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Catch-all handler for undefined routes
+
 app.use((req, res) => {
   console.log(`❌ Route not found: ${req.method} ${req.url}`);
   res.status(404).json({
@@ -139,7 +128,7 @@ app.use((req, res) => {
   });
 });
 
-// Global error handler
+
 app.use((err, _req, res, _next) => {
   console.error("🚨 Server Error:", err.stack);
   res.status(500).json({
@@ -178,4 +167,4 @@ const startServer = async () => {
   });
 };
 
-startServer(); //
+startServer(); 
