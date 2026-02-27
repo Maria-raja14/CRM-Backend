@@ -90,6 +90,17 @@
 // startServer();
 
 
+
+
+
+
+
+
+
+
+
+
+
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
@@ -106,6 +117,10 @@ import { initSocket } from "./realtime/socket.js";
 import { startFollowUpCron } from "./controllers/followups.cron.js";
 import { startActivityReminderCron } from "./controllers/activityReminder.cron.js";
 import { startProposalFollowUpCron } from "./controllers/proposalFollowUpCron.controller.js";
+import lostDealRoutes from "./routes/lostDealRoutes.js";
+import clientLTVRoutes from "./routes/clientLTVRoutes.js";
+import { startDealFollowUpCron } from "./controllers/dealFollowup.cron.js";
+
 
 dotenv.config();
 
@@ -140,6 +155,10 @@ const authenticateToken = (req, res, next) => {
 
 app.use("/api", routes);
 app.use("/api/files", fileRoutes);
+app.use("/api/deals", lostDealRoutes);
+app.use("/api/cltv", clientLTVRoutes);
+
+
 // Protected file download endpoint
 app.get("/api/files/download", authenticateToken, (req, res) => {
   try {
@@ -182,8 +201,9 @@ app.use((err, _req, res, _next) => {
 const server = http.createServer(app);
 initSocket(server); // Socket.IO
 startFollowUpCron();
-startActivityReminderCron(); // ✅ for activities      // Cron jobs
+startActivityReminderCron();
 startProposalFollowUpCron();
+startDealFollowUpCron(); // ✅ for deals      // Cron jobs  
 
 const PORT = process.env.PORT || 5000;
 
@@ -197,10 +217,4 @@ const startServer = async () => {
   }
 };
 
-startServer();//orginal
-
-
-
-
-
-
+startServer();

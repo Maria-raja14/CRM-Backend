@@ -1,16 +1,25 @@
-// followup.cron.js
+// controllers/proposalFollowUpCron.controller.js
 import cron from "node-cron";
 import Proposal from "../models/proposal.model.js";
-// import nodemailer from "nodemailer";
+import Deal from "../models/deals.model.js";
+import User from "../models/user.model.js";
+import Role from "../models/role.model.js";
 import moment from "moment";
 import { sendNotification } from "../services/notificationService.js";
 
 const REMIND_GAP_MINUTES = 120;
 
+const getAdminUserIds = async () => {
+  const adminRole = await Role.findOne({ name: "Admin" });
+  if (!adminRole) return [];
+  const admins = await User.find({ role: adminRole._id }, "_id");
+  return admins.map(a => a._id.toString());
+};
+
 export function startProposalFollowUpCron() {
   cron.schedule("* * * * *", async () => {
     const nowUtc = moment.utc();
-    console.log("📧 Proposal Follow-up Cron:", nowUtc.format("YYYY-MM-DD HH:mm:ss"));
+    console.log("📄 Proposal Follow-up Cron Running:", nowUtc.format("YYYY-MM-DD HH:mm:ss"));
 
     try {
       const dueProposals = await Proposal.find({
@@ -24,46 +33,66 @@ export function startProposalFollowUpCron() {
             },
           },
         ],
+      }).populate({
+        path: "deal",
+        populate: { path: "assignedTo", select: "firstName lastName email profileImage" }
       });
 
-      if (!dueProposals.length) return;
+      if (!dueProposals.length) {
+        console.log("📄 No due proposals found");
+        return;
+      }
 
-    //   const transporter = nodemailer.createTransport({
-    //     service: "gmail",
-    //     host: "smtp.gmail.com",
-    //     port: 587,
-    //     secure: false,
-    //     auth: {
-    //       user: process.env.EMAIL_USER,
-    //       pass: process.env.EMAIL_PASS,
-    //     },
-    //   });
+      console.log(`📄 Found ${dueProposals.length} due proposals`);
+      const admins = await getAdminUserIds();
 
       for (const proposal of dueProposals) {
-        // 📧 Send email reminder
-        // await transporter.sendMail({
-        //   from: `"Your Company" <${process.env.EMAIL_USER}>`,
-        //   to: proposal.email,
-        //   cc: proposal.cc || "",
-        //   subject: `Follow-up Reminder: ${proposal.title}`,
-        //   html: `
-        //     <p>Dear Client,</p>
-        //     <p>This is a follow-up regarding our proposal <b>${proposal.title}</b>.</p>
-        //     <p>Best regards,<br>Your Company</p>
-        //   `,
-        // });
+        let assignedUserId = null;
+        let salesmanName = 'Unknown';
+        let profileImage = null;
+        
+        if (proposal.deal && proposal.deal.assignedTo) {
+          assignedUserId = proposal.deal.assignedTo._id.toString();
+          salesmanName = `${proposal.deal.assignedTo.firstName || ''} ${proposal.deal.assignedTo.lastName || ''}`.trim();
+          profileImage = proposal.deal.assignedTo.profileImage;
+        }
 
-        // 🔔 Send in-app notification (to admins or proposal owner)
-        // await sendNotification(
-        //   proposal.deal, // or proposal.userId (depends on your schema)
-        //   `Follow-up due for proposal: ${proposal.title}`,
-        //   "followup",
-        //   { proposalId: proposal._id }
-        // );
+        console.log(`Processing proposal: ${proposal.title}, Assigned to: ${salesmanName}`);
 
-        // Update last reminder timestamp
+        // Send notification to assigned sales person
+        if (assignedUserId) {
+          await sendNotification(
+            assignedUserId,
+            `Follow-up due for proposal: ${proposal.title}`,
+            "followup",
+            { 
+              proposalId: proposal._id.toString(),
+              proposalTitle: proposal.title,
+              dealId: proposal.deal?._id,
+              salesmanName: salesmanName,
+              profileImage: profileImage
+            }
+          );
+        }
+
+        // Send notification to admins
+        for (const adminId of admins) {
+          await sendNotification(
+            adminId,
+            `Proposal follow-up due: ${proposal.title} (Assigned to: ${salesmanName})`,
+            "admin",
+            { 
+              proposalId: proposal._id.toString(),
+              proposalTitle: proposal.title,
+              salesmanName: salesmanName,
+              salesmanId: assignedUserId
+            }
+          );
+        }
+
         proposal.lastReminderAt = new Date();
         await proposal.save();
+        console.log(`✅ Updated lastReminderAt for proposal: ${proposal.title}`);
       }
     } catch (err) {
       console.error("❌ Proposal follow-up cron error:", err);

@@ -103,18 +103,19 @@
 //     }
 //   });
 // }
+// controllers/followups.cron.js
+
+
 
 import cron from "node-cron";
 import Lead from "../models/leads.model.js";
 import User from "../models/user.model.js";
 import Role from "../models/role.model.js";
 import Notification from "../models/notification.model.js";
-import moment from "moment"; // ✅ keep only moment
+import moment from "moment";
 import { sendNotification } from "../services/notificationService.js";
-import sendEmail from "../services/email.js"; // ✅ make sure this exists
 
-// Avoid duplicate reminders within the same gap (in minutes)
-const SHOULD_REMIND_EVERY_MINUTES = 1440;
+const SHOULD_REMIND_EVERY_MINUTES = 1440; // 24 hours
 
 // ✅ Get Admin UserIds
 const getAdminUserIds = async () => {
@@ -123,7 +124,6 @@ const getAdminUserIds = async () => {
     console.log("⚠️ No Admin role found in DB");
     return [];
   }
-
   const admins = await User.find({ role: adminRole._id }, "_id");
   return admins.map((a) => a._id.toString());
 };
@@ -132,9 +132,10 @@ const getAdminUserIds = async () => {
 export function startFollowUpCron() {
   cron.schedule("* * * * *", async () => {
     const nowUtc = moment.utc();
-    console.log("🕒 Follow-up Cron:", nowUtc.format("YYYY-MM-DD HH:mm:ss"));
+    console.log("🕒 Lead Follow-up Cron Running:", nowUtc.format("YYYY-MM-DD HH:mm:ss"));
 
     try {
+      // Find leads with follow-up date that has passed
       const dueLeads = await Lead.find({
         followUpDate: { $lte: nowUtc.toDate() },
         status: { $in: ["Hot", "Warm", "Cold"] },
@@ -150,88 +151,62 @@ export function startFollowUpCron() {
             },
           },
         ],
-      }).populate("assignTo", "firstName lastName email _id");
+      }).populate("assignTo", "firstName lastName email _id profileImage");
 
-      if (!dueLeads.length) return;
+      if (!dueLeads.length) {
+        console.log("📊 No due leads found");
+        return;
+      }
 
+      console.log(`📊 Found ${dueLeads.length} due leads`);
       const admins = await getAdminUserIds();
 
       for (const lead of dueLeads) {
-        // ✅ Recompute lead score whenever a reminder is sent
-        try {
-          lead.leadScore = computeLeadScore(
-            lead.toObject ? lead.toObject() : lead
-          );
-        } catch {
-          lead.leadScore = lead.leadScore || 0;
-        }
-
         const assignUserId = lead.assignTo?._id?.toString();
+        const salesmanName = lead.assignTo ? 
+          `${lead.assignTo.firstName || ''} ${lead.assignTo.lastName || ''}`.trim() : 
+          'Unassigned';
+
+        console.log(`Processing lead: ${lead.leadName}, Assigned to: ${salesmanName}`);
 
         // ----- 🔔 Notification for Salesperson -----
         if (assignUserId) {
-          await sendNotification(
+          const result = await sendNotification(
             assignUserId,
-            `⚠️ You missed a follow-up for Lead: ${
-              lead.leadName || "Unnamed Lead"
-            }`,
+            `Salesman missed follow-up for Lead: ${lead.leadName}`,
             "followup",
-            { leadId: lead._id.toString() }
+            { 
+              leadId: lead._id.toString(),
+              leadName: lead.leadName,
+              salesmanName: salesmanName,
+              profileImage: lead.assignTo?.profileImage
+            }
           );
+          console.log(`✅ Sent notification to salesperson: ${salesmanName}, Result:`, result ? 'Success' : 'Failed');
         }
 
         // ----- 🔔 Notification for Admins -----
         for (const adminId of admins) {
           await sendNotification(
             adminId,
-            `Salesman ${
-              lead.assignTo?.firstName || "Unknown"
-            } missed follow-up for Lead: ${lead.leadName}`,
-            "followup",
+            `Salesman ${salesmanName} missed follow-up for Lead: ${lead.leadName}`,
+            "admin",
             {
               leadId: lead._id.toString(),
-              salesman: lead.assignTo?.firstName || "Unknown",
+              leadName: lead.leadName,
+              salesmanName: salesmanName,
               salesmanId: lead.assignTo?._id?.toString(),
             }
           );
         }
 
-        // ----- 📧 Email to Lead -----
-        // ----- 📧 Email to Lead -----
-        if (lead.email) {
-          const followUpDate = moment(lead.followUpDate).format("DD-MM-YYYY");
-          const subject = `👋 Follow-Up Reminder — ${lead.leadName}`;
-          const htmlMessage = `
-    <p>Dear ${lead.leadName},</p>
-    <p>This is a reminder for our scheduled follow-up on ${followUpDate}.</p>
-    <p>We would love to know your thoughts or updates regarding your requirements.</p>
-    <p>Please reply to this email or let us know a convenient time for a quick call.</p>
-    <br/>
-    <p>— Your CRM Team</p>
-  `;
-          await sendEmail({ to: lead.email, subject, html: htmlMessage });
-          console.log(`📧 Follow-up email sent to Lead: ${lead.leadName}`);
-        }
-
         // ✅ Mark reminder as sent
         lead.lastReminderAt = new Date();
         await lead.save();
+        console.log(`✅ Updated lastReminderAt for lead: ${lead.leadName}`);
       }
     } catch (err) {
-      console.error("❌ followUp cron error:", err);
-    }
-  });
-
-  // ---------- Cleanup Expired Notifications Cron (every hour) ----------
-  cron.schedule("0 * * * *", async () => {
-    try {
-      const now = new Date();
-      const deleted = await Notification.deleteMany({
-        expiresAt: { $lte: now },
-      });
-      console.log("🗑️ Deleted expired notifications:", deleted.deletedCount);
-    } catch (err) {
-      console.error("❌ Error deleting expired notifications:", err);
+      console.error("❌ Lead followUp cron error:", err);
     }
   });
 }
