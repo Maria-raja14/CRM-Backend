@@ -4,7 +4,7 @@ import User from "./user.model.js";
 
 import Role from "./Role.models.js";
   // Ensure correct path
- 
+ import Streak from "./streak.model.js"; 
  
 
 // import LeadGroup from "./leadGroup.models.js";
@@ -20,7 +20,7 @@ import Activity from "./activity.models.js";
 import Meeting from './meeting.models.js'
 
 
-export {User,Role,Admin,AllDeals,Activity,deal,Invoice,lastreason,Meeting };
+export {User,Role,Admin,AllDeals,Activity,deal,Invoice,lastreason,Meeting, Streak };
 
 
 
