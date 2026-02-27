@@ -33,7 +33,7 @@ const dealSchema = new mongoose.Schema({
   stage: {
     type: String,
     enum: [
-      "Qualification",
+      "Qualifications",
       "Proposal Sent-Negotiation",
       "Invoice Sent",
       "Closed Won",
