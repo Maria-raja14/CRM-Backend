@@ -26,12 +26,12 @@ export default {
 //     res.status(500).json({ message: err.message });
 //   }
 // },
- getUserNotifications: async (req, res) => {
+// controllers/notification.controller.js
+getUserNotifications: async (req, res) => {
   try {
     const { userId } = req.params;
     const now = new Date();
 
-    // Fetch non-expired notifications
     let notifications = await Notification.find({
       userId,
       $or: [
@@ -41,10 +41,10 @@ export default {
     })
       .sort({ createdAt: -1 })
       .limit(50)
-      .lean(); // convert to plain JS objects so we can modify
+      .lean();
 
     for (let notif of notifications) {
-      // 1️⃣ If followup and leadId exists → get assigned salesman's profileImage
+      // Handle lead followups
       if (notif.type === "followup" && notif.meta?.leadId) {
         const lead = await Lead.findById(notif.meta.leadId).populate(
           "assignTo",
@@ -56,19 +56,23 @@ export default {
           notif.userName = `${lead.assignTo.firstName} ${lead.assignTo.lastName}`;
         }
       }
+      
+      // Handle proposal followups
+      else if (notif.type === "followup" && notif.meta?.proposalId) {
+        const proposal = await Proposal.findById(notif.meta.proposalId)
+          .populate({
+            path: "deal",
+            populate: { path: "assignedTo", select: "profileImage firstName lastName" }
+          });
 
-      // 2️⃣ Fallback → use userId (admin) profileImage if still missing
-      // if (!notif.profileImage && notif.userId) {
-      //   const user = await User.findById(notif.userId).select("profileImage firstName lastName");
-      //   if (user) {
-      //     notif.profileImage = user.profileImage?.replace(/\\/g, "/") || null;
-      //     notif.userName = `${user.firstName} ${user.lastName}`;
-      //   }
-      // }
+        if (proposal?.deal?.assignedTo) {
+          notif.profileImage = proposal.deal.assignedTo.profileImage?.replace(/\\/g, "/") || null;
+          notif.userName = `${proposal.deal.assignedTo.firstName} ${proposal.deal.assignedTo.lastName}`;
+        }
+      }
     }
 
     res.status(200).json(notifications);
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: err.message });

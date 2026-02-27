@@ -18,34 +18,32 @@ router.post(
   indexControllers.dealsController.createDealFromLead
 );
 
-// Get all deals - accessible to all authenticated users but filtered by role
+// Get all deals
 router.get("/getAll", indexControllers.dealsController.getAllDeals);
 
-// Get deal by ID - accessible to admin or assigned user
+// Get deal by ID
 router.get(
   "/getAll/:id",
   adminOrAssignedToDeal,
   indexControllers.dealsController.getDealById
 );
 
-// Update deal stage - only admin or assigned user can update
+// Update deal stage
 router.patch(
   "/:id/stage",
   adminOrAssignedToDeal,
   indexControllers.dealsController.updateStage
 );
 
-// Create manual deal - only admin can create manual deals
-//router.post("/createManual", adminOnly, indexControllers.dealsController.createManualDeal);
-
+// Create manual deal
 router.post(
   "/createManual",
   adminOnly,
-  upload.array("attachments", 10), // multer middleware
+  upload.array("attachments", 10),
   indexControllers.dealsController.createManualDeal
 );
 
-// Update deal (assignTo, stage, value, notes) - only admin or assigned user can update
+// Update deal
 router.patch(
   "/update-deal/:id",
   adminOrAssignedToDeal,
@@ -53,12 +51,20 @@ router.patch(
   indexControllers.dealsController.updateDeal
 );
 
-// Delete deal - only admin or assigned user can delete
+// Complete follow-up
+router.post(
+  "/:id/complete-followup",
+  adminOrAssignedToDeal,
+  indexControllers.dealsController.completeFollowUp
+);
+
+// Delete deal
 router.delete(
   "/delete-deal/:id",
   adminOrAssignedToDeal,
   indexControllers.dealsController.deleteDeal
 );
+
 router.get("/pending", indexControllers.dealsController.pendingDeals);
 
 export default router;
