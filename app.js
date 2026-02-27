@@ -109,10 +109,14 @@ import { fileURLToPath } from "url";
 import http from "http";
 import fs from "fs";
 import jwt from "jsonwebtoken";
-
+import helmet from 'helmet';
+import mongoSanitize from 'express-mongo-sanitize';
+import rateLimit from 'express-rate-limit';
 import connectDB from "./config/db.js";
 import routes from "./routes/index.routes.js";
 import fileRoutes from "./routes/files.routes.js";
+import callLogRoutes from "./routes/callLog.routes.js";
+import botRoutes from "./routes/bot.routes.js";
 import { initSocket } from "./realtime/socket.js";
 import { startFollowUpCron } from "./controllers/followups.cron.js";
 import { startActivityReminderCron } from "./controllers/activityReminder.cron.js";
@@ -131,7 +135,17 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
+// Global rate limiting for all routes 
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // Limit each IP to 1000 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
+app.use(helmet());
+app.use(mongoSanitize());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -152,12 +166,24 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
+app.use('/api/', globalLimiter);
+app.use(globalLimiter);
+// Add this RIGHT BEFORE app.use("/api", routes)
+console.log("🔍 Checking routes...");
+console.log("Routes import:", routes ? "✅ Loaded" : "❌ Not loaded");
+console.log("Routes type:", typeof routes);
+console.log("Routes stack:", routes?.stack?.length || 0);
 
+// Mount routes
 app.use("/api", routes);
 app.use("/api/files", fileRoutes);
 app.use("/api/deals", lostDealRoutes);
 app.use("/api/cltv", clientLTVRoutes);
+app.use("/api/calllogs", callLogRoutes); // Call log tracking routes
+app.use("/api/bot", botRoutes); // Bot command routes
 
+// Optional: If you want the /api/calls/command endpoint as well
+app.use("/api/calls", botRoutes);
 
 // Protected file download endpoint
 app.get("/api/files/download", authenticateToken, (req, res) => {
