@@ -1,3 +1,7 @@
+
+
+
+
 import mongoose from "mongoose";
 
 const permissionsSchema = new mongoose.Schema(
@@ -8,11 +12,10 @@ const permissionsSchema = new mongoose.Schema(
     deals_pipeline: { type: Boolean, default: false },
     invoices: { type: Boolean, default: false },
     proposal: { type: Boolean, default: false },
-    activities: { type: Boolean, default: false },
-    activities_calendar: { type: Boolean, default: false },
-    activities_list: { type: Boolean, default: false },
     users_roles: { type: Boolean, default: false },
-    admin_access: { type: Boolean, default: false },
+    email_chat: { type: Boolean, default: false },
+    whatsapp_chat: { type: Boolean, default: false },
+    reports: { type: Boolean, default: false },
   },
   { _id: false }
 );

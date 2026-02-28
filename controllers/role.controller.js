@@ -2,36 +2,36 @@ import Role from "../models/role.model.js";
 
 const roleController = {
   // ✅ Create a new role
-createRole: async (req, res) => {
-  try {
-    const { name, description, permissions } = req.body;
+  createRole: async (req, res) => {
+    try {
+      const { name, description, permissions } = req.body;
 
-    // Prevent duplicate role names
-    const existingRole = await Role.findOne({ name: name.trim() });
-    if (existingRole) {
-      return res.status(400).json({ message: "Role already exists" });
-    }
+      // Prevent duplicate role names
+      const existingRole = await Role.findOne({ name: name.trim() });
+      if (existingRole) {
+        return res.status(400).json({ message: "Role already exists" });
+      }
 
-    // ✅ Normalize permissions: force true/false
-    const normalizedPermissions = {};
-    if (permissions) {
-      Object.keys(permissions).forEach((key) => {
-        normalizedPermissions[key] = permissions[key] === true || permissions[key] === "true";
+      // ✅ Normalize permissions: force true/false
+      const normalizedPermissions = {};
+      if (permissions) {
+        Object.keys(permissions).forEach((key) => {
+          normalizedPermissions[key] = permissions[key] === true || permissions[key] === "true";
+        });
+      }
+
+      const role = await Role.create({
+        name: name.trim(),
+        description,
+        permissions: normalizedPermissions,
       });
+
+      res.status(201).json(role);
+    } catch (err) {
+      console.error("Error creating role:", err);
+      res.status(500).json({ message: "Error creating role", error: err.message });
     }
-
-    const role = await Role.create({
-      name: name.trim(),
-      description,
-      permissions: normalizedPermissions,
-    });
-
-    res.status(201).json(role);
-  } catch (err) {
-    console.error("Error creating role:", err);
-    res.status(500).json({ message: "Error creating role", error: err.message });
-  }
-},
+  },
 
   // ✅ Get all roles with pagination
   getRoles: async (req, res) => {
@@ -58,35 +58,33 @@ createRole: async (req, res) => {
   },
 
   // ✅ Update a role by ID
- // ✅ Update a role by ID
-updateRole: async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, description, permissions } = req.body;
+  updateRole: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, description, permissions } = req.body;
 
-    const role = await Role.findById(id);
-    if (!role) {
-      return res.status(404).json({ message: "Role not found" });
+      const role = await Role.findById(id);
+      if (!role) {
+        return res.status(404).json({ message: "Role not found" });
+      }
+
+      // Update fields if provided
+      if (name) role.name = name.trim();
+      if (description) role.description = description;
+
+      // ✅ Overwrite permissions correctly
+      if (permissions) {
+        role.permissions = { ...role.permissions.toObject(), ...permissions };
+      }
+
+      const updatedRole = await role.save();
+
+      res.status(200).json(updatedRole);
+    } catch (err) {
+      console.error("Error updating role:", err);
+      res.status(500).json({ message: "Error updating role", error: err.message });
     }
-
-    // Update fields if provided
-    if (name) role.name = name.trim();
-    if (description) role.description = description;
-
-    // ✅ Overwrite permissions correctly
-    if (permissions) {
-      role.permissions = { ...role.permissions.toObject(), ...permissions };
-    }
-
-    const updatedRole = await role.save();
-
-    res.status(200).json(updatedRole);
-  } catch (err) {
-    console.error("Error updating role:", err);
-    res.status(500).json({ message: "Error updating role", error: err.message });
-  }
-},
-
+  },
 
   // ✅ Delete a role by ID
   deleteRole: async (req, res) => {

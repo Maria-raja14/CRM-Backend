@@ -1,10 +1,20 @@
+
+
+
 import express from "express";
 import { protect, adminOrSales } from "../middlewares/auth.middleware.js";
-import indexControllers from "../controllers/index.controllers.js";
+import salesReportsController from "../controllers/salesReports.controller.js";
 
 const router = express.Router();
 
-// Fetch sales performance metrics
-router.get("/performance", protect, adminOrSales, indexControllers.salesReportsController.getSalesPerformance);
+// @route   GET /api/sales/performance
+// @desc    Get performance metrics for a salesperson (by userId query)
+// @access  Private (Admin or Sales)
+router.get(
+  "/performance",
+  protect,
+  adminOrSales,
+  salesReportsController.getSalesPerformance
+);
 
 export default router;

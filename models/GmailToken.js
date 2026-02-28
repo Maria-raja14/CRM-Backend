@@ -1,3 +1,4 @@
+
 import mongoose from "mongoose";
 
 const gmailTokenSchema = new mongoose.Schema({
@@ -7,6 +8,13 @@ const gmailTokenSchema = new mongoose.Schema({
     unique: true,
     lowercase: true,
     trim: true,
+  },
+  // Optional: link to the CRM user who connected this Gmail account
+  // This enables an extra layer of security lookup if needed
+  crm_user_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
   },
   access_token: {
     type: String,
@@ -45,12 +53,10 @@ const gmailTokenSchema = new mongoose.Schema({
   },
 });
 
-// Update the updated_at timestamp before saving
 gmailTokenSchema.pre("save", function (next) {
   this.updated_at = new Date();
   next();
 });
 
 const GmailToken = mongoose.model("GmailToken", gmailTokenSchema);
-
 export default GmailToken;

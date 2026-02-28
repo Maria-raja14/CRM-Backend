@@ -1,6 +1,3 @@
-
-
-
 import dotenv from "dotenv";
 import connectDB from "../config/db.js";
 import Role from "../models/role.model.js";
@@ -31,7 +28,7 @@ const seedAdmin = async () => {
       admin.lastName = "Admin";
       admin.role = adminRole._id;
       admin.password = "admin123"; // PLAIN — pre-save will hash
-            admin.status = "Active"; 
+            admin.status = "Active";
       await admin.save();          // triggers pre-save hook
       console.log("✅ Admin user password reset and updated");
     } else {
@@ -53,3 +50,8 @@ const seedAdmin = async () => {
 };
 
 seedAdmin();
+
+
+
+
+

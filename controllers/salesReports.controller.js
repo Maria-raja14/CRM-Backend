@@ -1,87 +1,82 @@
 import User from "../models/user.model.js";
 import Lead from "../models/leads.model.js";
 import Activity from "../models/activity.models.js";
-import Invoice from "../models/invoice.model.js"; // make sure you have Invoice model
+import Invoice from "../models/invoice.model.js";
 import mongoose from "mongoose";
 
-// Get performance metrics for a salesperson
-export default {
-    getSalesPerformance : async (req, res) => {
+const getSalesPerformance = async (req, res) => {
   try {
     const { userId, startDate, endDate } = req.query;
 
-    if (!userId || !mongoose.Types.ObjectId.isValid(userId))
-      return res.status(400).json({ message: "Invalid userId" });
+    // 1. Validate userId
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: "Invalid or missing userId" });
+    }
 
+    // 2. Fetch user with login history
     const user = await User.findById(userId).select(
       "firstName lastName email role loginHistory"
     );
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    
-let loginData = [];
-if (user.loginHistory?.length > 0) {
-  loginData = user.loginHistory.filter((item) => {
-    const itemDate = new Date(item.login);
-    if (startDate && endDate) {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      return itemDate >= start && itemDate <= end;
-    } else if (startDate) {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(startDate);
-      end.setHours(23, 59, 59, 999);
-      return itemDate >= start && itemDate <= end;
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
-    return true; // no filter
-  });
-}
 
-    // Leads assigned to this user
-    const leadsQuery = {
+    // 3. Filter loginHistory by date range if provided
+    let loginData = [];
+    if (user.loginHistory && Array.isArray(user.loginHistory)) {
+      loginData = user.loginHistory.filter((item) => {
+        if (!item.login) return false;
+        const itemDate = new Date(item.login);
+        if (startDate && endDate) {
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          return itemDate >= start && itemDate <= end;
+        }
+        if (startDate) {
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(startDate);
+          end.setHours(23, 59, 59, 999);
+          return itemDate >= start && itemDate <= end;
+        }
+        return true; // no date filter
+      });
+    }
+
+    // 4. Build date filter for other collections
+    const dateFilter = {};
+    if (startDate || endDate) {
+      dateFilter.createdAt = {};
+      if (startDate) dateFilter.createdAt.$gte = new Date(startDate);
+      if (endDate) dateFilter.createdAt.$lte = new Date(endDate);
+    }
+
+    // 5. Fetch leads assigned to this user
+    const leads = await Lead.find({
       assignTo: user._id,
-      ...(startDate || endDate
-        ? {
-            createdAt: {
-              ...(startDate && { $gte: new Date(startDate) }),
-              ...(endDate && { $lte: new Date(endDate) }),
-            },
-          }
-        : {}),
-    };
-    const leads = await Lead.find(leadsQuery);
+      ...dateFilter,
+    }).lean();
 
-    // Activities assigned to this user
-    const activitiesQuery = {
+    // 6. Fetch activities assigned to this user
+    const activities = await Activity.find({
       assignedTo: user._id,
-      ...(startDate || endDate
-        ? {
-            createdAt: {
-              ...(startDate && { $gte: new Date(startDate) }),
-              ...(endDate && { $lte: new Date(endDate) }),
-            },
-          }
-        : {}),
-    };
-    const activities = await Activity.find(activitiesQuery);
+      ...dateFilter,
+    }).lean();
 
-    // Invoices assigned to this user
-    const invoicesQuery = {
-      assignedTo: user._id,
-      ...(startDate || endDate
-        ? {
-            createdAt: {
-              ...(startDate && { $gte: new Date(startDate) }),
-              ...(endDate && { $lte: new Date(endDate) }),
-            },
-          }
-        : {}),
-    };
-    const invoices = await Invoice.find(invoicesQuery);
+    // 7. Fetch invoices (gracefully handle if model not available)
+    let invoices = [];
+    try {
+      invoices = await Invoice.find({
+        assignedTo: user._id,
+        ...dateFilter,
+      }).lean();
+    } catch (invoiceErr) {
+      console.warn("Invoice model may not be set up – ignoring:", invoiceErr.message);
+    }
 
+    // 8. Send response
     res.status(200).json({
       salesperson: {
         _id: user._id,
@@ -99,8 +94,11 @@ if (user.loginHistory?.length > 0) {
       invoices,
     });
   } catch (err) {
-    console.error("❌ Error fetching sales performance:", err);
+    console.error("❌ Error in getSalesPerformance:", err);
     res.status(500).json({ message: err.message });
   }
-}
-}
+};
+
+export default {
+  getSalesPerformance,
+};

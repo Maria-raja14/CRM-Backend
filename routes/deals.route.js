@@ -61,4 +61,12 @@ router.delete(
 );
 router.get("/pending", indexControllers.dealsController.pendingDeals);
 
+router.delete(
+  "/bulk-delete",
+  adminOrAssignedToDeal,                                   // ✅ FIXED: Sales can now bulk delete
+  indexControllers.dealsController.bulkDeleteDeals
+);
+
 export default router;
+
+

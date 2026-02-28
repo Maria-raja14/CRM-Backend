@@ -1,3976 +1,3 @@
-// import { google } from "googleapis";
-// import dotenv from "dotenv";
-// import path from "path";
-// import { fileURLToPath } from "url";
-// import mime from "mime-types";
-// import multer from "multer";
-// import GmailToken from "../models/GmailToken.js";
-
-// // Load environment variables first
-// dotenv.config();
-
-// const __filename = fileURLToPath(import.meta.url);
-// const __dirname = path.dirname(__filename);
-
-// // ✅ Detect environment
-// const isProduction = process.env.NODE_ENV === "production";
-// console.log(
-//   `📧 Gmail Service running in ${isProduction ? "PRODUCTION" : "DEVELOPMENT"} mode`,
-// );
-
-// // ✅ Use the correct redirect URI based on environment
-// const CLIENT_ID = process.env.GMAIL_CLIENT_ID;
-// const CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
-// const REDIRECT_URI = isProduction
-//   ? process.env.GMAIL_LIVE_REDIRECT_URI
-//   : process.env.GMAIL_REDIRECT_URI;
-
-// console.log(`📧 Using redirect URI: ${REDIRECT_URI}`);
-
-// // Validate required environment variables
-// if (!CLIENT_ID || !CLIENT_SECRET) {
-//   console.error(
-//     "❌ Missing Gmail OAuth credentials. Please check your .env file",
-//   );
-//   throw new Error("Gmail OAuth credentials not configured");
-// }
-
-// export const oauth2Client = new google.auth.OAuth2(
-//   CLIENT_ID,
-//   CLIENT_SECRET,
-//   REDIRECT_URI,
-// );
-
-// // Cache for current session
-// let currentGmailClient = null;
-// let currentUserEmail = null;
-// let tokenRefreshInProgress = false;
-
-// // Gmail API has a 25MB limit for the entire message
-// const GMAIL_MAX_SIZE = 25 * 1024 * 1024; // 25MB in bytes
-// const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30MB per file limit for frontend
-
-// // Multer configuration for file upload
-// const storage = multer.memoryStorage();
-// export const upload = multer({
-//   storage: storage,
-//   limits: {
-//     fileSize: MAX_FILE_SIZE, // 30MB per file
-//     files: 10, // Max 10 files
-//   },
-//   fileFilter: (req, file, cb) => {
-//     // Check file size
-//     if (req.headers["content-length"] > MAX_FILE_SIZE * 10) {
-//       return cb(new Error("Total files size exceeds 300MB limit"));
-//     }
-//     // Allow all file types
-//     cb(null, true);
-//   },
-// });
-
-// /**
-//  * Initialize Gmail client with tokens from database
-//  */
-// export async function initializeGmailClient(email = null) {
-//   try {
-//     console.log("🔄 Initializing Gmail client...");
-
-//     // If we have a current client and it's for the requested email, return it
-//     if (
-//       currentGmailClient &&
-//       currentUserEmail &&
-//       (!email || currentUserEmail === email)
-//     ) {
-//       console.log(`✅ Using existing Gmail client for ${currentUserEmail}`);
-//       return currentGmailClient;
-//     }
-
-//     // Find active token in database
-//     const tokenQuery = email ? { email, is_active: true } : { is_active: true };
-//     const tokenDoc = await GmailToken.findOne(tokenQuery).sort({
-//       last_connected: -1,
-//     });
-
-//     if (!tokenDoc) {
-//       console.log("❌ No active Gmail tokens found in database");
-//       throw new Error("No valid Gmail tokens found. Connect Gmail first.");
-//     }
-
-//     console.log(`✅ Found token for email: ${tokenDoc.email}`);
-
-//     // Check if token is expired
-//     const now = new Date();
-//     const expiryDate = new Date(tokenDoc.expiry_date);
-
-//     let tokens = {
-//       access_token: tokenDoc.access_token,
-//       refresh_token: tokenDoc.refresh_token,
-//       token_type: tokenDoc.token_type,
-//       expiry_date: expiryDate.getTime(),
-//       scope: tokenDoc.scope,
-//     };
-
-//     // Create OAuth2 client
-//     const oauth2ClientWithTokens = new google.auth.OAuth2(
-//       CLIENT_ID,
-//       CLIENT_SECRET,
-//       REDIRECT_URI,
-//     );
-
-//     oauth2ClientWithTokens.setCredentials(tokens);
-
-//     // Check if token needs refresh
-//     if (now > expiryDate) {
-//       console.log(`🔄 Token expired for ${tokenDoc.email}, refreshing...`);
-
-//       if (tokenRefreshInProgress) {
-//         console.log("⏳ Token refresh already in progress, waiting...");
-//         await new Promise((resolve) => setTimeout(resolve, 2000));
-//         return initializeGmailClient(email);
-//       }
-
-//       tokenRefreshInProgress = true;
-
-//       try {
-//         const { credentials } =
-//           await oauth2ClientWithTokens.refreshAccessToken();
-
-//         // Update tokens in database
-//         tokenDoc.access_token = credentials.access_token;
-//         tokenDoc.expiry_date = new Date(credentials.expiry_date);
-//         if (credentials.refresh_token) {
-//           tokenDoc.refresh_token = credentials.refresh_token;
-//         }
-//         tokenDoc.last_connected = new Date();
-//         await tokenDoc.save();
-
-//         console.log(`✅ Token refreshed and saved for ${tokenDoc.email}`);
-
-//         // Update OAuth2 client with new tokens
-//         oauth2ClientWithTokens.setCredentials(credentials);
-
-//         tokenRefreshInProgress = false;
-//       } catch (refreshError) {
-//         tokenRefreshInProgress = false;
-//         console.error(
-//           `❌ Failed to refresh token for ${tokenDoc.email}:`,
-//           refreshError.message,
-//         );
-//         throw new Error(
-//           "Token expired and could not be refreshed. Please reconnect Gmail.",
-//         );
-//       }
-//     }
-
-//     // Create Gmail client
-//     currentGmailClient = google.gmail({
-//       version: "v1",
-//       auth: oauth2ClientWithTokens,
-//     });
-
-//     currentUserEmail = tokenDoc.email;
-
-//     // Also update the global oauth2Client
-//     oauth2Client.setCredentials(tokens);
-
-//     console.log(
-//       `✅ Gmail client initialized successfully for ${currentUserEmail}`,
-//     );
-//     return currentGmailClient;
-//   } catch (error) {
-//     console.error("❌ Error initializing Gmail client:", error.message);
-
-//     // Reset current client on error
-//     currentGmailClient = null;
-//     currentUserEmail = null;
-
-//     throw new Error(`Failed to initialize Gmail client: ${error.message}`);
-//   }
-// }
-
-// /**
-//  * Generate Google OAuth URL
-//  */
-// // export function generateAuthUrl() {
-// //   if (!CLIENT_ID || !CLIENT_SECRET) {
-// //     throw new Error("Gmail OAuth credentials not configured");
-// //   }
-
-// //   const scopes = [
-// //     "https://mail.google.com/",
-// //     "https://www.googleapis.com/auth/gmail.modify",
-// //     "https://www.googleapis.com/auth/gmail.compose",
-// //     "https://www.googleapis.com/auth/gmail.readonly",
-// //   ];
-
-// //   const authUrl = oauth2Client.generateAuthUrl({
-// //     access_type: "offline",
-// //     prompt: "consent",
-// //     scope: scopes,
-// //   });
-
-// //   console.log("🔗 Generated auth URL");
-// //   return authUrl;
-// // }//old one..
-
-
-
-// export function generateAuthUrl(redirectUri) {
-//   if (!CLIENT_ID || !CLIENT_SECRET) {
-//     throw new Error("Gmail OAuth credentials not configured");
-//   }
-
-//   const scopes = [
-//     "https://mail.google.com/",
-//     "https://www.googleapis.com/auth/gmail.modify",
-//     "https://www.googleapis.com/auth/gmail.compose",
-//     "https://www.googleapis.com/auth/gmail.readonly",
-//   ];
-
-//   // Create a temporary OAuth2 client with the correct redirect URI
-//   const tempOAuth2Client = new google.auth.OAuth2(
-//     CLIENT_ID,
-//     CLIENT_SECRET,
-//     redirectUri
-//   );
-
-//   const authUrl = tempOAuth2Client.generateAuthUrl({
-//     access_type: "offline",
-//     prompt: "consent",
-//     scope: scopes,
-//   });
-
-//   console.log(`🔗 Generated auth URL with redirect: ${redirectUri}`);
-//   return authUrl;
-// }
-
-// /**
-//  * Save tokens to database
-//  */
-// export async function saveTokens(tokens) {
-//   try {
-//     console.log("💾 Saving tokens to database...");
-
-//     // Create OAuth2 client to get user info
-//     const tempOAuth2Client = new google.auth.OAuth2(
-//       CLIENT_ID,
-//       CLIENT_SECRET,
-//       REDIRECT_URI,
-//     );
-//     tempOAuth2Client.setCredentials(tokens);
-
-//     // Get user email
-//     const gmail = google.gmail({ version: "v1", auth: tempOAuth2Client });
-//     const profile = await gmail.users.getProfile({ userId: "me" });
-//     const email = profile.data.emailAddress;
-
-//     console.log(`📧 Got user email: ${email}`);
-
-//     // Calculate expiry date
-//     let expiryDate = new Date();
-//     if (tokens.expiry_date) {
-//       expiryDate = new Date(tokens.expiry_date);
-//     } else {
-//       expiryDate.setHours(expiryDate.getHours() + 1); // Default 1 hour
-//     }
-
-//     // Check if token already exists for this email
-//     const existingToken = await GmailToken.findOne({ email });
-
-//     if (existingToken) {
-//       // Update existing token
-//       existingToken.access_token = tokens.access_token;
-//       if (tokens.refresh_token) {
-//         existingToken.refresh_token = tokens.refresh_token;
-//       }
-//       existingToken.token_type = tokens.token_type || "Bearer";
-//       existingToken.expiry_date = expiryDate;
-//       existingToken.scope = tokens.scope || "";
-//       existingToken.is_active = true;
-//       existingToken.last_connected = new Date();
-
-//       await existingToken.save();
-//       console.log(`✅ Updated existing token for ${email}`);
-//     } else {
-//       // Create new token
-//       const newToken = new GmailToken({
-//         email,
-//         access_token: tokens.access_token,
-//         refresh_token: tokens.refresh_token,
-//         token_type: tokens.token_type || "Bearer",
-//         expiry_date: expiryDate,
-//         scope: tokens.scope || "",
-//         is_active: true,
-//         last_connected: new Date(),
-//       });
-
-//       await newToken.save();
-//       console.log(`✅ Created new token for ${email}`);
-//     }
-
-//     // Deactivate any other tokens for this email (shouldn't happen, but just in case)
-//     await GmailToken.updateMany(
-//       { email, is_active: true },
-//       { is_active: false },
-//     );
-
-//     // Reactivate this one
-//     await GmailToken.updateOne({ email }, { is_active: true });
-
-//     // Set credentials on the global oauth2Client
-//     oauth2Client.setCredentials(tokens);
-
-//     // Reset cached client
-//     currentGmailClient = null;
-//     currentUserEmail = null;
-
-//     console.log(`✅ Tokens saved successfully for ${email}`);
-//     return { success: true, email };
-//   } catch (error) {
-//     console.error("❌ Error saving tokens:", error);
-//     throw new Error(`Failed to save tokens: ${error.message}`);
-//   }
-// }
-
-// /**
-//  * Exchange authorization code for tokens
-//  */
-// // export async function exchangeCodeForTokens(code) {
-// //   try {
-// //     console.log("🔄 Exchanging code for tokens...");
-// //     const { tokens } = await oauth2Client.getToken(code);
-// //     console.log("✅ Received tokens from Google");
-
-// //     // Save tokens to database
-// //     const result = await saveTokens(tokens);
-
-// //     console.log(
-// //       `✅ Tokens exchanged and saved successfully for ${result.email}`,
-// //     );
-// //     return { ...tokens, email: result.email };
-// //   } catch (error) {
-// //     console.error("❌ Error exchanging code for tokens:", error);
-// //     console.error("Full error:", error.response?.data || error.message);
-// //     throw new Error(`Failed to exchange code for tokens: ${error.message}`);
-// //   }
-// // }//old one
-
-// export async function exchangeCodeForTokens(code, redirectUri) {
-//   try {
-//     console.log("🔄 Exchanging code for tokens...");
-
-//     // Create a temporary OAuth2 client with the correct redirect URI
-//     const tempOAuth2Client = new google.auth.OAuth2(
-//       CLIENT_ID,
-//       CLIENT_SECRET,
-//       redirectUri
-//     );
-
-//     const { tokens } = await tempOAuth2Client.getToken(code);
-//     console.log("✅ Received tokens from Google");
-
-//     // Save tokens to database (your existing saveTokens function)
-//     const result = await saveTokens(tokens);
-
-//     console.log(
-//       `✅ Tokens exchanged and saved successfully for ${result.email}`
-//     );
-//     return { ...tokens, email: result.email };
-//   } catch (error) {
-//     console.error("❌ Error exchanging code for tokens:", error);
-//     console.error("Full error:", error.response?.data || error.message);
-//     throw new Error(`Failed to exchange code for tokens: ${error.message}`);
-//   }
-// }
-
-
-// /**
-//  * Check authentication status
-//  */
-// export async function checkAuth(email = null) {
-//   try {
-//     console.log("🔐 Checking authentication status...");
-
-//     // Find active token in database
-//     const tokenQuery = email ? { email, is_active: true } : { is_active: true };
-//     const tokenDoc = await GmailToken.findOne(tokenQuery).sort({
-//       last_connected: -1,
-//     });
-
-//     if (!tokenDoc) {
-//       console.log("❌ No active Gmail tokens found");
-//       return {
-//         authenticated: false,
-//         message: "No Gmail account connected",
-//         email: null,
-//       };
-//     }
-
-//     // Try to initialize client
-//     try {
-//       const gmail = await initializeGmailClient(tokenDoc.email);
-
-//       // Verify by getting profile
-//       const profile = await gmail.users.getProfile({ userId: "me" });
-
-//       console.log(`✅ Auth check successful for ${tokenDoc.email}`);
-
-//       return {
-//         authenticated: true,
-//         message: "Gmail is connected",
-//         email: tokenDoc.email,
-//         profile: profile.data,
-//       };
-//     } catch (error) {
-//       console.error("❌ Auth check failed:", error.message);
-
-//       // Token might be invalid, deactivate it
-//       tokenDoc.is_active = false;
-//       await tokenDoc.save();
-
-//       return {
-//         authenticated: false,
-//         message: `Authentication failed: ${error.message}`,
-//         email: tokenDoc.email,
-//       };
-//     }
-//   } catch (error) {
-//     console.error("❌ Error checking auth status:", error);
-//     return {
-//       authenticated: false,
-//       message: "Error checking authentication status",
-//     };
-//   }
-// }
-
-// /**
-//  * Disconnect Gmail (deactivate token)
-//  */
-// export async function disconnectGmail(email = null) {
-//   try {
-//     console.log("🔌 Disconnecting Gmail...");
-
-//     const tokenQuery = email ? { email, is_active: true } : { is_active: true };
-//     const tokenDoc = await GmailToken.findOne(tokenQuery);
-
-//     if (tokenDoc) {
-//       tokenDoc.is_active = false;
-//       await tokenDoc.save();
-//       console.log(`✅ Deactivated token for ${tokenDoc.email}`);
-//     }
-
-//     // Clear cached data
-//     currentGmailClient = null;
-//     currentUserEmail = null;
-
-//     // Clear credentials from OAuth2 client
-//     oauth2Client.setCredentials({});
-
-//     console.log("✅ Gmail disconnected successfully");
-//     return {
-//       success: true,
-//       message: tokenDoc
-//         ? `Gmail disconnected for ${tokenDoc.email}`
-//         : "Gmail disconnected successfully",
-//     };
-//   } catch (error) {
-//     console.error("❌ Error disconnecting Gmail:", error);
-//     throw error;
-//   }
-// }
-
-// export async function getLabelCounts() {
-//   try {
-//     const gmail = await initializeGmailClient();
-
-//     const labelIds = [
-//       "INBOX",
-//       "UNREAD",
-//       "STARRED",
-//       "IMPORTANT",
-//       "SENT",
-//       "SPAM",
-//       "TRASH",
-//       "DRAFT",
-//     ];
-
-//     const counts = {};
-
-//     for (const labelId of labelIds) {
-//       try {
-//         const res = await gmail.users.labels.get({
-//           userId: "me",
-//           id: labelId,
-//         });
-
-//         counts[labelId === "DRAFT" ? "DRAFTS" : labelId] =
-//           res.data.threadsTotal || 0;
-//       } catch (err) {
-//         console.error(`Error fetching ${labelId}:`, err.message);
-//         counts[labelId] = 0;
-//       }
-//     }
-
-//     console.log("📊 FINAL Gmail counts:", counts);
-//     return counts;
-//   } catch (error) {
-//     console.error("❌ Error getting label counts:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * List threads with OPTIMIZED fetching - MUCH FASTER
-//  * Uses batch requests and minimal data
-//  */
-// export async function listThreads(
-//   maxResults = 20,
-//   pageToken = null,
-//   label = "INBOX",
-// ) {
-//   try {
-//     const gmail = await initializeGmailClient();
-//     const startTime = Date.now();
-
-//     // Build query parameters
-//     let params = {
-//       userId: "me",
-//       maxResults: maxResults,
-//       pageToken: pageToken,
-//       includeSpamTrash: label === "SPAM" || label === "TRASH",
-//     };
-
-//     // Set labelIds based on label for ACCURATE filtering
-//     switch (label) {
-//       case "INBOX":
-//         params.labelIds = ["INBOX"];
-//         break;
-//       case "UNREAD":
-//         params.q = "is:unread";
-//         params.labelIds = ["INBOX"];
-//         break;
-//       case "STARRED":
-//         params.labelIds = ["STARRED"];
-//         break;
-//       case "IMPORTANT":
-//         params.labelIds = ["IMPORTANT"];
-//         break;
-//       case "SENT":
-//         params.labelIds = ["SENT"];
-//         break;
-//       case "SPAM":
-//         params.labelIds = ["SPAM"];
-//         break;
-//       case "TRASH":
-//         params.labelIds = ["TRASH"];
-//         break;
-//       case "DRAFTS":
-//         // For drafts, we need to use drafts.list instead
-//         const draftsRes = await gmail.users.drafts.list({
-//           userId: "me",
-//           maxResults: maxResults,
-//           pageToken: pageToken,
-//         });
-
-//         const drafts = draftsRes.data.drafts || [];
-//         const draftThreads = [];
-
-//         // Process drafts in parallel for speed
-//         const draftPromises = drafts.map(async (draft) => {
-//           try {
-//             const message = draft.message;
-//             const headers = message?.payload?.headers || [];
-
-//             return {
-//               id: draft.id,
-//               threadId: message?.threadId || draft.id,
-//               snippet: message?.snippet || "",
-//               subject:
-//                 headers.find((h) => h.name === "Subject")?.value ||
-//                 "No Subject",
-//               from: headers.find((h) => h.name === "From")?.value || "Unknown",
-//               to: headers.find((h) => h.name === "To")?.value || "",
-//               date:
-//                 headers.find((h) => h.name === "Date")?.value ||
-//                 new Date().toISOString(),
-//               timestamp: Date.now(),
-//               unread: false,
-//               starred: false,
-//               important: false,
-//               spam: false,
-//               trash: false,
-//               isDraft: true, // FIX: mark as draft
-//               messagesCount: 1,
-//             };
-//           } catch (err) {
-//             return null;
-//           }
-//         });
-
-//         const draftResults = await Promise.all(draftPromises);
-//         const validDrafts = draftResults.filter((d) => d !== null);
-
-//         console.log(
-//           `✅ Fetched ${validDrafts.length} drafts in ${Date.now() - startTime}ms`,
-//         );
-
-//         return {
-//           threads: validDrafts,
-//           nextPageToken: draftsRes.data.nextPageToken,
-//           resultSizeEstimate: validDrafts.length,
-//         };
-
-//       default:
-//         params.labelIds = [label];
-//     }
-
-//     // Get thread list (this is fast - just IDs)
-//     const res = await gmail.users.threads.list(params);
-//     const threads = res.data.threads || [];
-
-//     console.log(
-//       `📋 Got ${threads.length} thread IDs from ${label} (Total: ${res.data.resultSizeEstimate || 0})`,
-//     );
-
-//     // If no threads, return empty
-//     if (threads.length === 0) {
-//       return {
-//         threads: [],
-//         nextPageToken: res.data.nextPageToken,
-//         resultSizeEstimate: res.data.resultSizeEstimate || 0,
-//       };
-//     }
-
-//     // OPTIMIZATION: Fetch all thread details in PARALLEL
-//     const detailedThreads = [];
-
-//     const threadPromises = threads.map(async (thread) => {
-//       try {
-//         // Use format: 'metadata' which is faster than 'full'
-//         const threadRes = await gmail.users.threads.get({
-//           userId: "me",
-//           id: thread.id,
-//           format: "metadata",
-//           metadataHeaders: ["Subject", "From", "Date", "To"],
-//         });
-
-//         const messages = threadRes.data.messages || [];
-//         const firstMessage = messages[0];
-
-//         if (!firstMessage) return null;
-
-//         const headers = firstMessage?.payload?.headers || [];
-
-//         const subject =
-//           headers.find((h) => h.name === "Subject")?.value || "No Subject";
-//         const from = headers.find((h) => h.name === "From")?.value || "Unknown";
-//         const to = headers.find((h) => h.name === "To")?.value || "";
-//         const date = headers.find((h) => h.name === "Date")?.value || "";
-
-//         // Get REAL label IDs to determine status
-//         const labelIds = firstMessage?.labelIds || [];
-
-//         let timestamp = 0;
-//         if (date) {
-//           timestamp = new Date(date).getTime();
-//         }
-
-//         return {
-//           id: thread.id,
-//           snippet: thread.snippet || "",
-//           subject,
-//           from,
-//           to,
-//           date,
-//           timestamp,
-//           unread: labelIds.includes("UNREAD"),
-//           starred: labelIds.includes("STARRED"),
-//           important: labelIds.includes("IMPORTANT"),
-//           spam: labelIds.includes("SPAM"),
-//           trash: labelIds.includes("TRASH"),
-//           drafts: labelIds.includes("DRAFT"),
-//           messagesCount: messages.length,
-//         };
-//       } catch (err) {
-//         console.error(`Error fetching thread ${thread.id}:`, err.message);
-//         return {
-//           id: thread.id,
-//           snippet: thread.snippet || "",
-//           subject: "No Subject",
-//           from: "Unknown",
-//           to: "",
-//           date: "",
-//           timestamp: 0,
-//           unread: false,
-//           starred: false,
-//           important: false,
-//           spam: false,
-//           trash: false,
-//           drafts: false,
-//           messagesCount: 0,
-//         };
-//       }
-//     });
-
-//     const results = await Promise.all(threadPromises);
-//     for (const result of results) {
-//       if (result) detailedThreads.push(result);
-//     }
-
-//     detailedThreads.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-
-//     const duration = Date.now() - startTime;
-//     console.log(
-//       `✅ Fetched ${detailedThreads.length} threads in ${duration}ms`,
-//     );
-
-//     return {
-//       threads: detailedThreads,
-//       nextPageToken: res.data.nextPageToken,
-//       resultSizeEstimate: res.data.resultSizeEstimate || detailedThreads.length,
-//     };
-//   } catch (error) {
-//     console.error("❌ Error listing threads:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Mark thread as read/unread
-//  */
-// export async function markAsRead(threadId, read = true) {
-//   try {
-//     const gmail = await initializeGmailClient();
-
-//     const res = await gmail.users.threads.modify({
-//       userId: "me",
-//       id: threadId,
-//       requestBody: {
-//         addLabelIds: read ? [] : ["UNREAD"],
-//         removeLabelIds: read ? ["UNREAD"] : [],
-//       },
-//     });
-
-//     console.log(`✅ Thread ${threadId} marked as ${read ? "read" : "unread"}`);
-//     return { success: true, ...res.data };
-//   } catch (error) {
-//     console.error("❌ Error marking thread:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Send email with attachments (FIXED)
-//  */
-// export async function sendEmailWithAttachments(
-//   to,
-//   subject,
-//   message,
-//   cc = "",
-//   bcc = "",
-//   attachments = [],
-//   files = [],
-// ) {
-//   try {
-//     const startTime = Date.now();
-//     console.log("🚀 Starting email send process...");
-
-//     // Validate recipient email
-//     const emailList = processEmailList(to);
-//     if (emailList.length === 0) {
-//       throw new Error(`Invalid recipient email address: ${to}`);
-//     }
-
-//     const gmail = await initializeGmailClient();
-
-//     // Get user's email from token
-//     const tokenDoc = await GmailToken.findOne({ is_active: true });
-//     if (!tokenDoc) {
-//       throw new Error("No active Gmail account found");
-//     }
-//     const fromEmail = tokenDoc.email;
-
-//     // CRITICAL FIX: Combine attachments from both sources
-//     const allAttachments = [];
-
-//     // Process attachments array (from route)
-//     if (attachments && attachments.length > 0) {
-//       for (const attachment of attachments) {
-//         if (attachment.content && attachment.filename) {
-//           allAttachments.push({
-//             filename: attachment.filename,
-//             content: attachment.content,
-//             mimetype:
-//               attachment.mimetype ||
-//               mime.lookup(attachment.filename) ||
-//               "application/octet-stream",
-//             size: attachment.size || 0,
-//           });
-//         }
-//       }
-//     }
-
-//     // Process files array (from multer)
-//     if (files && files.length > 0) {
-//       for (const file of files) {
-//         if (file.buffer && file.originalname) {
-//           // Validate file size
-//           if (file.size > 25 * 1024 * 1024) {
-//             throw new Error(`File ${file.originalname} exceeds 25MB limit`);
-//           }
-
-//           allAttachments.push({
-//             filename: file.originalname,
-//             content: file.buffer.toString("base64"),
-//             mimetype:
-//               file.mimetype ||
-//               mime.lookup(file.originalname) ||
-//               "application/octet-stream",
-//             size: file.size,
-//           });
-//         }
-//       }
-//     }
-
-//     console.log(`📧 Total attachments to send: ${allAttachments.length}`);
-
-//     // Prepare email addresses
-//     const fullTo = emailList.join(", ");
-//     const ccList = processEmailList(cc);
-//     const bccList = processEmailList(bcc);
-//     const fullCc = ccList.join(", ");
-//     const fullBcc = bccList.join(", ");
-
-//     // Create proper MIME email
-//     const boundary = `boundary_${Date.now()}_${Math.random().toString(36).substring(2)}`;
-//     const nl = "\r\n";
-
-//     // Build email headers
-//     let email = [
-//       `MIME-Version: 1.0`,
-//       `To: ${fullTo}`,
-//       `From: ${fromEmail}`,
-//       `Subject: ${subject || "(No Subject)"}`,
-//     ];
-
-//     if (fullCc) email.push(`Cc: ${fullCc}`);
-//     if (fullBcc) email.push(`Bcc: ${fullBcc}`);
-
-//     email.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
-//     email.push("");
-
-//     // Add text/plain part
-//     email.push(`--${boundary}`);
-//     email.push(`Content-Type: text/plain; charset="UTF-8"`);
-//     email.push(`Content-Transfer-Encoding: quoted-printable`);
-//     email.push("");
-//     email.push(message || " ");
-//     email.push("");
-
-//     // Add HTML part for better compatibility
-//     email.push(`--${boundary}`);
-//     email.push(`Content-Type: text/html; charset="UTF-8"`);
-//     email.push(`Content-Transfer-Encoding: quoted-printable`);
-//     email.push("");
-//     email.push(
-//       `<div style="font-family: Arial, sans-serif;">${message || " "}</div>`,
-//     );
-//     email.push("");
-
-//     // Add attachments
-//     if (allAttachments.length > 0) {
-//       for (const attachment of allAttachments) {
-//         try {
-//           const mimeType =
-//             attachment.mimetype ||
-//             mime.lookup(attachment.filename) ||
-//             "application/octet-stream";
-
-//           // Format base64 content (RFC 2822 requires lines <= 78 characters)
-//           const base64Content = attachment.content
-//             .replace(/\s/g, "")
-//             .match(/.{1,76}/g)
-//             .join(nl);
-
-//           email.push(`--${boundary}`);
-//           email.push(
-//             `Content-Type: ${mimeType}; name="${attachment.filename}"`,
-//           );
-//           email.push(
-//             `Content-Disposition: attachment; filename="${attachment.filename}"`,
-//           );
-//           email.push(`Content-Transfer-Encoding: base64`);
-//           email.push("");
-//           email.push(base64Content);
-//           email.push("");
-//         } catch (attErr) {
-//           console.error(
-//             `❌ Error adding attachment ${attachment.filename}:`,
-//             attErr,
-//           );
-//           throw new Error(
-//             `Failed to process attachment: ${attachment.filename}`,
-//           );
-//         }
-//       }
-//     }
-
-//     // Close boundary
-//     email.push(`--${boundary}--`);
-//     email.push("");
-
-//     // Combine all parts
-//     const emailString = email.join(nl);
-
-//     // Calculate size
-//     const rawSize = Buffer.byteLength(emailString, "utf8");
-//     const base64Size = Math.ceil((rawSize * 4) / 3);
-
-//     if (base64Size > 25 * 1024 * 1024) {
-//       throw new Error(
-//         `Email size exceeds Gmail's 25MB limit. Please reduce attachment sizes.`,
-//       );
-//     }
-
-//     // Convert to base64url
-//     const base64Email = Buffer.from(emailString, "utf8")
-//       .toString("base64")
-//       .replace(/\+/g, "-")
-//       .replace(/\//g, "_")
-//       .replace(/=+$/, "");
-
-//     // Send email
-//     const res = await gmail.users.messages.send({
-//       userId: "me",
-//       requestBody: {
-//         raw: base64Email,
-//       },
-//     });
-
-//     const duration = (Date.now() - startTime) / 1000;
-
-//     console.log(`✅ Email sent successfully!`);
-
-//     return {
-//       success: true,
-//       id: res.data.id,
-//       threadId: res.data.threadId,
-//       labelIds: res.data.labelIds || [],
-//       sendTime: duration,
-//     };
-//   } catch (error) {
-//     console.error("❌ Error in sendEmailWithAttachments:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Save draft
-//  */
-// export async function saveDraft(
-//   to,
-//   subject,
-//   message,
-//   cc = "",
-//   bcc = "",
-//   attachments = [],
-//   files = [],
-// ) {
-//   try {
-//     console.log("📝 Creating draft...");
-
-//     const gmail = await initializeGmailClient();
-
-//     // Get user's email from token
-//     const tokenDoc = await GmailToken.findOne({ is_active: true });
-//     if (!tokenDoc) {
-//       throw new Error("No active Gmail account found");
-//     }
-//     const fromEmail = tokenDoc.email;
-
-//     // Combine attachments
-//     const allAttachments = [];
-
-//     if (attachments && attachments.length > 0) {
-//       allAttachments.push(...attachments);
-//     }
-
-//     if (files && files.length > 0) {
-//       for (const file of files) {
-//         if (file.buffer && file.originalname) {
-//           allAttachments.push({
-//             filename: file.originalname,
-//             content: file.buffer.toString("base64"),
-//             mimetype: file.mimetype,
-//             size: file.size,
-//           });
-//         }
-//       }
-//     }
-
-//     // Create draft using Gmail API
-//     const emailResult = await createDraftMessage(
-//       to,
-//       subject,
-//       message,
-//       cc,
-//       bcc,
-//       allAttachments,
-//       fromEmail,
-//     );
-
-//     const res = await gmail.users.drafts.create({
-//       userId: "me",
-//       requestBody: {
-//         message: {
-//           raw: emailResult.raw,
-//         },
-//       },
-//     });
-
-//     console.log("✅ Draft saved successfully");
-
-//     return {
-//       success: true,
-//       id: res.data.id,
-//       message: "Draft saved successfully",
-//     };
-//   } catch (error) {
-//     console.error("❌ Error saving draft:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Create draft message (helper)
-//  */
-// async function createDraftMessage(
-//   to,
-//   subject,
-//   message,
-//   cc = "",
-//   bcc = "",
-//   attachments = [],
-//   fromEmail,
-// ) {
-//   const boundary = `boundary_${Date.now()}_${Math.random().toString(36).substring(2)}`;
-//   const nl = "\r\n";
-
-//   // Build email headers
-//   let email = [
-//     `MIME-Version: 1.0`,
-//     `To: ${to}`,
-//     `From: ${fromEmail}`,
-//     `Subject: ${subject || "(No Subject)"}`,
-//   ];
-
-//   if (cc) email.push(`Cc: ${cc}`);
-//   if (bcc) email.push(`Bcc: ${bcc}`);
-
-//   email.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
-//   email.push("");
-
-//   // Add text part
-//   email.push(`--${boundary}`);
-//   email.push(`Content-Type: text/plain; charset="UTF-8"`);
-//   email.push(`Content-Transfer-Encoding: quoted-printable`);
-//   email.push("");
-//   email.push(message || " ");
-//   email.push("");
-
-//   // Add attachments
-//   if (attachments && attachments.length > 0) {
-//     for (const attachment of attachments) {
-//       const mimeType =
-//         attachment.mimetype ||
-//         mime.lookup(attachment.filename) ||
-//         "application/octet-stream";
-
-//       const base64Content = attachment.content
-//         .replace(/\s/g, "")
-//         .match(/.{1,76}/g)
-//         .join(nl);
-
-//       email.push(`--${boundary}`);
-//       email.push(`Content-Type: ${mimeType}; name="${attachment.filename}"`);
-//       email.push(
-//         `Content-Disposition: attachment; filename="${attachment.filename}"`,
-//       );
-//       email.push(`Content-Transfer-Encoding: base64`);
-//       email.push("");
-//       email.push(base64Content);
-//       email.push("");
-//     }
-//   }
-
-//   email.push(`--${boundary}--`);
-//   email.push("");
-
-//   const emailString = email.join(nl);
-
-//   // Convert to base64url
-//   const base64Email = Buffer.from(emailString, "utf8")
-//     .toString("base64")
-//     .replace(/\+/g, "-")
-//     .replace(/\//g, "_")
-//     .replace(/=+$/, "");
-
-//   return { raw: base64Email };
-// }
-
-// /**
-//  * Get drafts
-//  */
-// export async function getDrafts(maxResults = 20) {
-//   try {
-//     const gmail = await initializeGmailClient();
-
-//     const res = await gmail.users.drafts.list({
-//       userId: "me",
-//       maxResults: maxResults,
-//     });
-
-//     return res.data.drafts || [];
-//   } catch (error) {
-//     console.error("❌ Error getting drafts:", error);
-//     throw error;
-//   }
-// }
-
-// // ============= NEW FUNCTION: Get a single draft =============
-// /**
-//  * Get a single draft with full content
-//  */
-// export async function getDraft(draftId) {
-//   try {
-//     const gmail = await initializeGmailClient();
-//     const res = await gmail.users.drafts.get({
-//       userId: "me",
-//       id: draftId,
-//       format: "full",
-//     });
-
-//     const message = res.data.message;
-//     const headers = message?.payload?.headers || [];
-//     const subject = headers.find((h) => h.name === "Subject")?.value || "No Subject";
-//     const from = headers.find((h) => h.name === "From")?.value || "Unknown";
-//     const to = headers.find((h) => h.name === "To")?.value || "";
-//     const date = headers.find((h) => h.name === "Date")?.value || "";
-//     const cc = headers.find((h) => h.name === "Cc")?.value || "";
-//     const bcc = headers.find((h) => h.name === "Bcc")?.value || "";
-
-//     const content = extractContent(message?.payload?.parts || [message?.payload]);
-
-//     const processedMessage = {
-//       id: message.id,
-//       snippet: message.snippet,
-//       subject,
-//       from,
-//       to,
-//       cc,
-//       bcc,
-//       date,
-//       body: content.text,
-//       htmlBody: content.html,
-//       attachments: content.attachments,
-//       hasAttachments: content.attachments.length > 0,
-//       labelIds: message.labelIds || [],
-//       isDraft: true,
-//     };
-
-//     // Return in same structure as getThread for frontend consistency
-//     return {
-//       messages: [processedMessage],
-//     };
-//   } catch (error) {
-//     console.error("❌ Error getting draft:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Get single thread with full content
-//  */
-// export async function getThread(threadId) {
-//   try {
-//     const gmail = await initializeGmailClient();
-//     const res = await gmail.users.threads.get({
-//       userId: "me",
-//       id: threadId,
-//     });
-
-//     console.log(`✅ Fetched thread ${threadId}`);
-
-//     // Process messages
-//     const processedMessages = (res.data.messages || []).map((message) => {
-//       const headers = message.payload?.headers || [];
-//       const subject =
-//         headers.find((h) => h.name === "Subject")?.value || "No Subject";
-//       const from =
-//         headers.find((h) => h.name === "From")?.value || "Unknown Sender";
-//       const to = headers.find((h) => h.name === "To")?.value || "";
-//       const date = headers.find((h) => h.name === "Date")?.value || "";
-//       const cc = headers.find((h) => h.name === "Cc")?.value || "";
-//       const bcc = headers.find((h) => h.name === "Bcc")?.value || "";
-
-//       // Get label IDs
-//       const labelIds = message.labelIds || [];
-
-//       // Extract content
-//       const content = extractContent(
-//         message.payload?.parts || [message.payload],
-//       );
-
-//       return {
-//         id: message.id,
-//         snippet: message.snippet,
-//         subject,
-//         from,
-//         to,
-//         cc,
-//         bcc,
-//         date,
-//         body: content.text,
-//         htmlBody: content.html,
-//         attachments: content.attachments,
-//         hasAttachments: content.attachments.length > 0,
-//         unread: labelIds.includes("UNREAD"),
-//         starred: labelIds.includes("STARRED"),
-//         important: labelIds.includes("IMPORTANT"),
-//         spam: labelIds.includes("SPAM"),
-//         trash: labelIds.includes("TRASH"),
-//         drafts: labelIds.includes("DRAFT"),
-//         labelIds: labelIds,
-//       };
-//     });
-
-//     return {
-//       ...res.data,
-//       messages: processedMessages,
-//     };
-//   } catch (error) {
-//     console.error("❌ Error getting thread:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Get attachment
-//  */
-// export async function getAttachment(messageId, attachmentId) {
-//   try {
-//     const gmail = await initializeGmailClient();
-//     const res = await gmail.users.messages.attachments.get({
-//       userId: "me",
-//       messageId: messageId,
-//       id: attachmentId,
-//     });
-
-//     return {
-//       data: res.data.data,
-//       size: res.data.size,
-//     };
-//   } catch (error) {
-//     console.error("❌ Error fetching attachment:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Delete thread
-//  */
-// export async function deleteThread(threadId) {
-//   try {
-//     const gmail = await initializeGmailClient();
-
-//     const res = await gmail.users.threads.delete({
-//       userId: "me",
-//       id: threadId,
-//     });
-
-//     console.log(`✅ Thread ${threadId} deleted`);
-//     return { success: true, ...res.data };
-//   } catch (error) {
-//     console.error("❌ Error deleting thread:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Delete email
-//  */
-// export async function deleteEmail(messageId) {
-//   try {
-//     const gmail = await initializeGmailClient();
-
-//     const res = await gmail.users.messages.delete({
-//       userId: "me",
-//       id: messageId,
-//     });
-
-//     console.log(`✅ Email ${messageId} deleted`);
-//     return { success: true, ...res.data };
-//   } catch (error) {
-//     console.error("❌ Error deleting email:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Star/unstar thread
-//  */
-// export async function starThread(threadId, star = true) {
-//   try {
-//     const gmail = await initializeGmailClient();
-
-//     const res = await gmail.users.threads.modify({
-//       userId: "me",
-//       id: threadId,
-//       requestBody: {
-//         addLabelIds: star ? ["STARRED"] : [],
-//         removeLabelIds: star ? [] : ["STARRED"],
-//       },
-//     });
-
-//     console.log(`✅ Thread ${threadId} ${star ? "starred" : "unstarred"}`);
-//     return { success: true, ...res.data };
-//   } catch (error) {
-//     console.error("❌ Error starring thread:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Bulk star/unstar threads
-//  */
-// export async function bulkStarThreads(threadIds, star = true) {
-//   try {
-//     const gmail = await initializeGmailClient();
-
-//     console.log(
-//       `⭐ Bulk ${star ? "starring" : "unstarring"} ${threadIds.length} threads...`,
-//     );
-
-//     const starPromises = threadIds.map(async (threadId) => {
-//       try {
-//         await gmail.users.threads.modify({
-//           userId: "me",
-//           id: threadId,
-//           requestBody: {
-//             addLabelIds: star ? ["STARRED"] : [],
-//             removeLabelIds: star ? [] : ["STARRED"],
-//           },
-//         });
-//         return { success: true, threadId };
-//       } catch (error) {
-//         console.error(
-//           `❌ Error ${star ? "starring" : "unstarring"} thread ${threadId}:`,
-//           error.message,
-//         );
-//         return { success: false, threadId, error: error.message };
-//       }
-//     });
-
-//     const results = await Promise.allSettled(starPromises);
-
-//     const successful = results.filter(
-//       (r) => r.status === "fulfilled" && r.value.success,
-//     );
-
-//     console.log(
-//       `✅ Bulk ${star ? "star" : "unstar"} completed: ${successful.length} successful`,
-//     );
-
-//     return {
-//       success: true,
-//       message: `${star ? "Starred" : "Unstarred"} ${successful.length} threads successfully`,
-//       count: successful.length,
-//     };
-//   } catch (error) {
-//     console.error("❌ Error in bulk star:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Mark as spam
-//  */
-// export async function markAsSpam(threadId, spam = true) {
-//   try {
-//     const gmail = await initializeGmailClient();
-
-//     const res = await gmail.users.threads.modify({
-//       userId: "me",
-//       id: threadId,
-//       requestBody: {
-//         addLabelIds: spam ? ["SPAM"] : [],
-//         removeLabelIds: spam ? [] : ["SPAM"],
-//       },
-//     });
-
-//     console.log(
-//       `✅ Thread ${threadId} ${spam ? "marked as spam" : "removed from spam"}`,
-//     );
-//     return { success: true, ...res.data };
-//   } catch (error) {
-//     console.error("❌ Error marking as spam:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Mark as important
-//  */
-// export async function markAsImportant(threadId, important = true) {
-//   try {
-//     const gmail = await initializeGmailClient();
-
-//     const res = await gmail.users.threads.modify({
-//       userId: "me",
-//       id: threadId,
-//       requestBody: {
-//         addLabelIds: important ? ["IMPORTANT"] : [],
-//         removeLabelIds: important ? [] : ["IMPORTANT"],
-//       },
-//     });
-
-//     console.log(
-//       `✅ Thread ${threadId} ${important ? "marked as important" : "removed from important"}`,
-//     );
-//     return { success: true, ...res.data };
-//   } catch (error) {
-//     console.error("❌ Error marking as important:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Apply label to thread
-//  */
-// export async function applyLabel(threadId, labelId) {
-//   try {
-//     const gmail = await initializeGmailClient();
-
-//     const res = await gmail.users.threads.modify({
-//       userId: "me",
-//       id: threadId,
-//       requestBody: {
-//         addLabelIds: [labelId],
-//       },
-//     });
-
-//     console.log(`✅ Label applied to thread ${threadId}`);
-//     return { success: true, ...res.data };
-//   } catch (error) {
-//     console.error("❌ Error applying label:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Move to trash
-//  */
-// export async function moveToTrash(threadId) {
-//   try {
-//     const gmail = await initializeGmailClient();
-
-//     const res = await gmail.users.threads.trash({
-//       userId: "me",
-//       id: threadId,
-//     });
-
-//     console.log(`✅ Thread ${threadId} moved to trash`);
-//     return { success: true, ...res.data };
-//   } catch (error) {
-//     console.error("❌ Error moving to trash:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Bulk move to trash
-//  */
-// export async function bulkMoveToTrash(threadIds) {
-//   try {
-//     const gmail = await initializeGmailClient();
-
-//     console.log(`🗑️ Bulk moving ${threadIds.length} threads to trash...`);
-
-//     const trashPromises = threadIds.map(async (threadId) => {
-//       try {
-//         await gmail.users.threads.trash({
-//           userId: "me",
-//           id: threadId,
-//         });
-//         return { success: true, threadId };
-//       } catch (error) {
-//         console.error(
-//           `❌ Error moving thread ${threadId} to trash:`,
-//           error.message,
-//         );
-//         return { success: false, threadId, error: error.message };
-//       }
-//     });
-
-//     const results = await Promise.allSettled(trashPromises);
-
-//     const successful = results.filter(
-//       (r) => r.status === "fulfilled" && r.value.success,
-//     );
-
-//     console.log(
-//       `✅ Bulk move to trash completed: ${successful.length} successful`,
-//     );
-
-//     return {
-//       success: true,
-//       message: `Moved ${successful.length} threads to trash`,
-//       count: successful.length,
-//     };
-//   } catch (error) {
-//     console.error("❌ Error in bulk move to trash:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Bulk delete threads
-//  */
-// export async function bulkDeleteThreads(threadIds) {
-//   try {
-//     const gmail = await initializeGmailClient();
-
-//     console.log(`🗑️ Bulk deleting ${threadIds.length} threads...`);
-
-//     const deletePromises = threadIds.map(async (threadId) => {
-//       try {
-//         await gmail.users.threads.delete({
-//           userId: "me",
-//           id: threadId,
-//         });
-//         return { success: true, threadId };
-//       } catch (error) {
-//         console.error(`❌ Error deleting thread ${threadId}:`, error.message);
-//         return { success: false, threadId, error: error.message };
-//       }
-//     });
-
-//     const results = await Promise.allSettled(deletePromises);
-
-//     const successful = results.filter(
-//       (r) => r.status === "fulfilled" && r.value.success,
-//     );
-
-//     console.log(`✅ Bulk delete completed: ${successful.length} successful`);
-
-//     return {
-//       success: successful.length > 0,
-//       message: `Deleted ${successful.length} threads successfully`,
-//       count: successful.length,
-//     };
-//   } catch (error) {
-//     console.error("❌ Error in bulk delete:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Get labels
-//  */
-// export async function getLabels() {
-//   try {
-//     const gmail = await initializeGmailClient();
-
-//     const res = await gmail.users.labels.list({
-//       userId: "me",
-//     });
-
-//     return res.data.labels || [];
-//   } catch (error) {
-//     console.error("❌ Error getting labels:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Get email suggestions
-//  */
-// export async function getEmailSuggestions(query, limit = 10) {
-//   try {
-//     const gmail = await initializeGmailClient();
-
-//     if (!query || query.length < 2) {
-//       return [];
-//     }
-
-//     // Search for emails containing the query
-//     const res = await gmail.users.messages.list({
-//       userId: "me",
-//       maxResults: 50,
-//       q: `from:${query} OR to:${query} OR cc:${query}`,
-//     });
-
-//     const messages = res.data.messages || [];
-//     const emailSet = new Set();
-
-//     // Extract email addresses from recent messages
-//     for (const message of messages.slice(0, 10)) {
-//       try {
-//         const msgRes = await gmail.users.messages.get({
-//           userId: "me",
-//           id: message.id,
-//           format: "metadata",
-//           metadataHeaders: ["From", "To", "Cc"],
-//         });
-
-//         const headers = msgRes.data.payload?.headers || [];
-
-//         // Extract from header
-//         const fromHeader = headers.find((h) => h.name === "From");
-//         if (fromHeader?.value) {
-//           const emails = extractAllEmails(fromHeader.value);
-//           emails.forEach((email) => emailSet.add(email));
-//         }
-
-//         // Extract to header
-//         const toHeader = headers.find((h) => h.name === "To");
-//         if (toHeader?.value) {
-//           const emails = extractAllEmails(toHeader.value);
-//           emails.forEach((email) => emailSet.add(email));
-//         }
-
-//         // Extract cc header
-//         const ccHeader = headers.find((h) => h.name === "Cc");
-//         if (ccHeader?.value) {
-//           const emails = extractAllEmails(ccHeader.value);
-//           emails.forEach((email) => emailSet.add(email));
-//         }
-//       } catch (err) {
-//         console.error(`Error processing message ${message.id}:`, err.message);
-//       }
-//     }
-
-//     // Also search in sent emails
-//     const sentRes = await gmail.users.messages.list({
-//       userId: "me",
-//       maxResults: 20,
-//       q: `in:sent ${query}`,
-//     });
-
-//     const sentMessages = sentRes.data.messages || [];
-
-//     for (const message of sentMessages.slice(0, 5)) {
-//       try {
-//         const msgRes = await gmail.users.messages.get({
-//           userId: "me",
-//           id: message.id,
-//           format: "metadata",
-//           metadataHeaders: ["To", "Cc"],
-//         });
-
-//         const headers = msgRes.data.payload?.headers || [];
-
-//         // Extract to header from sent emails
-//         const toHeader = headers.find((h) => h.name === "To");
-//         if (toHeader?.value) {
-//           const emails = extractAllEmails(toHeader.value);
-//           emails.forEach((email) => emailSet.add(email));
-//         }
-
-//         // Extract cc header from sent emails
-//         const ccHeader = headers.find((h) => h.name === "Cc");
-//         if (ccHeader?.value) {
-//           const emails = extractAllEmails(ccHeader.value);
-//           emails.forEach((email) => emailSet.add(email));
-//         }
-//       } catch (err) {
-//         console.error(
-//           `Error processing sent message ${message.id}:`,
-//           err.message,
-//         );
-//       }
-//     }
-
-//     // Filter by query if provided
-//     let suggestions = Array.from(emailSet);
-//     if (query) {
-//       const lowerQuery = query.toLowerCase();
-//       suggestions = suggestions.filter((email) =>
-//         email.toLowerCase().includes(lowerQuery),
-//       );
-//     }
-
-//     return suggestions.slice(0, limit);
-//   } catch (error) {
-//     console.error("❌ Error getting email suggestions:", error);
-//     return [];
-//   }
-// }
-
-// /**
-//  * Watch inbox (uses polling instead of Pub/Sub)
-//  */
-// export async function watchInbox() {
-//   try {
-//     await initializeGmailClient();
-//     console.log("🔔 Using polling for real-time updates");
-//     return { historyId: Date.now().toString() };
-//   } catch (error) {
-//     console.error("❌ Error starting inbox watch:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Stop watch
-//  */
-// export async function stopWatch(userId) {
-//   try {
-//     const gmail = await initializeGmailClient();
-
-//     await gmail.users.stop({
-//       userId: userId,
-//     });
-
-//     console.log("🔕 Inbox watch stopped");
-//   } catch (error) {
-//     console.error("❌ Error stopping inbox watch:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * List all threads (simplified)
-//  */
-// export async function listAllThreads() {
-//   try {
-//     const gmail = await initializeGmailClient();
-
-//     const res = await gmail.users.threads.list({
-//       userId: "me",
-//       maxResults: 100,
-//       q: "in:inbox",
-//     });
-
-//     const threads = res.data.threads || [];
-//     console.log(`✅ Fetched ${threads.length} threads`);
-
-//     const basicThreads = threads.map((thread) => ({
-//       id: thread.id,
-//       snippet: thread.snippet,
-//     }));
-
-//     return basicThreads;
-//   } catch (error) {
-//     console.error("❌ Error listing all threads:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Send simple email without attachments
-//  */
-// export async function sendEmail(
-//   to,
-//   subject,
-//   message,
-//   cc = "",
-//   bcc = "",
-//   attachments = [],
-//   files = [],
-// ) {
-//   if ((attachments && attachments.length > 0) || (files && files.length > 0)) {
-//     return await sendEmailWithAttachments(
-//       to,
-//       subject,
-//       message,
-//       cc,
-//       bcc,
-//       attachments,
-//       files,
-//     );
-//   }
-
-//   try {
-//     const startTime = Date.now();
-//     console.log("📧 Sending simple email...");
-
-//     // Validate email
-//     const emailList = processEmailList(to);
-//     if (emailList.length === 0) {
-//       throw new Error(`Invalid recipient email address: ${to}`);
-//     }
-
-//     const gmail = await initializeGmailClient();
-
-//     // Get user's email from token
-//     const tokenDoc = await GmailToken.findOne({ is_active: true });
-//     if (!tokenDoc) {
-//       throw new Error("No active Gmail account found");
-//     }
-//     const fromEmail = tokenDoc.email;
-
-//     // Construct simple email
-//     const emailLines = [
-//       `To: ${to}`,
-//       `From: ${fromEmail}`,
-//       `Subject: ${subject || "(No Subject)"}`,
-//     ];
-
-//     const ccList = processEmailList(cc);
-//     const bccList = processEmailList(bcc);
-
-//     if (ccList.length > 0) emailLines.push(`Cc: ${ccList.join(", ")}`);
-//     if (bccList.length > 0) emailLines.push(`Bcc: ${bccList.join(", ")}`);
-
-//     emailLines.push(
-//       'Content-Type: text/plain; charset="UTF-8"',
-//       "Content-Transfer-Encoding: quoted-printable",
-//       "MIME-Version: 1.0",
-//       "",
-//       message || "",
-//     );
-
-//     const email = emailLines.join("\r\n");
-
-//     // Convert to base64
-//     const base64Email = Buffer.from(email)
-//       .toString("base64")
-//       .replace(/\+/g, "-")
-//       .replace(/\//g, "_")
-//       .replace(/=+$/, "");
-
-//     const res = await gmail.users.messages.send({
-//       userId: "me",
-//       requestBody: { raw: base64Email },
-//     });
-
-//     const duration = (Date.now() - startTime) / 1000;
-//     console.log(`✅ Simple email sent in ${duration.toFixed(2)}s`);
-
-//     return {
-//       success: true,
-//       ...res.data,
-//       sendTime: duration,
-//     };
-//   } catch (error) {
-//     console.error("❌ Error sending simple email:", error);
-//     throw error;
-//   }
-// }
-
-// // ============= HELPER FUNCTIONS =============
-
-// /**
-//  * Extract content from email parts
-//  */
-// function extractContent(parts) {
-//   if (!parts) return { text: "", html: "", attachments: [] };
-
-//   let text = "";
-//   let html = "";
-//   const attachments = [];
-
-//   function processPart(part, depth = 0) {
-//     if (!part) return;
-
-//     const mimeType = part.mimeType || "";
-//     const filename = part.filename || "";
-//     const body = part.body || {};
-
-//     // Check if this part is an attachment
-//     if (filename && body.attachmentId) {
-//       attachments.push({
-//         id: body.attachmentId,
-//         filename: filename,
-//         mimeType: mimeType,
-//         size: body.size || 0,
-//       });
-//       return;
-//     }
-
-//     // Extract text content
-//     if (mimeType === "text/plain" && body.data) {
-//       text = Buffer.from(body.data, "base64").toString("utf-8");
-//     }
-//     // Extract HTML content
-//     else if (mimeType === "text/html" && body.data) {
-//       html = Buffer.from(body.data, "base64").toString("utf-8");
-//     }
-//     // Process nested parts
-//     else if (part.parts) {
-//       part.parts.forEach((nestedPart) => processPart(nestedPart, depth + 1));
-//     }
-//   }
-
-//   if (Array.isArray(parts)) {
-//     parts.forEach((part) => processPart(part));
-//   } else {
-//     processPart(parts);
-//   }
-
-//   return { text, html, attachments };
-// }
-
-// /**
-//  * Validate email address format
-//  */
-// function validateEmailAddress(email) {
-//   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-//   return re.test(email);
-// }
-
-// /**
-//  * Process email list from string
-//  */
-// function processEmailList(emailString) {
-//   if (!emailString) return [];
-//   return emailString
-//     .split(",")
-//     .map((email) => email.trim())
-//     .filter((email) => email && validateEmailAddress(email));
-// }
-
-// /**
-//  * Extract all emails from string
-//  */
-// function extractAllEmails(str) {
-//   if (!str) return [];
-//   const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi;
-//   const matches = str.match(emailRegex);
-//   return matches ? matches : [];
-// }
-
-// /**
-//  * Get all active Gmail accounts
-//  */
-// export async function getAllActiveAccounts() {
-//   try {
-//     const accounts = await GmailToken.find({ is_active: true }).sort({
-//       last_connected: -1,
-//     });
-//     return accounts.map((account) => ({
-//       email: account.email,
-//       last_connected: account.last_connected,
-//     }));
-//   } catch (error) {
-//     console.error("❌ Error getting active accounts:", error);
-//     return [];
-//   }
-// }
-
-// /**
-//  * Switch Gmail account
-//  */
-// export async function switchAccount(email) {
-//   try {
-//     // Clear current client
-//     currentGmailClient = null;
-//     currentUserEmail = null;
-
-//     // Initialize with new email
-//     const gmail = await initializeGmailClient(email);
-
-//     return {
-//       success: true,
-//       email: email,
-//       message: `Switched to account: ${email}`,
-//     };
-//   } catch (error) {
-//     console.error("❌ Error switching account:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Delete a draft
-//  */
-// export async function deleteDraft(draftId) {
-//   try {
-//     const gmail = await initializeGmailClient();
-//     await gmail.users.drafts.delete({
-//       userId: 'me',
-//       id: draftId,
-//     });
-//     console.log(`✅ Draft ${draftId} deleted`);
-//     return { success: true };
-//   } catch (error) {
-//     console.error('❌ Error deleting draft:', error);
-//     throw error;
-//   }
-// }//live working correctly..
-
-
-
-
-
-
-
-
-// import { google } from "googleapis";
-// import dotenv from "dotenv";
-// import path from "path";
-// import { fileURLToPath } from "url";
-// import mime from "mime-types";
-// import multer from "multer";
-// import GmailToken from "../models/GmailToken.js";
-
-// // Load environment variables first
-// dotenv.config();
-
-// const __filename = fileURLToPath(import.meta.url);
-// const __dirname = path.dirname(__filename);
-
-// // ✅ Detect environment
-// const isProduction = process.env.NODE_ENV === "production";
-// console.log(
-//   `📧 Gmail Service running in ${isProduction ? "PRODUCTION" : "DEVELOPMENT"} mode`,
-// );
-
-// // ✅ Use the correct redirect URI based on environment
-// const CLIENT_ID = process.env.GMAIL_CLIENT_ID;
-// const CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
-// const REDIRECT_URI = isProduction
-//   ? process.env.GMAIL_LIVE_REDIRECT_URI
-//   : process.env.GMAIL_REDIRECT_URI;
-
-// console.log(`📧 Using redirect URI: ${REDIRECT_URI}`);
-
-// // Validate required environment variables
-// if (!CLIENT_ID || !CLIENT_SECRET) {
-//   console.error(
-//     "❌ Missing Gmail OAuth credentials. Please check your .env file",
-//   );
-//   throw new Error("Gmail OAuth credentials not configured");
-// }
-
-// export const oauth2Client = new google.auth.OAuth2(
-//   CLIENT_ID,
-//   CLIENT_SECRET,
-//   REDIRECT_URI,
-// );
-
-// // Cache for current session
-// let currentGmailClient = null;
-// let currentUserEmail = null;
-// let tokenRefreshInProgress = false;
-
-// // Gmail API has a 25MB limit for the entire message
-// const GMAIL_MAX_SIZE = 25 * 1024 * 1024; // 25MB in bytes
-// const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30MB per file limit for frontend
-
-// // Multer configuration for file upload
-// const storage = multer.memoryStorage();
-// export const upload = multer({
-//   storage: storage,
-//   limits: {
-//     fileSize: MAX_FILE_SIZE, // 30MB per file
-//     files: 10, // Max 10 files
-//   },
-//   fileFilter: (req, file, cb) => {
-//     // Check file size
-//     if (req.headers["content-length"] > MAX_FILE_SIZE * 10) {
-//       return cb(new Error("Total files size exceeds 300MB limit"));
-//     }
-//     // Allow all file types
-//     cb(null, true);
-//   },
-// });
-
-// /**
-//  * Initialize Gmail client with tokens from database
-//  */
-// export async function initializeGmailClient(email = null) {
-//   try {
-//     console.log("🔄 Initializing Gmail client...");
-
-//     // If we have a current client and it's for the requested email, return it
-//     if (
-//       currentGmailClient &&
-//       currentUserEmail &&
-//       (!email || currentUserEmail === email)
-//     ) {
-//       console.log(`✅ Using existing Gmail client for ${currentUserEmail}`);
-//       return currentGmailClient;
-//     }
-
-//     // Find active token in database
-//     const tokenQuery = email ? { email, is_active: true } : { is_active: true };
-//     const tokenDoc = await GmailToken.findOne(tokenQuery).sort({
-//       last_connected: -1,
-//     });
-
-//     if (!tokenDoc) {
-//       console.log("❌ No active Gmail tokens found in database");
-//       throw new Error("No valid Gmail tokens found. Connect Gmail first.");
-//     }
-
-//     console.log(`✅ Found token for email: ${tokenDoc.email}`);
-
-//     // Check if token is expired
-//     const now = new Date();
-//     const expiryDate = new Date(tokenDoc.expiry_date);
-
-//     let tokens = {
-//       access_token: tokenDoc.access_token,
-//       refresh_token: tokenDoc.refresh_token,
-//       token_type: tokenDoc.token_type,
-//       expiry_date: expiryDate.getTime(),
-//       scope: tokenDoc.scope,
-//     };
-
-//     // Create OAuth2 client
-//     const oauth2ClientWithTokens = new google.auth.OAuth2(
-//       CLIENT_ID,
-//       CLIENT_SECRET,
-//       REDIRECT_URI,
-//     );
-
-//     oauth2ClientWithTokens.setCredentials(tokens);
-
-//     // Check if token needs refresh
-//     if (now > expiryDate) {
-//       console.log(`🔄 Token expired for ${tokenDoc.email}, refreshing...`);
-
-//       if (tokenRefreshInProgress) {
-//         console.log("⏳ Token refresh already in progress, waiting...");
-//         await new Promise((resolve) => setTimeout(resolve, 2000));
-//         return initializeGmailClient(email);
-//       }
-
-//       tokenRefreshInProgress = true;
-
-//       try {
-//         const { credentials } =
-//           await oauth2ClientWithTokens.refreshAccessToken();
-
-//         // Update tokens in database
-//         tokenDoc.access_token = credentials.access_token;
-//         tokenDoc.expiry_date = new Date(credentials.expiry_date);
-//         if (credentials.refresh_token) {
-//           tokenDoc.refresh_token = credentials.refresh_token;
-//         }
-//         tokenDoc.last_connected = new Date();
-//         await tokenDoc.save();
-
-//         console.log(`✅ Token refreshed and saved for ${tokenDoc.email}`);
-
-//         // Update OAuth2 client with new tokens
-//         oauth2ClientWithTokens.setCredentials(credentials);
-
-//         tokenRefreshInProgress = false;
-//       } catch (refreshError) {
-//         tokenRefreshInProgress = false;
-//         console.error(
-//           `❌ Failed to refresh token for ${tokenDoc.email}:`,
-//           refreshError.message,
-//         );
-//         throw new Error(
-//           "Token expired and could not be refreshed. Please reconnect Gmail.",
-//         );
-//       }
-//     }
-
-//     // Create Gmail client
-//     currentGmailClient = google.gmail({
-//       version: "v1",
-//       auth: oauth2ClientWithTokens,
-//     });
-
-//     currentUserEmail = tokenDoc.email;
-
-//     // Also update the global oauth2Client
-//     oauth2Client.setCredentials(tokens);
-
-//     console.log(
-//       `✅ Gmail client initialized successfully for ${currentUserEmail}`,
-//     );
-//     return currentGmailClient;
-//   } catch (error) {
-//     console.error("❌ Error initializing Gmail client:", error.message);
-
-//     // Reset current client on error
-//     currentGmailClient = null;
-//     currentUserEmail = null;
-
-//     throw new Error(`Failed to initialize Gmail client: ${error.message}`);
-//   }
-// }
-
-// /**
-//  * Generate Google OAuth URL
-//  */
-// export function generateAuthUrl(redirectUri) {
-//   if (!CLIENT_ID || !CLIENT_SECRET) {
-//     throw new Error("Gmail OAuth credentials not configured");
-//   }
-
-//   const scopes = [
-//     "https://mail.google.com/",
-//     "https://www.googleapis.com/auth/gmail.modify",
-//     "https://www.googleapis.com/auth/gmail.compose",
-//     "https://www.googleapis.com/auth/gmail.readonly",
-//   ];
-
-//   // Create a temporary OAuth2 client with the correct redirect URI
-//   const tempOAuth2Client = new google.auth.OAuth2(
-//     CLIENT_ID,
-//     CLIENT_SECRET,
-//     redirectUri
-//   );
-
-//   const authUrl = tempOAuth2Client.generateAuthUrl({
-//     access_type: "offline",
-//     prompt: "consent",
-//     scope: scopes,
-//   });
-
-//   console.log(`🔗 Generated auth URL with redirect: ${redirectUri}`);
-//   return authUrl;
-// }
-
-// /**
-//  * Save tokens to database
-//  */
-// export async function saveTokens(tokens) {
-//   try {
-//     console.log("💾 Saving tokens to database...");
-
-//     // Create OAuth2 client to get user info
-//     const tempOAuth2Client = new google.auth.OAuth2(
-//       CLIENT_ID,
-//       CLIENT_SECRET,
-//       REDIRECT_URI,
-//     );
-//     tempOAuth2Client.setCredentials(tokens);
-
-//     // Get user email
-//     const gmail = google.gmail({ version: "v1", auth: tempOAuth2Client });
-//     const profile = await gmail.users.getProfile({ userId: "me" });
-//     const email = profile.data.emailAddress;
-
-//     console.log(`📧 Got user email: ${email}`);
-
-//     // Calculate expiry date
-//     let expiryDate = new Date();
-//     if (tokens.expiry_date) {
-//       expiryDate = new Date(tokens.expiry_date);
-//     } else {
-//       expiryDate.setHours(expiryDate.getHours() + 1); // Default 1 hour
-//     }
-
-//     // Check if token already exists for this email
-//     const existingToken = await GmailToken.findOne({ email });
-
-//     if (existingToken) {
-//       // Update existing token
-//       existingToken.access_token = tokens.access_token;
-//       if (tokens.refresh_token) {
-//         existingToken.refresh_token = tokens.refresh_token;
-//       }
-//       existingToken.token_type = tokens.token_type || "Bearer";
-//       existingToken.expiry_date = expiryDate;
-//       existingToken.scope = tokens.scope || "";
-//       existingToken.is_active = true;
-//       existingToken.last_connected = new Date();
-
-//       await existingToken.save();
-//       console.log(`✅ Updated existing token for ${email}`);
-//     } else {
-//       // Create new token
-//       const newToken = new GmailToken({
-//         email,
-//         access_token: tokens.access_token,
-//         refresh_token: tokens.refresh_token,
-//         token_type: tokens.token_type || "Bearer",
-//         expiry_date: expiryDate,
-//         scope: tokens.scope || "",
-//         is_active: true,
-//         last_connected: new Date(),
-//       });
-
-//       await newToken.save();
-//       console.log(`✅ Created new token for ${email}`);
-//     }
-
-//     // Deactivate any other tokens for this email (shouldn't happen, but just in case)
-//     await GmailToken.updateMany(
-//       { email, is_active: true },
-//       { is_active: false },
-//     );
-
-//     // Reactivate this one
-//     await GmailToken.updateOne({ email }, { is_active: true });
-
-//     // Set credentials on the global oauth2Client
-//     oauth2Client.setCredentials(tokens);
-
-//     // Reset cached client
-//     currentGmailClient = null;
-//     currentUserEmail = null;
-
-//     console.log(`✅ Tokens saved successfully for ${email}`);
-//     return { success: true, email };
-//   } catch (error) {
-//     console.error("❌ Error saving tokens:", error);
-//     throw new Error(`Failed to save tokens: ${error.message}`);
-//   }
-// }
-
-// /**
-//  * Exchange authorization code for tokens
-//  */
-// export async function exchangeCodeForTokens(code, redirectUri) {
-//   try {
-//     console.log("🔄 Exchanging code for tokens...");
-
-//     // Create a temporary OAuth2 client with the correct redirect URI
-//     const tempOAuth2Client = new google.auth.OAuth2(
-//       CLIENT_ID,
-//       CLIENT_SECRET,
-//       redirectUri
-//     );
-
-//     const { tokens } = await tempOAuth2Client.getToken(code);
-//     console.log("✅ Received tokens from Google");
-
-//     // Save tokens to database
-//     const result = await saveTokens(tokens);
-
-//     console.log(
-//       `✅ Tokens exchanged and saved successfully for ${result.email}`
-//     );
-//     return { ...tokens, email: result.email };
-//   } catch (error) {
-//     console.error("❌ Error exchanging code for tokens:", error);
-//     console.error("Full error:", error.response?.data || error.message);
-//     throw new Error(`Failed to exchange code for tokens: ${error.message}`);
-//   }
-// }
-
-// /**
-//  * Check authentication status
-//  */
-// export async function checkAuth(email = null) {
-//   try {
-//     console.log("🔐 Checking authentication status...");
-
-//     // Find active token in database
-//     const tokenQuery = email ? { email, is_active: true } : { is_active: true };
-//     const tokenDoc = await GmailToken.findOne(tokenQuery).sort({
-//       last_connected: -1,
-//     });
-
-//     if (!tokenDoc) {
-//       console.log("❌ No active Gmail tokens found");
-//       return {
-//         authenticated: false,
-//         message: "No Gmail account connected",
-//         email: null,
-//       };
-//     }
-
-//     // Try to initialize client
-//     try {
-//       const gmail = await initializeGmailClient(tokenDoc.email);
-
-//       // Verify by getting profile
-//       const profile = await gmail.users.getProfile({ userId: "me" });
-
-//       console.log(`✅ Auth check successful for ${tokenDoc.email}`);
-
-//       return {
-//         authenticated: true,
-//         message: "Gmail is connected",
-//         email: tokenDoc.email,
-//         profile: profile.data,
-//       };
-//     } catch (error) {
-//       console.error("❌ Auth check failed:", error.message);
-
-//       // Token might be invalid, deactivate it
-//       tokenDoc.is_active = false;
-//       await tokenDoc.save();
-
-//       return {
-//         authenticated: false,
-//         message: `Authentication failed: ${error.message}`,
-//         email: tokenDoc.email,
-//       };
-//     }
-//   } catch (error) {
-//     console.error("❌ Error checking auth status:", error);
-//     return {
-//       authenticated: false,
-//       message: "Error checking authentication status",
-//     };
-//   }
-// }
-
-// /**
-//  * Disconnect Gmail (deactivate token)
-//  */
-// export async function disconnectGmail(email = null) {
-//   try {
-//     console.log("🔌 Disconnecting Gmail...");
-
-//     const tokenQuery = email ? { email, is_active: true } : { is_active: true };
-//     const tokenDoc = await GmailToken.findOne(tokenQuery);
-
-//     if (tokenDoc) {
-//       tokenDoc.is_active = false;
-//       await tokenDoc.save();
-//       console.log(`✅ Deactivated token for ${tokenDoc.email}`);
-//     }
-
-//     // Clear cached data
-//     currentGmailClient = null;
-//     currentUserEmail = null;
-
-//     // Clear credentials from OAuth2 client
-//     oauth2Client.setCredentials({});
-
-//     console.log("✅ Gmail disconnected successfully");
-//     return {
-//       success: true,
-//       message: tokenDoc
-//         ? `Gmail disconnected for ${tokenDoc.email}`
-//         : "Gmail disconnected successfully",
-//     };
-//   } catch (error) {
-//     console.error("❌ Error disconnecting Gmail:", error);
-//     throw error;
-//   }
-// }
-
-// export async function getLabelCounts(email = null) {
-//   try {
-//     const gmail = await initializeGmailClient(email);
-
-//     const labelIds = [
-//       "INBOX",
-//       "UNREAD",
-//       "STARRED",
-//       "IMPORTANT",
-//       "SENT",
-//       "SPAM",
-//       "TRASH",
-//       "DRAFT",
-//     ];
-
-//     const counts = {};
-
-//     for (const labelId of labelIds) {
-//       try {
-//         const res = await gmail.users.labels.get({
-//           userId: "me",
-//           id: labelId,
-//         });
-
-//         counts[labelId === "DRAFT" ? "DRAFTS" : labelId] =
-//           res.data.threadsTotal || 0;
-//       } catch (err) {
-//         console.error(`Error fetching ${labelId}:`, err.message);
-//         counts[labelId] = 0;
-//       }
-//     }
-
-//     console.log("📊 FINAL Gmail counts:", counts);
-//     return counts;
-//   } catch (error) {
-//     console.error("❌ Error getting label counts:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * List threads with OPTIMIZED fetching - MUCH FASTER
-//  * Uses batch requests and minimal data
-//  */
-// export async function listThreads(
-//   maxResults = 20,
-//   pageToken = null,
-//   label = "INBOX",
-//   email = null,
-// ) {
-//   try {
-//     const gmail = await initializeGmailClient(email);
-//     const startTime = Date.now();
-
-//     // Build query parameters
-//     let params = {
-//       userId: "me",
-//       maxResults: maxResults,
-//       pageToken: pageToken,
-//       includeSpamTrash: label === "SPAM" || label === "TRASH",
-//     };
-
-//     // Set labelIds based on label for ACCURATE filtering
-//     switch (label) {
-//       case "INBOX":
-//         params.labelIds = ["INBOX"];
-//         break;
-//       case "UNREAD":
-//         params.q = "is:unread";
-//         params.labelIds = ["INBOX"];
-//         break;
-//       case "STARRED":
-//         params.labelIds = ["STARRED"];
-//         break;
-//       case "IMPORTANT":
-//         params.labelIds = ["IMPORTANT"];
-//         break;
-//       case "SENT":
-//         params.labelIds = ["SENT"];
-//         break;
-//       case "SPAM":
-//         params.labelIds = ["SPAM"];
-//         break;
-//       case "TRASH":
-//         params.labelIds = ["TRASH"];
-//         break;
-//       case "DRAFTS":
-//         // For drafts, we need to use drafts.list instead
-//         const draftsRes = await gmail.users.drafts.list({
-//           userId: "me",
-//           maxResults: maxResults,
-//           pageToken: pageToken,
-//         });
-
-//         const drafts = draftsRes.data.drafts || [];
-//         const draftThreads = [];
-
-//         // Process drafts in parallel for speed
-//         const draftPromises = drafts.map(async (draft) => {
-//           try {
-//             const message = draft.message;
-//             const headers = message?.payload?.headers || [];
-
-//             return {
-//               id: draft.id,
-//               threadId: message?.threadId || draft.id,
-//               snippet: message?.snippet || "",
-//               subject:
-//                 headers.find((h) => h.name === "Subject")?.value ||
-//                 "No Subject",
-//               from: headers.find((h) => h.name === "From")?.value || "Unknown",
-//               to: headers.find((h) => h.name === "To")?.value || "",
-//               date:
-//                 headers.find((h) => h.name === "Date")?.value ||
-//                 new Date().toISOString(),
-//               timestamp: Date.now(),
-//               unread: false,
-//               starred: false,
-//               important: false,
-//               spam: false,
-//               trash: false,
-//               isDraft: true, // FIX: mark as draft
-//               messagesCount: 1,
-//             };
-//           } catch (err) {
-//             return null;
-//           }
-//         });
-
-//         const draftResults = await Promise.all(draftPromises);
-//         const validDrafts = draftResults.filter((d) => d !== null);
-
-//         console.log(
-//           `✅ Fetched ${validDrafts.length} drafts in ${Date.now() - startTime}ms`,
-//         );
-
-//         return {
-//           threads: validDrafts,
-//           nextPageToken: draftsRes.data.nextPageToken,
-//           resultSizeEstimate: validDrafts.length,
-//         };
-
-//       default:
-//         params.labelIds = [label];
-//     }
-
-//     // Get thread list (this is fast - just IDs)
-//     const res = await gmail.users.threads.list(params);
-//     const threads = res.data.threads || [];
-
-//     console.log(
-//       `📋 Got ${threads.length} thread IDs from ${label} (Total: ${res.data.resultSizeEstimate || 0})`,
-//     );
-
-//     // If no threads, return empty
-//     if (threads.length === 0) {
-//       return {
-//         threads: [],
-//         nextPageToken: res.data.nextPageToken,
-//         resultSizeEstimate: res.data.resultSizeEstimate || 0,
-//       };
-//     }
-
-//     // OPTIMIZATION: Fetch all thread details in PARALLEL
-//     const detailedThreads = [];
-
-//     const threadPromises = threads.map(async (thread) => {
-//       try {
-//         // Use format: 'metadata' which is faster than 'full'
-//         const threadRes = await gmail.users.threads.get({
-//           userId: "me",
-//           id: thread.id,
-//           format: "metadata",
-//           metadataHeaders: ["Subject", "From", "Date", "To"],
-//         });
-
-//         const messages = threadRes.data.messages || [];
-//         const firstMessage = messages[0];
-
-//         if (!firstMessage) return null;
-
-//         const headers = firstMessage?.payload?.headers || [];
-
-//         const subject =
-//           headers.find((h) => h.name === "Subject")?.value || "No Subject";
-//         const from = headers.find((h) => h.name === "From")?.value || "Unknown";
-//         const to = headers.find((h) => h.name === "To")?.value || "";
-//         const date = headers.find((h) => h.name === "Date")?.value || "";
-
-//         // Get REAL label IDs to determine status
-//         const labelIds = firstMessage?.labelIds || [];
-
-//         let timestamp = 0;
-//         if (date) {
-//           timestamp = new Date(date).getTime();
-//         }
-
-//         return {
-//           id: thread.id,
-//           snippet: thread.snippet || "",
-//           subject,
-//           from,
-//           to,
-//           date,
-//           timestamp,
-//           unread: labelIds.includes("UNREAD"),
-//           starred: labelIds.includes("STARRED"),
-//           important: labelIds.includes("IMPORTANT"),
-//           spam: labelIds.includes("SPAM"),
-//           trash: labelIds.includes("TRASH"),
-//           drafts: labelIds.includes("DRAFT"),
-//           messagesCount: messages.length,
-//         };
-//       } catch (err) {
-//         console.error(`Error fetching thread ${thread.id}:`, err.message);
-//         return {
-//           id: thread.id,
-//           snippet: thread.snippet || "",
-//           subject: "No Subject",
-//           from: "Unknown",
-//           to: "",
-//           date: "",
-//           timestamp: 0,
-//           unread: false,
-//           starred: false,
-//           important: false,
-//           spam: false,
-//           trash: false,
-//           drafts: false,
-//           messagesCount: 0,
-//         };
-//       }
-//     });
-
-//     const results = await Promise.all(threadPromises);
-//     for (const result of results) {
-//       if (result) detailedThreads.push(result);
-//     }
-
-//     detailedThreads.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-
-//     const duration = Date.now() - startTime;
-//     console.log(
-//       `✅ Fetched ${detailedThreads.length} threads in ${duration}ms`,
-//     );
-
-//     return {
-//       threads: detailedThreads,
-//       nextPageToken: res.data.nextPageToken,
-//       resultSizeEstimate: res.data.resultSizeEstimate || detailedThreads.length,
-//     };
-//   } catch (error) {
-//     console.error("❌ Error listing threads:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Mark thread as read/unread
-//  */
-// export async function markAsRead(threadId, read = true, email = null) {
-//   try {
-//     const gmail = await initializeGmailClient(email);
-
-//     const res = await gmail.users.threads.modify({
-//       userId: "me",
-//       id: threadId,
-//       requestBody: {
-//         addLabelIds: read ? [] : ["UNREAD"],
-//         removeLabelIds: read ? ["UNREAD"] : [],
-//       },
-//     });
-
-//     console.log(`✅ Thread ${threadId} marked as ${read ? "read" : "unread"}`);
-//     return { success: true, ...res.data };
-//   } catch (error) {
-//     console.error("❌ Error marking thread:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Send email with attachments (FIXED)
-//  */
-// export async function sendEmailWithAttachments(
-//   to,
-//   subject,
-//   message,
-//   cc = "",
-//   bcc = "",
-//   attachments = [],
-//   files = [],
-//   email = null, // 👈 new parameter
-// ) {
-//   try {
-//     const startTime = Date.now();
-//     console.log("🚀 Starting email send process...");
-
-//     // Validate recipient email
-//     const emailList = processEmailList(to);
-//     if (emailList.length === 0) {
-//       throw new Error(`Invalid recipient email address: ${to}`);
-//     }
-
-//     const gmail = await initializeGmailClient(email);
-
-//     // Get user's email from token
-//     const tokenDoc = await GmailToken.findOne({ is_active: true });
-//     if (!tokenDoc) {
-//       throw new Error("No active Gmail account found");
-//     }
-//     const fromEmail = tokenDoc.email;
-
-//     // CRITICAL FIX: Combine attachments from both sources
-//     const allAttachments = [];
-
-//     // Process attachments array (from route)
-//     if (attachments && attachments.length > 0) {
-//       for (const attachment of attachments) {
-//         if (attachment.content && attachment.filename) {
-//           allAttachments.push({
-//             filename: attachment.filename,
-//             content: attachment.content,
-//             mimetype:
-//               attachment.mimetype ||
-//               mime.lookup(attachment.filename) ||
-//               "application/octet-stream",
-//             size: attachment.size || 0,
-//           });
-//         }
-//       }
-//     }
-
-//     // Process files array (from multer)
-//     if (files && files.length > 0) {
-//       for (const file of files) {
-//         if (file.buffer && file.originalname) {
-//           // Validate file size
-//           if (file.size > 25 * 1024 * 1024) {
-//             throw new Error(`File ${file.originalname} exceeds 25MB limit`);
-//           }
-
-//           allAttachments.push({
-//             filename: file.originalname,
-//             content: file.buffer.toString("base64"),
-//             mimetype:
-//               file.mimetype ||
-//               mime.lookup(file.originalname) ||
-//               "application/octet-stream",
-//             size: file.size,
-//           });
-//         }
-//       }
-//     }
-
-//     console.log(`📧 Total attachments to send: ${allAttachments.length}`);
-
-//     // Prepare email addresses
-//     const fullTo = emailList.join(", ");
-//     const ccList = processEmailList(cc);
-//     const bccList = processEmailList(bcc);
-//     const fullCc = ccList.join(", ");
-//     const fullBcc = bccList.join(", ");
-
-//     // Create proper MIME email
-//     const boundary = `boundary_${Date.now()}_${Math.random().toString(36).substring(2)}`;
-//     const nl = "\r\n";
-
-//     // Build email headers
-//     let emailHeaders = [
-//       `MIME-Version: 1.0`,
-//       `To: ${fullTo}`,
-//       `From: ${fromEmail}`,
-//       `Subject: ${subject || "(No Subject)"}`,
-//     ];
-
-//     if (fullCc) emailHeaders.push(`Cc: ${fullCc}`);
-//     if (fullBcc) emailHeaders.push(`Bcc: ${fullBcc}`);
-
-//     emailHeaders.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
-//     emailHeaders.push("");
-
-//     // Add text/plain part
-//     emailHeaders.push(`--${boundary}`);
-//     emailHeaders.push(`Content-Type: text/plain; charset="UTF-8"`);
-//     emailHeaders.push(`Content-Transfer-Encoding: quoted-printable`);
-//     emailHeaders.push("");
-//     emailHeaders.push(message || " ");
-//     emailHeaders.push("");
-
-//     // Add HTML part for better compatibility
-//     emailHeaders.push(`--${boundary}`);
-//     emailHeaders.push(`Content-Type: text/html; charset="UTF-8"`);
-//     emailHeaders.push(`Content-Transfer-Encoding: quoted-printable`);
-//     emailHeaders.push("");
-//     emailHeaders.push(
-//       `<div style="font-family: Arial, sans-serif;">${message || " "}</div>`,
-//     );
-//     emailHeaders.push("");
-
-//     // Add attachments
-//     if (allAttachments.length > 0) {
-//       for (const attachment of allAttachments) {
-//         try {
-//           const mimeType =
-//             attachment.mimetype ||
-//             mime.lookup(attachment.filename) ||
-//             "application/octet-stream";
-
-//           // Format base64 content (RFC 2822 requires lines <= 78 characters)
-//           const base64Content = attachment.content
-//             .replace(/\s/g, "")
-//             .match(/.{1,76}/g)
-//             .join(nl);
-
-//           emailHeaders.push(`--${boundary}`);
-//           emailHeaders.push(
-//             `Content-Type: ${mimeType}; name="${attachment.filename}"`,
-//           );
-//           emailHeaders.push(
-//             `Content-Disposition: attachment; filename="${attachment.filename}"`,
-//           );
-//           emailHeaders.push(`Content-Transfer-Encoding: base64`);
-//           emailHeaders.push("");
-//           emailHeaders.push(base64Content);
-//           emailHeaders.push("");
-//         } catch (attErr) {
-//           console.error(
-//             `❌ Error adding attachment ${attachment.filename}:`,
-//             attErr,
-//           );
-//           throw new Error(
-//             `Failed to process attachment: ${attachment.filename}`,
-//           );
-//         }
-//       }
-//     }
-
-//     // Close boundary
-//     emailHeaders.push(`--${boundary}--`);
-//     emailHeaders.push("");
-
-//     // Combine all parts
-//     const emailString = emailHeaders.join(nl);
-
-//     // Calculate size
-//     const rawSize = Buffer.byteLength(emailString, "utf8");
-//     const base64Size = Math.ceil((rawSize * 4) / 3);
-
-//     if (base64Size > 25 * 1024 * 1024) {
-//       throw new Error(
-//         `Email size exceeds Gmail's 25MB limit. Please reduce attachment sizes.`,
-//       );
-//     }
-
-//     // Convert to base64url
-//     const base64Email = Buffer.from(emailString, "utf8")
-//       .toString("base64")
-//       .replace(/\+/g, "-")
-//       .replace(/\//g, "_")
-//       .replace(/=+$/, "");
-
-//     // Send email
-//     const res = await gmail.users.messages.send({
-//       userId: "me",
-//       requestBody: {
-//         raw: base64Email,
-//       },
-//     });
-
-//     const duration = (Date.now() - startTime) / 1000;
-
-//     console.log(`✅ Email sent successfully!`);
-
-//     return {
-//       success: true,
-//       id: res.data.id,
-//       threadId: res.data.threadId,
-//       labelIds: res.data.labelIds || [],
-//       sendTime: duration,
-//     };
-//   } catch (error) {
-//     console.error("❌ Error in sendEmailWithAttachments:", error);
-//     throw error;
-//   }
-// }//old one..
-
-// /**
-//  * Save draft
-//  */
-// export async function saveDraft(
-//   to,
-//   subject,
-//   message,
-//   cc = "",
-//   bcc = "",
-//   attachments = [],
-//   files = [],
-//   email = null, // 👈 new parameter
-// ) {
-//   try {
-//     console.log("📝 Creating draft...");
-
-//     const gmail = await initializeGmailClient(email);
-
-//     // Get user's email from token
-//     const tokenDoc = await GmailToken.findOne({ is_active: true });
-//     if (!tokenDoc) {
-//       throw new Error("No active Gmail account found");
-//     }
-//     const fromEmail = tokenDoc.email;
-
-//     // Combine attachments
-//     const allAttachments = [];
-
-//     if (attachments && attachments.length > 0) {
-//       allAttachments.push(...attachments);
-//     }
-
-//     if (files && files.length > 0) {
-//       for (const file of files) {
-//         if (file.buffer && file.originalname) {
-//           allAttachments.push({
-//             filename: file.originalname,
-//             content: file.buffer.toString("base64"),
-//             mimetype: file.mimetype,
-//             size: file.size,
-//           });
-//         }
-//       }
-//     }
-
-//     // Create draft using Gmail API
-//     const emailResult = await createDraftMessage(
-//       to,
-//       subject,
-//       message,
-//       cc,
-//       bcc,
-//       allAttachments,
-//       fromEmail,
-//     );
-
-//     const res = await gmail.users.drafts.create({
-//       userId: "me",
-//       requestBody: {
-//         message: {
-//           raw: emailResult.raw,
-//         },
-//       },
-//     });
-
-//     console.log("✅ Draft saved successfully");
-
-//     return {
-//       success: true,
-//       id: res.data.id,
-//       message: "Draft saved successfully",
-//     };
-//   } catch (error) {
-//     console.error("❌ Error saving draft:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Create draft message (helper)
-//  */
-// async function createDraftMessage(
-//   to,
-//   subject,
-//   message,
-//   cc = "",
-//   bcc = "",
-//   attachments = [],
-//   fromEmail,
-// ) {
-//   const boundary = `boundary_${Date.now()}_${Math.random().toString(36).substring(2)}`;
-//   const nl = "\r\n";
-
-//   // Build email headers
-//   let email = [
-//     `MIME-Version: 1.0`,
-//     `To: ${to}`,
-//     `From: ${fromEmail}`,
-//     `Subject: ${subject || "(No Subject)"}`,
-//   ];
-
-//   if (cc) email.push(`Cc: ${cc}`);
-//   if (bcc) email.push(`Bcc: ${bcc}`);
-
-//   email.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
-//   email.push("");
-
-//   // Add text part
-//   email.push(`--${boundary}`);
-//   email.push(`Content-Type: text/plain; charset="UTF-8"`);
-//   email.push(`Content-Transfer-Encoding: quoted-printable`);
-//   email.push("");
-//   email.push(message || " ");
-//   email.push("");
-
-//   // Add attachments
-//   if (attachments && attachments.length > 0) {
-//     for (const attachment of attachments) {
-//       const mimeType =
-//         attachment.mimetype ||
-//         mime.lookup(attachment.filename) ||
-//         "application/octet-stream";
-
-//       const base64Content = attachment.content
-//         .replace(/\s/g, "")
-//         .match(/.{1,76}/g)
-//         .join(nl);
-
-//       email.push(`--${boundary}`);
-//       email.push(`Content-Type: ${mimeType}; name="${attachment.filename}"`);
-//       email.push(
-//         `Content-Disposition: attachment; filename="${attachment.filename}"`,
-//       );
-//       email.push(`Content-Transfer-Encoding: base64`);
-//       email.push("");
-//       email.push(base64Content);
-//       email.push("");
-//     }
-//   }
-
-//   email.push(`--${boundary}--`);
-//   email.push("");
-
-//   const emailString = email.join(nl);
-
-//   // Convert to base64url
-//   const base64Email = Buffer.from(emailString, "utf8")
-//     .toString("base64")
-//     .replace(/\+/g, "-")
-//     .replace(/\//g, "_")
-//     .replace(/=+$/, "");
-
-//   return { raw: base64Email };
-// }
-
-// /**
-//  * Get drafts
-//  */
-// export async function getDrafts(maxResults = 20, email = null) {
-//   try {
-//     const gmail = await initializeGmailClient(email);
-
-//     const res = await gmail.users.drafts.list({
-//       userId: "me",
-//       maxResults: maxResults,
-//     });
-
-//     return res.data.drafts || [];
-//   } catch (error) {
-//     console.error("❌ Error getting drafts:", error);
-//     throw error;
-//   }
-// }
-
-// // ============= NEW FUNCTION: Get a single draft =============
-// /**
-//  * Get a single draft with full content
-//  */
-// export async function getDraft(draftId, email = null) {
-//   try {
-//     const gmail = await initializeGmailClient(email);
-//     const res = await gmail.users.drafts.get({
-//       userId: "me",
-//       id: draftId,
-//       format: "full",
-//     });
-
-//     const message = res.data.message;
-//     const headers = message?.payload?.headers || [];
-//     const subject = headers.find((h) => h.name === "Subject")?.value || "No Subject";
-//     const from = headers.find((h) => h.name === "From")?.value || "Unknown";
-//     const to = headers.find((h) => h.name === "To")?.value || "";
-//     const date = headers.find((h) => h.name === "Date")?.value || "";
-//     const cc = headers.find((h) => h.name === "Cc")?.value || "";
-//     const bcc = headers.find((h) => h.name === "Bcc")?.value || "";
-
-//     const content = extractContent(message?.payload?.parts || [message?.payload]);
-
-//     const processedMessage = {
-//       id: message.id,
-//       snippet: message.snippet,
-//       subject,
-//       from,
-//       to,
-//       cc,
-//       bcc,
-//       date,
-//       body: content.text,
-//       htmlBody: content.html,
-//       attachments: content.attachments,
-//       hasAttachments: content.attachments.length > 0,
-//       labelIds: message.labelIds || [],
-//       isDraft: true,
-//     };
-
-//     // Return in same structure as getThread for frontend consistency
-//     return {
-//       messages: [processedMessage],
-//     };
-//   } catch (error) {
-//     console.error("❌ Error getting draft:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Get single thread with full content
-//  */
-// export async function getThread(threadId, email = null) {
-//   try {
-//     const gmail = await initializeGmailClient(email);
-//     const res = await gmail.users.threads.get({
-//       userId: "me",
-//       id: threadId,
-//     });
-
-//     console.log(`✅ Fetched thread ${threadId}`);
-
-//     // Process messages
-//     const processedMessages = (res.data.messages || []).map((message) => {
-//       const headers = message.payload?.headers || [];
-//       const subject =
-//         headers.find((h) => h.name === "Subject")?.value || "No Subject";
-//       const from =
-//         headers.find((h) => h.name === "From")?.value || "Unknown Sender";
-//       const to = headers.find((h) => h.name === "To")?.value || "";
-//       const date = headers.find((h) => h.name === "Date")?.value || "";
-//       const cc = headers.find((h) => h.name === "Cc")?.value || "";
-//       const bcc = headers.find((h) => h.name === "Bcc")?.value || "";
-
-//       // Get label IDs
-//       const labelIds = message.labelIds || [];
-
-//       // Extract content
-//       const content = extractContent(
-//         message.payload?.parts || [message.payload],
-//       );
-
-//       return {
-//         id: message.id,
-//         snippet: message.snippet,
-//         subject,
-//         from,
-//         to,
-//         cc,
-//         bcc,
-//         date,
-//         body: content.text,
-//         htmlBody: content.html,
-//         attachments: content.attachments,
-//         hasAttachments: content.attachments.length > 0,
-//         unread: labelIds.includes("UNREAD"),
-//         starred: labelIds.includes("STARRED"),
-//         important: labelIds.includes("IMPORTANT"),
-//         spam: labelIds.includes("SPAM"),
-//         trash: labelIds.includes("TRASH"),
-//         drafts: labelIds.includes("DRAFT"),
-//         labelIds: labelIds,
-//       };
-//     });
-
-//     return {
-//       ...res.data,
-//       messages: processedMessages,
-//     };
-//   } catch (error) {
-//     console.error("❌ Error getting thread:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Get attachment
-//  */
-// export async function getAttachment(messageId, attachmentId, email = null) {
-//   try {
-//     const gmail = await initializeGmailClient(email);
-//     const res = await gmail.users.messages.attachments.get({
-//       userId: "me",
-//       messageId: messageId,
-//       id: attachmentId,
-//     });
-
-//     return {
-//       data: res.data.data,
-//       size: res.data.size,
-//     };
-//   } catch (error) {
-//     console.error("❌ Error fetching attachment:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Delete thread
-//  */
-// export async function deleteThread(threadId, email = null) {
-//   try {
-//     const gmail = await initializeGmailClient(email);
-
-//     const res = await gmail.users.threads.delete({
-//       userId: "me",
-//       id: threadId,
-//     });
-
-//     console.log(`✅ Thread ${threadId} deleted`);
-//     return { success: true, ...res.data };
-//   } catch (error) {
-//     console.error("❌ Error deleting thread:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Delete email
-//  */
-// export async function deleteEmail(messageId, email = null) {
-//   try {
-//     const gmail = await initializeGmailClient(email);
-
-//     const res = await gmail.users.messages.delete({
-//       userId: "me",
-//       id: messageId,
-//     });
-
-//     console.log(`✅ Email ${messageId} deleted`);
-//     return { success: true, ...res.data };
-//   } catch (error) {
-//     console.error("❌ Error deleting email:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Star/unstar thread
-//  */
-// export async function starThread(threadId, star = true, email = null) {
-//   try {
-//     const gmail = await initializeGmailClient(email);
-
-//     const res = await gmail.users.threads.modify({
-//       userId: "me",
-//       id: threadId,
-//       requestBody: {
-//         addLabelIds: star ? ["STARRED"] : [],
-//         removeLabelIds: star ? [] : ["STARRED"],
-//       },
-//     });
-
-//     console.log(`✅ Thread ${threadId} ${star ? "starred" : "unstarred"}`);
-//     return { success: true, ...res.data };
-//   } catch (error) {
-//     console.error("❌ Error starring thread:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Bulk star/unstar threads
-//  */
-// export async function bulkStarThreads(threadIds, star = true, email = null) {
-//   try {
-//     const gmail = await initializeGmailClient(email);
-
-//     console.log(
-//       `⭐ Bulk ${star ? "starring" : "unstarring"} ${threadIds.length} threads...`,
-//     );
-
-//     const starPromises = threadIds.map(async (threadId) => {
-//       try {
-//         await gmail.users.threads.modify({
-//           userId: "me",
-//           id: threadId,
-//           requestBody: {
-//             addLabelIds: star ? ["STARRED"] : [],
-//             removeLabelIds: star ? [] : ["STARRED"],
-//           },
-//         });
-//         return { success: true, threadId };
-//       } catch (error) {
-//         console.error(
-//           `❌ Error ${star ? "starring" : "unstarring"} thread ${threadId}:`,
-//           error.message,
-//         );
-//         return { success: false, threadId, error: error.message };
-//       }
-//     });
-
-//     const results = await Promise.allSettled(starPromises);
-
-//     const successful = results.filter(
-//       (r) => r.status === "fulfilled" && r.value.success,
-//     );
-
-//     console.log(
-//       `✅ Bulk ${star ? "star" : "unstar"} completed: ${successful.length} successful`,
-//     );
-
-//     return {
-//       success: true,
-//       message: `${star ? "Starred" : "Unstarred"} ${successful.length} threads successfully`,
-//       count: successful.length,
-//     };
-//   } catch (error) {
-//     console.error("❌ Error in bulk star:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Mark as spam
-//  */
-// export async function markAsSpam(threadId, spam = true, email = null) {
-//   try {
-//     const gmail = await initializeGmailClient(email);
-
-//     const res = await gmail.users.threads.modify({
-//       userId: "me",
-//       id: threadId,
-//       requestBody: {
-//         addLabelIds: spam ? ["SPAM"] : [],
-//         removeLabelIds: spam ? [] : ["SPAM"],
-//       },
-//     });
-
-//     console.log(
-//       `✅ Thread ${threadId} ${spam ? "marked as spam" : "removed from spam"}`,
-//     );
-//     return { success: true, ...res.data };
-//   } catch (error) {
-//     console.error("❌ Error marking as spam:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Mark as important
-//  */
-// export async function markAsImportant(threadId, important = true, email = null) {
-//   try {
-//     const gmail = await initializeGmailClient(email);
-
-//     const res = await gmail.users.threads.modify({
-//       userId: "me",
-//       id: threadId,
-//       requestBody: {
-//         addLabelIds: important ? ["IMPORTANT"] : [],
-//         removeLabelIds: important ? [] : ["IMPORTANT"],
-//       },
-//     });
-
-//     console.log(
-//       `✅ Thread ${threadId} ${important ? "marked as important" : "removed from important"}`,
-//     );
-//     return { success: true, ...res.data };
-//   } catch (error) {
-//     console.error("❌ Error marking as important:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Apply label to thread
-//  */
-// export async function applyLabel(threadId, labelId, email = null) {
-//   try {
-//     const gmail = await initializeGmailClient(email);
-
-//     const res = await gmail.users.threads.modify({
-//       userId: "me",
-//       id: threadId,
-//       requestBody: {
-//         addLabelIds: [labelId],
-//       },
-//     });
-
-//     console.log(`✅ Label applied to thread ${threadId}`);
-//     return { success: true, ...res.data };
-//   } catch (error) {
-//     console.error("❌ Error applying label:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Move to trash
-//  */
-// export async function moveToTrash(threadId, email = null) {
-//   try {
-//     const gmail = await initializeGmailClient(email);
-
-//     const res = await gmail.users.threads.trash({
-//       userId: "me",
-//       id: threadId,
-//     });
-
-//     console.log(`✅ Thread ${threadId} moved to trash`);
-//     return { success: true, ...res.data };
-//   } catch (error) {
-//     console.error("❌ Error moving to trash:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Bulk move to trash
-//  */
-// export async function bulkMoveToTrash(threadIds, email = null) {
-//   try {
-//     const gmail = await initializeGmailClient(email);
-
-//     console.log(`🗑️ Bulk moving ${threadIds.length} threads to trash...`);
-
-//     const trashPromises = threadIds.map(async (threadId) => {
-//       try {
-//         await gmail.users.threads.trash({
-//           userId: "me",
-//           id: threadId,
-//         });
-//         return { success: true, threadId };
-//       } catch (error) {
-//         console.error(
-//           `❌ Error moving thread ${threadId} to trash:`,
-//           error.message,
-//         );
-//         return { success: false, threadId, error: error.message };
-//       }
-//     });
-
-//     const results = await Promise.allSettled(trashPromises);
-
-//     const successful = results.filter(
-//       (r) => r.status === "fulfilled" && r.value.success,
-//     );
-
-//     console.log(
-//       `✅ Bulk move to trash completed: ${successful.length} successful`,
-//     );
-
-//     return {
-//       success: true,
-//       message: `Moved ${successful.length} threads to trash`,
-//       count: successful.length,
-//     };
-//   } catch (error) {
-//     console.error("❌ Error in bulk move to trash:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Bulk delete threads
-//  */
-// export async function bulkDeleteThreads(threadIds, email = null) {
-//   try {
-//     const gmail = await initializeGmailClient(email);
-
-//     console.log(`🗑️ Bulk deleting ${threadIds.length} threads...`);
-
-//     const deletePromises = threadIds.map(async (threadId) => {
-//       try {
-//         await gmail.users.threads.delete({
-//           userId: "me",
-//           id: threadId,
-//         });
-//         return { success: true, threadId };
-//       } catch (error) {
-//         console.error(`❌ Error deleting thread ${threadId}:`, error.message);
-//         return { success: false, threadId, error: error.message };
-//       }
-//     });
-
-//     const results = await Promise.allSettled(deletePromises);
-
-//     const successful = results.filter(
-//       (r) => r.status === "fulfilled" && r.value.success,
-//     );
-
-//     console.log(`✅ Bulk delete completed: ${successful.length} successful`);
-
-//     return {
-//       success: successful.length > 0,
-//       message: `Deleted ${successful.length} threads successfully`,
-//       count: successful.length,
-//     };
-//   } catch (error) {
-//     console.error("❌ Error in bulk delete:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Get labels
-//  */
-// export async function getLabels(email = null) {
-//   try {
-//     const gmail = await initializeGmailClient(email);
-
-//     const res = await gmail.users.labels.list({
-//       userId: "me",
-//     });
-
-//     return res.data.labels || [];
-//   } catch (error) {
-//     console.error("❌ Error getting labels:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Get email suggestions
-//  */
-// export async function getEmailSuggestions(query, limit = 10, email = null) {
-//   try {
-//     const gmail = await initializeGmailClient(email);
-
-//     if (!query || query.length < 2) {
-//       return [];
-//     }
-
-//     // Search for emails containing the query
-//     const res = await gmail.users.messages.list({
-//       userId: "me",
-//       maxResults: 50,
-//       q: `from:${query} OR to:${query} OR cc:${query}`,
-//     });
-
-//     const messages = res.data.messages || [];
-//     const emailSet = new Set();
-
-//     // Extract email addresses from recent messages
-//     for (const message of messages.slice(0, 10)) {
-//       try {
-//         const msgRes = await gmail.users.messages.get({
-//           userId: "me",
-//           id: message.id,
-//           format: "metadata",
-//           metadataHeaders: ["From", "To", "Cc"],
-//         });
-
-//         const headers = msgRes.data.payload?.headers || [];
-
-//         // Extract from header
-//         const fromHeader = headers.find((h) => h.name === "From");
-//         if (fromHeader?.value) {
-//           const emails = extractAllEmails(fromHeader.value);
-//           emails.forEach((email) => emailSet.add(email));
-//         }
-
-//         // Extract to header
-//         const toHeader = headers.find((h) => h.name === "To");
-//         if (toHeader?.value) {
-//           const emails = extractAllEmails(toHeader.value);
-//           emails.forEach((email) => emailSet.add(email));
-//         }
-
-//         // Extract cc header
-//         const ccHeader = headers.find((h) => h.name === "Cc");
-//         if (ccHeader?.value) {
-//           const emails = extractAllEmails(ccHeader.value);
-//           emails.forEach((email) => emailSet.add(email));
-//         }
-//       } catch (err) {
-//         console.error(`Error processing message ${message.id}:`, err.message);
-//       }
-//     }
-
-//     // Also search in sent emails
-//     const sentRes = await gmail.users.messages.list({
-//       userId: "me",
-//       maxResults: 20,
-//       q: `in:sent ${query}`,
-//     });
-
-//     const sentMessages = sentRes.data.messages || [];
-
-//     for (const message of sentMessages.slice(0, 5)) {
-//       try {
-//         const msgRes = await gmail.users.messages.get({
-//           userId: "me",
-//           id: message.id,
-//           format: "metadata",
-//           metadataHeaders: ["To", "Cc"],
-//         });
-
-//         const headers = msgRes.data.payload?.headers || [];
-
-//         // Extract to header from sent emails
-//         const toHeader = headers.find((h) => h.name === "To");
-//         if (toHeader?.value) {
-//           const emails = extractAllEmails(toHeader.value);
-//           emails.forEach((email) => emailSet.add(email));
-//         }
-
-//         // Extract cc header from sent emails
-//         const ccHeader = headers.find((h) => h.name === "Cc");
-//         if (ccHeader?.value) {
-//           const emails = extractAllEmails(ccHeader.value);
-//           emails.forEach((email) => emailSet.add(email));
-//         }
-//       } catch (err) {
-//         console.error(
-//           `Error processing sent message ${message.id}:`,
-//           err.message,
-//         );
-//       }
-//     }
-
-//     // Filter by query if provided
-//     let suggestions = Array.from(emailSet);
-//     if (query) {
-//       const lowerQuery = query.toLowerCase();
-//       suggestions = suggestions.filter((email) =>
-//         email.toLowerCase().includes(lowerQuery),
-//       );
-//     }
-
-//     return suggestions.slice(0, limit);
-//   } catch (error) {
-//     console.error("❌ Error getting email suggestions:", error);
-//     return [];
-//   }
-// }
-
-// /**
-//  * Watch inbox (uses polling instead of Pub/Sub)
-//  */
-// export async function watchInbox() {
-//   try {
-//     await initializeGmailClient();
-//     console.log("🔔 Using polling for real-time updates");
-//     return { historyId: Date.now().toString() };
-//   } catch (error) {
-//     console.error("❌ Error starting inbox watch:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Stop watch
-//  */
-// export async function stopWatch(userId) {
-//   try {
-//     const gmail = await initializeGmailClient();
-
-//     await gmail.users.stop({
-//       userId: userId,
-//     });
-
-//     console.log("🔕 Inbox watch stopped");
-//   } catch (error) {
-//     console.error("❌ Error stopping inbox watch:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * List all threads (simplified)
-//  */
-// export async function listAllThreads() {
-//   try {
-//     const gmail = await initializeGmailClient();
-
-//     const res = await gmail.users.threads.list({
-//       userId: "me",
-//       maxResults: 100,
-//       q: "in:inbox",
-//     });
-
-//     const threads = res.data.threads || [];
-//     console.log(`✅ Fetched ${threads.length} threads`);
-
-//     const basicThreads = threads.map((thread) => ({
-//       id: thread.id,
-//       snippet: thread.snippet,
-//     }));
-
-//     return basicThreads;
-//   } catch (error) {
-//     console.error("❌ Error listing all threads:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Send simple email without attachments
-//  */
-// export async function sendEmail(
-//   to,
-//   subject,
-//   message,
-//   cc = "",
-//   bcc = "",
-//   attachments = [],
-//   files = [],
-//   email = null,
-// ) {
-//   if ((attachments && attachments.length > 0) || (files && files.length > 0)) {
-//     return await sendEmailWithAttachments(
-//       to,
-//       subject,
-//       message,
-//       cc,
-//       bcc,
-//       attachments,
-//       files,
-//       email,
-//     );
-//   }
-
-//   try {
-//     const startTime = Date.now();
-//     console.log("📧 Sending simple email...");
-
-//     // Validate email
-//     const emailList = processEmailList(to);
-//     if (emailList.length === 0) {
-//       throw new Error(`Invalid recipient email address: ${to}`);
-//     }
-
-//     const gmail = await initializeGmailClient(email);
-
-//     // Get user's email from token
-//     const tokenDoc = await GmailToken.findOne({ is_active: true });
-//     if (!tokenDoc) {
-//       throw new Error("No active Gmail account found");
-//     }
-//     const fromEmail = tokenDoc.email;
-
-//     // Construct simple email
-//     const emailLines = [
-//       `To: ${to}`,
-//       `From: ${fromEmail}`,
-//       `Subject: ${subject || "(No Subject)"}`,
-//     ];
-
-//     const ccList = processEmailList(cc);
-//     const bccList = processEmailList(bcc);
-
-//     if (ccList.length > 0) emailLines.push(`Cc: ${ccList.join(", ")}`);
-//     if (bccList.length > 0) emailLines.push(`Bcc: ${bccList.join(", ")}`);
-
-//     emailLines.push(
-//       'Content-Type: text/plain; charset="UTF-8"',
-//       "Content-Transfer-Encoding: quoted-printable",
-//       "MIME-Version: 1.0",
-//       "",
-//       message || "",
-//     );
-
-//     const email = emailLines.join("\r\n");
-
-//     // Convert to base64
-//     const base64Email = Buffer.from(email)
-//       .toString("base64")
-//       .replace(/\+/g, "-")
-//       .replace(/\//g, "_")
-//       .replace(/=+$/, "");
-
-//     const res = await gmail.users.messages.send({
-//       userId: "me",
-//       requestBody: { raw: base64Email },
-//     });
-
-//     const duration = (Date.now() - startTime) / 1000;
-//     console.log(`✅ Simple email sent in ${duration.toFixed(2)}s`);
-
-//     return {
-//       success: true,
-//       ...res.data,
-//       sendTime: duration,
-//     };
-//   } catch (error) {
-//     console.error("❌ Error sending simple email:", error);
-//     throw error;
-//   }
-// }
-
-// // ============= HELPER FUNCTIONS =============
-
-// /**
-//  * Extract content from email parts
-//  */
-// function extractContent(parts) {
-//   if (!parts) return { text: "", html: "", attachments: [] };
-
-//   let text = "";
-//   let html = "";
-//   const attachments = [];
-
-//   function processPart(part, depth = 0) {
-//     if (!part) return;
-
-//     const mimeType = part.mimeType || "";
-//     const filename = part.filename || "";
-//     const body = part.body || {};
-
-//     // Check if this part is an attachment
-//     if (filename && body.attachmentId) {
-//       attachments.push({
-//         id: body.attachmentId,
-//         filename: filename,
-//         mimeType: mimeType,
-//         size: body.size || 0,
-//       });
-//       return;
-//     }
-
-//     // Extract text content
-//     if (mimeType === "text/plain" && body.data) {
-//       text = Buffer.from(body.data, "base64").toString("utf-8");
-//     }
-//     // Extract HTML content
-//     else if (mimeType === "text/html" && body.data) {
-//       html = Buffer.from(body.data, "base64").toString("utf-8");
-//     }
-//     // Process nested parts
-//     else if (part.parts) {
-//       part.parts.forEach((nestedPart) => processPart(nestedPart, depth + 1));
-//     }
-//   }
-
-//   if (Array.isArray(parts)) {
-//     parts.forEach((part) => processPart(part));
-//   } else {
-//     processPart(parts);
-//   }
-
-//   return { text, html, attachments };
-// }
-
-// /**
-//  * Validate email address format
-//  */
-// function validateEmailAddress(email) {
-//   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-//   return re.test(email);
-// }
-
-// /**
-//  * Process email list from string
-//  */
-// function processEmailList(emailString) {
-//   if (!emailString) return [];
-//   return emailString
-//     .split(",")
-//     .map((email) => email.trim())
-//     .filter((email) => email && validateEmailAddress(email));
-// }
-
-// /**
-//  * Extract all emails from string
-//  */
-// function extractAllEmails(str) {
-//   if (!str) return [];
-//   const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi;
-//   const matches = str.match(emailRegex);
-//   return matches ? matches : [];
-// }
-
-// /**
-//  * Get all active Gmail accounts
-//  */
-// export async function getAllActiveAccounts() {
-//   try {
-//     const accounts = await GmailToken.find({ is_active: true }).sort({
-//       last_connected: -1,
-//     });
-//     return accounts.map((account) => ({
-//       email: account.email,
-//       last_connected: account.last_connected,
-//     }));
-//   } catch (error) {
-//     console.error("❌ Error getting active accounts:", error);
-//     return [];
-//   }
-// }
-
-// /**
-//  * Switch Gmail account
-//  */
-// export async function switchAccount(email) {
-//   try {
-//     // Clear current client
-//     currentGmailClient = null;
-//     currentUserEmail = null;
-
-//     // Initialize with new email
-//     const gmail = await initializeGmailClient(email);
-
-//     return {
-//       success: true,
-//       email: email,
-//       message: `Switched to account: ${email}`,
-//     };
-//   } catch (error) {
-//     console.error("❌ Error switching account:", error);
-//     throw error;
-//   }
-// }
-
-// /**
-//  * Delete a draft
-//  */
-// export async function deleteDraft(draftId, email = null) {
-//   try {
-//     const gmail = await initializeGmailClient(email);
-//     await gmail.users.drafts.delete({
-//       userId: 'me',
-//       id: draftId,
-//     });
-//     console.log(`✅ Draft ${draftId} deleted`);
-//     return { success: true };
-//   } catch (error) {
-//     console.error('❌ Error deleting draft:', error);
-//     throw error;
-//   }
-// }//all live working correctly..
-
-
-
 import { google } from "googleapis";
 import dotenv from "dotenv";
 import path from "path";
@@ -3985,9 +12,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const isProduction = process.env.NODE_ENV === "production";
-console.log(
-  `📧 Gmail Service running in ${isProduction ? "PRODUCTION" : "DEVELOPMENT"} mode`,
-);
+console.log(`📧 Gmail Service: ${isProduction ? "PRODUCTION" : "DEVELOPMENT"} mode`);
 
 const CLIENT_ID = process.env.GMAIL_CLIENT_ID;
 const CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
@@ -3995,1726 +20,830 @@ const REDIRECT_URI = isProduction
   ? process.env.GMAIL_LIVE_REDIRECT_URI
   : process.env.GMAIL_REDIRECT_URI;
 
-console.log(`📧 Using redirect URI: ${REDIRECT_URI}`);
-
 if (!CLIENT_ID || !CLIENT_SECRET) {
-  console.error("❌ Missing Gmail OAuth credentials. Please check your .env file");
   throw new Error("Gmail OAuth credentials not configured");
 }
 
-export const oauth2Client = new google.auth.OAuth2(
-  CLIENT_ID,
-  CLIENT_SECRET,
-  REDIRECT_URI,
-);
+export const oauth2Client = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
 
-let currentGmailClient = null;
-let currentUserEmail = null;
-let tokenRefreshInProgress = false;
+// ─── PER-USER CLIENT CACHE ────────────────────────────────────────────────────
+const clientCache = new Map(); // email -> { client, auth, expiresAt }
+const CLIENT_CACHE_TTL = 45 * 60 * 1000; // 45 minutes
 
-// ✅ 25MB per attachment limit (Gmail's actual per-attachment limit)
-const ATTACHMENT_MAX_SIZE = 25 * 1024 * 1024; // 25MB per attachment
-const MAX_FILE_SIZE = 25 * 1024 * 1024;        // 25MB per file for multer
+const ATTACHMENT_MAX_SIZE = 25 * 1024 * 1024;
+const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
-const storage = multer.memoryStorage();
 export const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: MAX_FILE_SIZE, // 25MB per file
-    files: 10,
-  },
-  fileFilter: (req, file, cb) => {
-    cb(null, true); // Allow all file types: images, pdf, audio, video, word, excel, etc.
-  },
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_FILE_SIZE, files: 10 },
+  fileFilter: (_req, _file, cb) => cb(null, true),
 });
 
-/**
- * Initialize Gmail client with tokens from database
- */
-export async function initializeGmailClient(email = null) {
-  try {
-    console.log("🔄 Initializing Gmail client...");
+// ─── INIT CLIENT ──────────────────────────────────────────────────────────────
+export async function initializeGmailClient(email) {
+  if (!email) throw new Error("email is required for Gmail client initialization");
 
-    if (
-      currentGmailClient &&
-      currentUserEmail &&
-      (!email || currentUserEmail === email)
-    ) {
-      console.log(`✅ Using existing Gmail client for ${currentUserEmail}`);
-      return currentGmailClient;
-    }
+  const normalEmail = email.toLowerCase().trim();
 
-    const tokenQuery = email ? { email, is_active: true } : { is_active: true };
-    const tokenDoc = await GmailToken.findOne(tokenQuery).sort({
-      last_connected: -1,
-    });
-
-    if (!tokenDoc) {
-      console.log("❌ No active Gmail tokens found in database");
-      throw new Error("No valid Gmail tokens found. Connect Gmail first.");
-    }
-
-    console.log(`✅ Found token for email: ${tokenDoc.email}`);
-
-    const now = new Date();
-    const expiryDate = new Date(tokenDoc.expiry_date);
-
-    let tokens = {
-      access_token: tokenDoc.access_token,
-      refresh_token: tokenDoc.refresh_token,
-      token_type: tokenDoc.token_type,
-      expiry_date: expiryDate.getTime(),
-      scope: tokenDoc.scope,
-    };
-
-    const oauth2ClientWithTokens = new google.auth.OAuth2(
-      CLIENT_ID,
-      CLIENT_SECRET,
-      REDIRECT_URI,
-    );
-
-    oauth2ClientWithTokens.setCredentials(tokens);
-
-    if (now > expiryDate) {
-      console.log(`🔄 Token expired for ${tokenDoc.email}, refreshing...`);
-
-      if (tokenRefreshInProgress) {
-        console.log("⏳ Token refresh already in progress, waiting...");
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        return initializeGmailClient(email);
-      }
-
-      tokenRefreshInProgress = true;
-
-      try {
-        const { credentials } =
-          await oauth2ClientWithTokens.refreshAccessToken();
-
-        tokenDoc.access_token = credentials.access_token;
-        tokenDoc.expiry_date = new Date(credentials.expiry_date);
-        if (credentials.refresh_token) {
-          tokenDoc.refresh_token = credentials.refresh_token;
-        }
-        tokenDoc.last_connected = new Date();
-        await tokenDoc.save();
-
-        console.log(`✅ Token refreshed and saved for ${tokenDoc.email}`);
-
-        oauth2ClientWithTokens.setCredentials(credentials);
-
-        tokenRefreshInProgress = false;
-      } catch (refreshError) {
-        tokenRefreshInProgress = false;
-        console.error(
-          `❌ Failed to refresh token for ${tokenDoc.email}:`,
-          refreshError.message,
-        );
-        throw new Error(
-          "Token expired and could not be refreshed. Please reconnect Gmail.",
-        );
-      }
-    }
-
-    currentGmailClient = google.gmail({
-      version: "v1",
-      auth: oauth2ClientWithTokens,
-    });
-
-    currentUserEmail = tokenDoc.email;
-    oauth2Client.setCredentials(tokens);
-
-    console.log(`✅ Gmail client initialized successfully for ${currentUserEmail}`);
-    return currentGmailClient;
-  } catch (error) {
-    console.error("❌ Error initializing Gmail client:", error.message);
-    currentGmailClient = null;
-    currentUserEmail = null;
-    throw new Error(`Failed to initialize Gmail client: ${error.message}`);
+  const cached = clientCache.get(normalEmail);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.client;
   }
+
+  const tokenDoc = await GmailToken.findOne({ email: normalEmail, is_active: true });
+  if (!tokenDoc) throw new Error(`No Gmail token found for ${email}. Please connect Gmail first.`);
+
+  const now = new Date();
+  const expiryDate = new Date(tokenDoc.expiry_date);
+
+  const auth = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
+  auth.setCredentials({
+    access_token: tokenDoc.access_token,
+    refresh_token: tokenDoc.refresh_token,
+    token_type: tokenDoc.token_type,
+    expiry_date: expiryDate.getTime(),
+    scope: tokenDoc.scope,
+  });
+
+  if (now > expiryDate) {
+    console.log(`🔄 Refreshing token for ${normalEmail}...`);
+    try {
+      const { credentials } = await auth.refreshAccessToken();
+      tokenDoc.access_token = credentials.access_token;
+      tokenDoc.expiry_date = new Date(credentials.expiry_date);
+      if (credentials.refresh_token) tokenDoc.refresh_token = credentials.refresh_token;
+      tokenDoc.last_connected = new Date();
+      await tokenDoc.save();
+      auth.setCredentials(credentials);
+      console.log(`✅ Token refreshed for ${normalEmail}`);
+    } catch (err) {
+      tokenDoc.is_active = false;
+      await tokenDoc.save();
+      clientCache.delete(normalEmail);
+      throw new Error("Token expired and refresh failed. Please reconnect Gmail.");
+    }
+  }
+
+  const gmailClient = google.gmail({ version: "v1", auth });
+  clientCache.set(normalEmail, { client: gmailClient, expiresAt: Date.now() + CLIENT_CACHE_TTL });
+  console.log(`✅ Gmail client ready for ${normalEmail}`);
+  return gmailClient;
 }
 
-/**
- * Generate Google OAuth URL
- */
-export function generateAuthUrl(redirectUri) {
-  if (!CLIENT_ID || !CLIENT_SECRET) {
-    throw new Error("Gmail OAuth credentials not configured");
-  }
+function invalidateClientCache(email) {
+  if (email) clientCache.delete(email.toLowerCase().trim());
+}
 
+// ─── AUTH URL ─────────────────────────────────────────────────────────────────
+export function generateAuthUrl(redirectUri) {
   const scopes = [
     "https://mail.google.com/",
     "https://www.googleapis.com/auth/gmail.modify",
     "https://www.googleapis.com/auth/gmail.compose",
     "https://www.googleapis.com/auth/gmail.readonly",
   ];
+  const client = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, redirectUri);
+  return client.generateAuthUrl({ access_type: "offline", prompt: "consent", scope: scopes });
+}
 
-  const tempOAuth2Client = new google.auth.OAuth2(
-    CLIENT_ID,
-    CLIENT_SECRET,
-    redirectUri
+// ─── SAVE TOKENS ─────────────────────────────────────────────────────────────
+export async function saveTokens(tokens) {
+  const tempClient = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
+  tempClient.setCredentials(tokens);
+
+  const gmail = google.gmail({ version: "v1", auth: tempClient });
+  const profile = await gmail.users.getProfile({ userId: "me" });
+  const email = profile.data.emailAddress.toLowerCase().trim();
+
+  console.log(`📧 Saving tokens for: ${email}`);
+
+  const expiryDate = tokens.expiry_date ? new Date(tokens.expiry_date) : new Date(Date.now() + 3600000);
+
+  await GmailToken.updateMany({ email }, { is_active: false });
+
+  await GmailToken.findOneAndUpdate(
+    { email },
+    {
+      email,
+      access_token: tokens.access_token,
+      ...(tokens.refresh_token && { refresh_token: tokens.refresh_token }),
+      token_type: tokens.token_type || "Bearer",
+      expiry_date: expiryDate,
+      scope: tokens.scope || "",
+      is_active: true,
+      last_connected: new Date(),
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
-  const authUrl = tempOAuth2Client.generateAuthUrl({
-    access_type: "offline",
-    prompt: "consent",
-    scope: scopes,
+  invalidateClientCache(email);
+  console.log(`✅ Tokens saved for ${email}`);
+  return { success: true, email };
+}
+
+// ─── EXCHANGE CODE ────────────────────────────────────────────────────────────
+export async function exchangeCodeForTokens(code, redirectUri) {
+  const tempClient = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, redirectUri);
+  const { tokens } = await tempClient.getToken(code);
+  const result = await saveTokens(tokens);
+  return { ...tokens, email: result.email };
+}
+
+// ─── CHECK AUTH ───────────────────────────────────────────────────────────────
+export async function checkAuth(email = null) {
+  const query = email ? { email: email.toLowerCase().trim(), is_active: true } : { is_active: true };
+  const tokenDoc = await GmailToken.findOne(query).sort({ last_connected: -1 });
+  if (!tokenDoc) return { authenticated: false, message: "No Gmail account connected", email: null };
+
+  try {
+    const gmail = await initializeGmailClient(tokenDoc.email);
+    const profile = await gmail.users.getProfile({ userId: "me" });
+    return { authenticated: true, message: "Gmail is connected", email: tokenDoc.email, profile: profile.data };
+  } catch (err) {
+    tokenDoc.is_active = false;
+    await tokenDoc.save();
+    invalidateClientCache(tokenDoc.email);
+    return { authenticated: false, message: `Auth failed: ${err.message}`, email: tokenDoc.email };
+  }
+}
+
+// ─── DISCONNECT ───────────────────────────────────────────────────────────────
+export async function disconnectGmail(email) {
+  if (!email) throw new Error("email required");
+  const normalEmail = email.toLowerCase().trim();
+  await GmailToken.updateMany({ email: normalEmail }, { is_active: false });
+  invalidateClientCache(normalEmail);
+  return { success: true, message: `Gmail disconnected for ${normalEmail}` };
+}
+
+// ─── KEY FIX: GET LABEL COUNTS — accurate unread using messagesUnread ─────────
+export async function getLabelCounts(email) {
+  if (!email) throw new Error("email required");
+  const gmail = await initializeGmailClient(email);
+
+  // Fetch INBOX label separately for accurate unread count (messagesUnread field)
+  const labelIds = ["INBOX", "STARRED", "IMPORTANT", "SENT", "SPAM", "TRASH", "DRAFT"];
+
+  const results = await Promise.allSettled(
+    labelIds.map((id) => gmail.users.labels.get({ userId: "me", id }))
+  );
+
+  const counts = {};
+  labelIds.forEach((id, idx) => {
+    const r = results[idx];
+    const key = id === "DRAFT" ? "DRAFTS" : id;
+    counts[key] = r.status === "fulfilled" ? (r.value.data.threadsTotal || 0) : 0;
   });
 
-  console.log(`🔗 Generated auth URL with redirect: ${redirectUri}`);
-  return authUrl;
-}
-
-/**
- * Save tokens to database
- */
-export async function saveTokens(tokens) {
-  try {
-    console.log("💾 Saving tokens to database...");
-
-    const tempOAuth2Client = new google.auth.OAuth2(
-      CLIENT_ID,
-      CLIENT_SECRET,
-      REDIRECT_URI,
-    );
-    tempOAuth2Client.setCredentials(tokens);
-
-    const gmail = google.gmail({ version: "v1", auth: tempOAuth2Client });
-    const profile = await gmail.users.getProfile({ userId: "me" });
-    const email = profile.data.emailAddress;
-
-    console.log(`📧 Got user email: ${email}`);
-
-    let expiryDate = new Date();
-    if (tokens.expiry_date) {
-      expiryDate = new Date(tokens.expiry_date);
-    } else {
-      expiryDate.setHours(expiryDate.getHours() + 1);
-    }
-
-    const existingToken = await GmailToken.findOne({ email });
-
-    if (existingToken) {
-      existingToken.access_token = tokens.access_token;
-      if (tokens.refresh_token) {
-        existingToken.refresh_token = tokens.refresh_token;
-      }
-      existingToken.token_type = tokens.token_type || "Bearer";
-      existingToken.expiry_date = expiryDate;
-      existingToken.scope = tokens.scope || "";
-      existingToken.is_active = true;
-      existingToken.last_connected = new Date();
-
-      await existingToken.save();
-      console.log(`✅ Updated existing token for ${email}`);
-    } else {
-      const newToken = new GmailToken({
-        email,
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        token_type: tokens.token_type || "Bearer",
-        expiry_date: expiryDate,
-        scope: tokens.scope || "",
-        is_active: true,
-        last_connected: new Date(),
-      });
-
-      await newToken.save();
-      console.log(`✅ Created new token for ${email}`);
-    }
-
-    await GmailToken.updateMany(
-      { email, is_active: true },
-      { is_active: false },
-    );
-
-    await GmailToken.updateOne({ email }, { is_active: true });
-
-    oauth2Client.setCredentials(tokens);
-    currentGmailClient = null;
-    currentUserEmail = null;
-
-    console.log(`✅ Tokens saved successfully for ${email}`);
-    return { success: true, email };
-  } catch (error) {
-    console.error("❌ Error saving tokens:", error);
-    throw new Error(`Failed to save tokens: ${error.message}`);
-  }
-}
-
-/**
- * Exchange authorization code for tokens
- */
-export async function exchangeCodeForTokens(code, redirectUri) {
-  try {
-    console.log("🔄 Exchanging code for tokens...");
-
-    const tempOAuth2Client = new google.auth.OAuth2(
-      CLIENT_ID,
-      CLIENT_SECRET,
-      redirectUri
-    );
-
-    const { tokens } = await tempOAuth2Client.getToken(code);
-    console.log("✅ Received tokens from Google");
-
-    const result = await saveTokens(tokens);
-
-    console.log(`✅ Tokens exchanged and saved successfully for ${result.email}`);
-    return { ...tokens, email: result.email };
-  } catch (error) {
-    console.error("❌ Error exchanging code for tokens:", error);
-    console.error("Full error:", error.response?.data || error.message);
-    throw new Error(`Failed to exchange code for tokens: ${error.message}`);
-  }
-}
-
-/**
- * Check authentication status
- */
-export async function checkAuth(email = null) {
-  try {
-    console.log("🔐 Checking authentication status...");
-
-    const tokenQuery = email ? { email, is_active: true } : { is_active: true };
-    const tokenDoc = await GmailToken.findOne(tokenQuery).sort({
-      last_connected: -1,
-    });
-
-    if (!tokenDoc) {
-      console.log("❌ No active Gmail tokens found");
-      return {
-        authenticated: false,
-        message: "No Gmail account connected",
-        email: null,
-      };
-    }
-
+  // ✅ KEY FIX: UNREAD count = messagesUnread from INBOX label (most accurate)
+  // This is the actual unread message count, not thread count
+  if (results[0].status === "fulfilled") {
+    counts.UNREAD = results[0].value.data.messagesUnread || 0;
+  } else {
+    // Fallback: query unread messages directly
     try {
-      const gmail = await initializeGmailClient(tokenDoc.email);
-      const profile = await gmail.users.getProfile({ userId: "me" });
-
-      console.log(`✅ Auth check successful for ${tokenDoc.email}`);
-
-      return {
-        authenticated: true,
-        message: "Gmail is connected",
-        email: tokenDoc.email,
-        profile: profile.data,
-      };
-    } catch (error) {
-      console.error("❌ Auth check failed:", error.message);
-
-      tokenDoc.is_active = false;
-      await tokenDoc.save();
-
-      return {
-        authenticated: false,
-        message: `Authentication failed: ${error.message}`,
-        email: tokenDoc.email,
-      };
+      const unreadRes = await gmail.users.messages.list({
+        userId: "me",
+        q: "is:unread in:inbox",
+        maxResults: 1,
+      });
+      counts.UNREAD = unreadRes.data.resultSizeEstimate || 0;
+    } catch {
+      counts.UNREAD = 0;
     }
-  } catch (error) {
-    console.error("❌ Error checking auth status:", error);
-    return {
-      authenticated: false,
-      message: "Error checking authentication status",
-    };
   }
+
+  console.log(`📊 Counts for ${email}:`, counts);
+  return counts;
 }
 
-/**
- * Disconnect Gmail (deactivate token)
- */
-export async function disconnectGmail(email = null) {
-  try {
-    console.log("🔌 Disconnecting Gmail...");
-
-    const tokenQuery = email ? { email, is_active: true } : { is_active: true };
-    const tokenDoc = await GmailToken.findOne(tokenQuery);
-
-    if (tokenDoc) {
-      tokenDoc.is_active = false;
-      await tokenDoc.save();
-      console.log(`✅ Deactivated token for ${tokenDoc.email}`);
-    }
-
-    currentGmailClient = null;
-    currentUserEmail = null;
-    oauth2Client.setCredentials({});
-
-    console.log("✅ Gmail disconnected successfully");
-    return {
-      success: true,
-      message: tokenDoc
-        ? `Gmail disconnected for ${tokenDoc.email}`
-        : "Gmail disconnected successfully",
-    };
-  } catch (error) {
-    console.error("❌ Error disconnecting Gmail:", error);
-    throw error;
-  }
+// ─── HELPER: case-insensitive header lookup ───────────────────────────────────
+function getHeader(headers, name) {
+  if (!headers || !Array.isArray(headers)) return "";
+  const lower = name.toLowerCase();
+  const found = headers.find((h) => h.name && h.name.toLowerCase() === lower);
+  return found ? (found.value || "") : "";
 }
 
-export async function getLabelCounts(email = null) {
-  try {
-    const gmail = await initializeGmailClient(email);
+// ─── LIST THREADS ─────────────────────────────────────────────────────────────
+export async function listThreads(maxResults = 20, pageToken = null, label = "INBOX", email) {
+  if (!email) throw new Error("email required");
+  const gmail = await initializeGmailClient(email);
+  const startTime = Date.now();
 
-    const labelIds = [
-      "INBOX", "UNREAD", "STARRED", "IMPORTANT",
-      "SENT", "SPAM", "TRASH", "DRAFT",
-    ];
-
-    const counts = {};
-
-    for (const labelId of labelIds) {
-      try {
-        const res = await gmail.users.labels.get({
-          userId: "me",
-          id: labelId,
-        });
-        counts[labelId === "DRAFT" ? "DRAFTS" : labelId] =
-          res.data.threadsTotal || 0;
-      } catch (err) {
-        console.error(`Error fetching ${labelId}:`, err.message);
-        counts[labelId] = 0;
-      }
-    }
-
-    console.log("📊 FINAL Gmail counts:", counts);
-    return counts;
-  } catch (error) {
-    console.error("❌ Error getting label counts:", error);
-    throw error;
-  }
-}
-
-/**
- * List threads with OPTIMIZED fetching
- */
-export async function listThreads(
-  maxResults = 20,
-  pageToken = null,
-  label = "INBOX",
-  email = null,
-) {
-  try {
-    const gmail = await initializeGmailClient(email);
-    const startTime = Date.now();
-
-    let params = {
+  // ── DRAFTS ──────────────────────────────────────────────────────────────────
+  if (label === "DRAFTS") {
+    const listRes = await gmail.users.drafts.list({
       userId: "me",
-      maxResults: maxResults,
-      pageToken: pageToken,
-      includeSpamTrash: label === "SPAM" || label === "TRASH",
-    };
+      maxResults,
+      pageToken: pageToken || undefined,
+    });
 
-    switch (label) {
-      case "INBOX":
-        params.labelIds = ["INBOX"];
-        break;
-      case "UNREAD":
-        params.q = "is:unread";
-        params.labelIds = ["INBOX"];
-        break;
-      case "STARRED":
-        params.labelIds = ["STARRED"];
-        break;
-      case "IMPORTANT":
-        params.labelIds = ["IMPORTANT"];
-        break;
-      case "SENT":
-        params.labelIds = ["SENT"];
-        break;
-      case "SPAM":
-        params.labelIds = ["SPAM"];
-        break;
-      case "TRASH":
-        params.labelIds = ["TRASH"];
-        break;
-      case "DRAFTS":
-        const draftsRes = await gmail.users.drafts.list({
+    const drafts = listRes.data.drafts || [];
+    if (!drafts.length) return { threads: [], nextPageToken: null, resultSizeEstimate: 0 };
+
+    const results = await Promise.allSettled(
+      drafts.map((draft) =>
+        gmail.users.messages.get({
           userId: "me",
-          maxResults: maxResults,
-          pageToken: pageToken,
-        });
-
-        const drafts = draftsRes.data.drafts || [];
-        const draftPromises = drafts.map(async (draft) => {
-          try {
-            const message = draft.message;
-            const headers = message?.payload?.headers || [];
-
-            return {
-              id: draft.id,
-              threadId: message?.threadId || draft.id,
-              snippet: message?.snippet || "",
-              subject:
-                headers.find((h) => h.name === "Subject")?.value || "No Subject",
-              from: headers.find((h) => h.name === "From")?.value || "Unknown",
-              to: headers.find((h) => h.name === "To")?.value || "",
-              date:
-                headers.find((h) => h.name === "Date")?.value ||
-                new Date().toISOString(),
-              timestamp: Date.now(),
-              unread: false,
-              starred: false,
-              important: false,
-              spam: false,
-              trash: false,
-              isDraft: true,
-              messagesCount: 1,
-            };
-          } catch (err) {
-            return null;
-          }
-        });
-
-        const draftResults = await Promise.all(draftPromises);
-        const validDrafts = draftResults.filter((d) => d !== null);
-
-        console.log(`✅ Fetched ${validDrafts.length} drafts in ${Date.now() - startTime}ms`);
-
-        return {
-          threads: validDrafts,
-          nextPageToken: draftsRes.data.nextPageToken,
-          resultSizeEstimate: validDrafts.length,
-        };
-
-      default:
-        params.labelIds = [label];
-    }
-
-    const res = await gmail.users.threads.list(params);
-    const threads = res.data.threads || [];
-
-    console.log(`📋 Got ${threads.length} thread IDs from ${label}`);
-
-    if (threads.length === 0) {
-      return {
-        threads: [],
-        nextPageToken: res.data.nextPageToken,
-        resultSizeEstimate: res.data.resultSizeEstimate || 0,
-      };
-    }
-
-    const detailedThreads = [];
-
-    const threadPromises = threads.map(async (thread) => {
-      try {
-        const threadRes = await gmail.users.threads.get({
-          userId: "me",
-          id: thread.id,
+          id: draft.message.id,
           format: "metadata",
-          metadataHeaders: ["Subject", "From", "Date", "To"],
-        });
-
-        const messages = threadRes.data.messages || [];
-        const firstMessage = messages[0];
-
-        if (!firstMessage) return null;
-
-        const headers = firstMessage?.payload?.headers || [];
-
-        const subject = headers.find((h) => h.name === "Subject")?.value || "No Subject";
-        const from = headers.find((h) => h.name === "From")?.value || "Unknown";
-        const to = headers.find((h) => h.name === "To")?.value || "";
-        const date = headers.find((h) => h.name === "Date")?.value || "";
-
-        const labelIds = firstMessage?.labelIds || [];
-
-        let timestamp = 0;
-        if (date) timestamp = new Date(date).getTime();
-
-        return {
-          id: thread.id,
-          snippet: thread.snippet || "",
-          subject,
-          from,
-          to,
-          date,
-          timestamp,
-          unread: labelIds.includes("UNREAD"),
-          starred: labelIds.includes("STARRED"),
-          important: labelIds.includes("IMPORTANT"),
-          spam: labelIds.includes("SPAM"),
-          trash: labelIds.includes("TRASH"),
-          drafts: labelIds.includes("DRAFT"),
-          messagesCount: messages.length,
-        };
-      } catch (err) {
-        console.error(`Error fetching thread ${thread.id}:`, err.message);
-        return {
-          id: thread.id,
-          snippet: thread.snippet || "",
-          subject: "No Subject",
-          from: "Unknown",
-          to: "",
-          date: "",
-          timestamp: 0,
-          unread: false,
-          starred: false,
-          important: false,
-          spam: false,
-          trash: false,
-          drafts: false,
-          messagesCount: 0,
-        };
-      }
-    });
-
-    const results = await Promise.all(threadPromises);
-    for (const result of results) {
-      if (result) detailedThreads.push(result);
-    }
-
-    detailedThreads.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-
-    const duration = Date.now() - startTime;
-    console.log(`✅ Fetched ${detailedThreads.length} threads in ${duration}ms`);
-
-    return {
-      threads: detailedThreads,
-      nextPageToken: res.data.nextPageToken,
-      resultSizeEstimate: res.data.resultSizeEstimate || detailedThreads.length,
-    };
-  } catch (error) {
-    console.error("❌ Error listing threads:", error);
-    throw error;
-  }
-}
-
-/**
- * Mark thread as read/unread
- */
-export async function markAsRead(threadId, read = true, email = null) {
-  try {
-    const gmail = await initializeGmailClient(email);
-
-    const res = await gmail.users.threads.modify({
-      userId: "me",
-      id: threadId,
-      requestBody: {
-        addLabelIds: read ? [] : ["UNREAD"],
-        removeLabelIds: read ? ["UNREAD"] : [],
-      },
-    });
-
-    console.log(`✅ Thread ${threadId} marked as ${read ? "read" : "unread"}`);
-    return { success: true, ...res.data };
-  } catch (error) {
-    console.error("❌ Error marking thread:", error);
-    throw error;
-  }
-}
-
-/**
- * Send email with attachments
- * ✅ FIX: Only check per-attachment size (25MB each), NOT total email size
- */
-export async function sendEmailWithAttachments(
-  to,
-  subject,
-  message,
-  cc = "",
-  bcc = "",
-  attachments = [],
-  files = [],
-  email = null,
-) {
-  try {
-    const startTime = Date.now();
-    console.log("🚀 Starting email send process...");
-
-    const emailList = processEmailList(to);
-    if (emailList.length === 0) {
-      throw new Error(`Invalid recipient email address: ${to}`);
-    }
-
-    const gmail = await initializeGmailClient(email);
-
-    const tokenDoc = await GmailToken.findOne({ is_active: true });
-    if (!tokenDoc) {
-      throw new Error("No active Gmail account found");
-    }
-    const fromEmail = tokenDoc.email;
-
-    const allAttachments = [];
-
-    // Process attachments array (from route handler)
-    if (attachments && attachments.length > 0) {
-      for (const attachment of attachments) {
-        if (attachment.content && attachment.filename) {
-          // ✅ Check individual attachment size only (25MB per attachment)
-          if (attachment.size && attachment.size > ATTACHMENT_MAX_SIZE) {
-            throw new Error(
-              `Attachment "${attachment.filename}" is ${(attachment.size / 1024 / 1024).toFixed(2)}MB which exceeds the 25MB per-attachment limit. Please reduce the file size.`
-            );
-          }
-          allAttachments.push({
-            filename: attachment.filename,
-            content: attachment.content,
-            mimetype:
-              attachment.mimetype ||
-              mime.lookup(attachment.filename) ||
-              "application/octet-stream",
-            size: attachment.size || 0,
-          });
-          console.log(`📎 Attachment ready: ${attachment.filename} (${((attachment.size || 0) / 1024 / 1024).toFixed(2)}MB)`);
-        }
-      }
-    }
-
-    // Process files array (from multer)
-    if (files && files.length > 0) {
-      for (const file of files) {
-        if (file.buffer && file.originalname) {
-          // ✅ Check individual attachment size only (25MB per attachment)
-          if (file.size > ATTACHMENT_MAX_SIZE) {
-            throw new Error(
-              `Attachment "${file.originalname}" is ${(file.size / 1024 / 1024).toFixed(2)}MB which exceeds the 25MB per-attachment limit. Please reduce the file size.`
-            );
-          }
-
-          allAttachments.push({
-            filename: file.originalname,
-            content: file.buffer.toString("base64"),
-            mimetype:
-              file.mimetype ||
-              mime.lookup(file.originalname) ||
-              "application/octet-stream",
-            size: file.size,
-          });
-          console.log(`📎 File attachment ready: ${file.originalname} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
-        }
-      }
-    }
-
-    console.log(`📧 Total attachments to send: ${allAttachments.length}`);
-
-    const fullTo = emailList.join(", ");
-    const ccList = processEmailList(cc);
-    const bccList = processEmailList(bcc);
-    const fullCc = ccList.join(", ");
-    const fullBcc = bccList.join(", ");
-
-    const boundary = `boundary_${Date.now()}_${Math.random().toString(36).substring(2)}`;
-    const nl = "\r\n";
-
-    let emailParts = [
-      `MIME-Version: 1.0`,
-      `To: ${fullTo}`,
-      `From: ${fromEmail}`,
-      `Subject: ${subject || "(No Subject)"}`,
-    ];
-
-    if (fullCc) emailParts.push(`Cc: ${fullCc}`);
-    if (fullBcc) emailParts.push(`Bcc: ${fullBcc}`);
-
-    emailParts.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
-    emailParts.push("");
-
-    // Text part
-    emailParts.push(`--${boundary}`);
-    emailParts.push(`Content-Type: text/plain; charset="UTF-8"`);
-    emailParts.push(`Content-Transfer-Encoding: quoted-printable`);
-    emailParts.push("");
-    emailParts.push(message || " ");
-    emailParts.push("");
-
-    // HTML part
-    emailParts.push(`--${boundary}`);
-    emailParts.push(`Content-Type: text/html; charset="UTF-8"`);
-    emailParts.push(`Content-Transfer-Encoding: quoted-printable`);
-    emailParts.push("");
-    emailParts.push(
-      `<div style="font-family: Arial, sans-serif;">${message || " "}</div>`,
-    );
-    emailParts.push("");
-
-    // ✅ Add ALL attachment types: images, pdf, audio, video, word, excel, zip, any file
-    if (allAttachments.length > 0) {
-      for (const attachment of allAttachments) {
-        try {
-          const mimeType =
-            attachment.mimetype ||
-            mime.lookup(attachment.filename) ||
-            "application/octet-stream";
-
-          // RFC 2822: base64 lines max 76 chars
-          const base64Content = attachment.content
-            .replace(/\s/g, "")
-            .match(/.{1,76}/g)
-            .join(nl);
-
-          emailParts.push(`--${boundary}`);
-          emailParts.push(`Content-Type: ${mimeType}; name="${attachment.filename}"`);
-          emailParts.push(`Content-Disposition: attachment; filename="${attachment.filename}"`);
-          emailParts.push(`Content-Transfer-Encoding: base64`);
-          emailParts.push("");
-          emailParts.push(base64Content);
-          emailParts.push("");
-
-          console.log(`✅ Added attachment: ${attachment.filename} (${mimeType})`);
-        } catch (attErr) {
-          console.error(`❌ Error adding attachment ${attachment.filename}:`, attErr);
-          throw new Error(`Failed to process attachment: ${attachment.filename}`);
-        }
-      }
-    }
-
-    emailParts.push(`--${boundary}--`);
-    emailParts.push("");
-
-    const emailString = emailParts.join(nl);
-
-    // ✅ Removed total email size check — only per-attachment 25MB limit applies
-    // Convert to base64url
-    const base64Email = Buffer.from(emailString, "utf8")
-      .toString("base64")
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/, "");
-
-    const res = await gmail.users.messages.send({
-      userId: "me",
-      requestBody: {
-        raw: base64Email,
-      },
-    });
-
-    const duration = (Date.now() - startTime) / 1000;
-    console.log(`✅ Email sent successfully in ${duration.toFixed(2)}s!`);
-
-    return {
-      success: true,
-      id: res.data.id,
-      threadId: res.data.threadId,
-      labelIds: res.data.labelIds || [],
-      sendTime: duration,
-    };
-  } catch (error) {
-    console.error("❌ Error in sendEmailWithAttachments:", error);
-    throw error;
-  }
-}
-
-/**
- * Save draft
- */
-export async function saveDraft(
-  to,
-  subject,
-  message,
-  cc = "",
-  bcc = "",
-  attachments = [],
-  files = [],
-  email = null,
-) {
-  try {
-    console.log("📝 Creating draft...");
-
-    const gmail = await initializeGmailClient(email);
-
-    const tokenDoc = await GmailToken.findOne({ is_active: true });
-    if (!tokenDoc) {
-      throw new Error("No active Gmail account found");
-    }
-    const fromEmail = tokenDoc.email;
-
-    const allAttachments = [];
-
-    if (attachments && attachments.length > 0) {
-      allAttachments.push(...attachments);
-    }
-
-    if (files && files.length > 0) {
-      for (const file of files) {
-        if (file.buffer && file.originalname) {
-          allAttachments.push({
-            filename: file.originalname,
-            content: file.buffer.toString("base64"),
-            mimetype: file.mimetype,
-            size: file.size,
-          });
-        }
-      }
-    }
-
-    const emailResult = await createDraftMessage(
-      to,
-      subject,
-      message,
-      cc,
-      bcc,
-      allAttachments,
-      fromEmail,
+          metadataHeaders: ["Subject", "From", "To", "Date"],
+        })
+      )
     );
 
-    const res = await gmail.users.drafts.create({
-      userId: "me",
-      requestBody: {
-        message: {
-          raw: emailResult.raw,
-        },
-      },
-    });
+    const threads = drafts.map((draft, idx) => {
+      if (results[idx].status !== "fulfilled") return null;
+      const msg = results[idx].value.data;
+      const headers = msg.payload?.headers || [];
+      const date = getHeader(headers, "Date");
+      return {
+        id: draft.id,
+        threadId: draft.message?.threadId || draft.id,
+        snippet: msg.snippet || "",
+        subject: getHeader(headers, "Subject") || "(No Subject)",
+        from: getHeader(headers, "From") || email,
+        to: getHeader(headers, "To"),
+        date,
+        timestamp: date ? new Date(date).getTime() : Date.now(),
+        unread: false,
+        starred: false,
+        important: false,
+        isDraft: true,
+        messagesCount: 1,
+      };
+    }).filter(Boolean);
 
-    console.log("✅ Draft saved successfully");
+    return { threads, nextPageToken: listRes.data.nextPageToken, resultSizeEstimate: threads.length };
+  }
+
+  // ── REGULAR LABELS ──────────────────────────────────────────────────────────
+  let params = {
+    userId: "me",
+    maxResults,
+    pageToken: pageToken || undefined,
+    includeSpamTrash: label === "SPAM" || label === "TRASH",
+  };
+
+  switch (label) {
+    case "INBOX":     params.labelIds = ["INBOX"]; break;
+    // ✅ KEY FIX: UNREAD — fetch all unread (not just inbox unread)
+    case "UNREAD":
+      params.q = "is:unread";
+      delete params.labelIds; // Don't restrict to INBOX — show ALL unread
+      params.includeSpamTrash = false;
+      break;
+    case "STARRED":   params.labelIds = ["STARRED"]; break;
+    case "IMPORTANT": params.labelIds = ["IMPORTANT"]; break;
+    case "SENT":      params.labelIds = ["SENT"]; break;
+    case "SPAM":      params.labelIds = ["SPAM"]; break;
+    case "TRASH":     params.labelIds = ["TRASH"]; break;
+    default:          params.labelIds = [label];
+  }
+
+  const listRes = await gmail.users.threads.list(params);
+  const threadStubs = listRes.data.threads || [];
+
+  if (!threadStubs.length) {
+    return { threads: [], nextPageToken: listRes.data.nextPageToken, resultSizeEstimate: 0 };
+  }
+
+  // ✅ KEY FIX: Fetch threads in parallel with metadata for speed
+  const results = await Promise.allSettled(
+    threadStubs.map((t) =>
+      gmail.users.threads.get({
+        userId: "me",
+        id: t.id,
+        format: "metadata",
+        metadataHeaders: ["Subject", "From", "To", "Date", "Reply-To"],
+      })
+    )
+  );
+
+  const threads = results.map((result, idx) => {
+    const stub = threadStubs[idx];
+    if (result.status !== "fulfilled") {
+      return {
+        id: stub.id,
+        snippet: stub.snippet || "",
+        subject: "(No Subject)",
+        from: "Unknown",
+        to: "",
+        date: "",
+        timestamp: 0,
+        unread: false,
+        starred: false,
+        important: false,
+        spam: false,
+        trash: false,
+        isDraft: false,
+        messagesCount: 0,
+      };
+    }
+
+    const threadData = result.value.data;
+    const messages = threadData.messages || [];
+
+    // Use first message for subject (original), last message for sender (most recent)
+    const lastMsg = messages[messages.length - 1];
+    const firstMsg = messages[0];
+
+    const lastHeaders = lastMsg?.payload?.headers || [];
+    const firstHeaders = firstMsg?.payload?.headers || [];
+
+    const subject = getHeader(firstHeaders, "Subject") || getHeader(lastHeaders, "Subject") || "(No Subject)";
+
+    let from;
+    if (label === "SENT") {
+      from = getHeader(lastHeaders, "To") || getHeader(firstHeaders, "To") || "Unknown";
+    } else {
+      from = getHeader(lastHeaders, "From") || getHeader(firstHeaders, "From") || "Unknown";
+    }
+
+    const to = getHeader(firstHeaders, "To");
+    const date = getHeader(lastHeaders, "Date") || getHeader(firstHeaders, "Date");
+
+    // ✅ KEY FIX: Check ALL messages in thread for unread status
+    const allLabelIds = messages.flatMap((m) => m.labelIds || []);
+    const lastLabelIds = lastMsg?.labelIds || firstMsg?.labelIds || [];
 
     return {
-      success: true,
-      id: res.data.id,
-      message: "Draft saved successfully",
-    };
-  } catch (error) {
-    console.error("❌ Error saving draft:", error);
-    throw error;
-  }
-}
-
-/**
- * Create draft message (helper)
- */
-async function createDraftMessage(
-  to,
-  subject,
-  message,
-  cc = "",
-  bcc = "",
-  attachments = [],
-  fromEmail,
-) {
-  const boundary = `boundary_${Date.now()}_${Math.random().toString(36).substring(2)}`;
-  const nl = "\r\n";
-
-  let emailParts = [
-    `MIME-Version: 1.0`,
-    `To: ${to}`,
-    `From: ${fromEmail}`,
-    `Subject: ${subject || "(No Subject)"}`,
-  ];
-
-  if (cc) emailParts.push(`Cc: ${cc}`);
-  if (bcc) emailParts.push(`Bcc: ${bcc}`);
-
-  emailParts.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
-  emailParts.push("");
-
-  emailParts.push(`--${boundary}`);
-  emailParts.push(`Content-Type: text/plain; charset="UTF-8"`);
-  emailParts.push(`Content-Transfer-Encoding: quoted-printable`);
-  emailParts.push("");
-  emailParts.push(message || " ");
-  emailParts.push("");
-
-  if (attachments && attachments.length > 0) {
-    for (const attachment of attachments) {
-      const mimeType =
-        attachment.mimetype ||
-        mime.lookup(attachment.filename) ||
-        "application/octet-stream";
-
-      const base64Content = attachment.content
-        .replace(/\s/g, "")
-        .match(/.{1,76}/g)
-        .join(nl);
-
-      emailParts.push(`--${boundary}`);
-      emailParts.push(`Content-Type: ${mimeType}; name="${attachment.filename}"`);
-      emailParts.push(`Content-Disposition: attachment; filename="${attachment.filename}"`);
-      emailParts.push(`Content-Transfer-Encoding: base64`);
-      emailParts.push("");
-      emailParts.push(base64Content);
-      emailParts.push("");
-    }
-  }
-
-  emailParts.push(`--${boundary}--`);
-  emailParts.push("");
-
-  const emailString = emailParts.join(nl);
-
-  const base64Email = Buffer.from(emailString, "utf8")
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-
-  return { raw: base64Email };
-}
-
-/**
- * Get drafts
- */
-export async function getDrafts(maxResults = 20, email = null) {
-  try {
-    const gmail = await initializeGmailClient(email);
-
-    const res = await gmail.users.drafts.list({
-      userId: "me",
-      maxResults: maxResults,
-    });
-
-    return res.data.drafts || [];
-  } catch (error) {
-    console.error("❌ Error getting drafts:", error);
-    throw error;
-  }
-}
-
-/**
- * Get a single draft with full content
- */
-export async function getDraft(draftId, email = null) {
-  try {
-    const gmail = await initializeGmailClient(email);
-    const res = await gmail.users.drafts.get({
-      userId: "me",
-      id: draftId,
-      format: "full",
-    });
-
-    const message = res.data.message;
-    const headers = message?.payload?.headers || [];
-    const subject = headers.find((h) => h.name === "Subject")?.value || "No Subject";
-    const from = headers.find((h) => h.name === "From")?.value || "Unknown";
-    const to = headers.find((h) => h.name === "To")?.value || "";
-    const date = headers.find((h) => h.name === "Date")?.value || "";
-    const cc = headers.find((h) => h.name === "Cc")?.value || "";
-    const bcc = headers.find((h) => h.name === "Bcc")?.value || "";
-
-    const content = extractContent(message?.payload?.parts || [message?.payload]);
-
-    const processedMessage = {
-      id: message.id,
-      snippet: message.snippet,
+      id: stub.id,
+      snippet: stub.snippet || threadData.snippet || "",
       subject,
       from,
       to,
-      cc,
-      bcc,
       date,
+      timestamp: date ? new Date(date).getTime() : 0,
+      // ✅ KEY FIX: unread = ANY message in thread has UNREAD label
+      unread: allLabelIds.includes("UNREAD"),
+      starred: allLabelIds.includes("STARRED"),
+      important: allLabelIds.includes("IMPORTANT"),
+      spam: lastLabelIds.includes("SPAM"),
+      trash: lastLabelIds.includes("TRASH"),
+      isDraft: lastLabelIds.includes("DRAFT"),
+      messagesCount: messages.length,
+    };
+  }).filter(Boolean);
+
+  threads.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  console.log(`✅ ${email}: ${threads.length} threads for ${label} in ${Date.now() - startTime}ms`);
+
+  return {
+    threads,
+    nextPageToken: listRes.data.nextPageToken,
+    resultSizeEstimate: listRes.data.resultSizeEstimate || threads.length,
+  };
+}
+
+// ─── GET THREAD (full content) ────────────────────────────────────────────────
+export async function getThread(threadId, email) {
+  if (!email) throw new Error("email required");
+  const gmail = await initializeGmailClient(email);
+
+  const res = await gmail.users.threads.get({ userId: "me", id: threadId, format: "full" });
+
+  const processedMessages = (res.data.messages || []).map((message) => {
+    const headers = message.payload?.headers || [];
+    const labelIds = message.labelIds || [];
+    const content = extractContent(message.payload);
+
+    return {
+      id: message.id,
+      snippet: message.snippet,
+      subject: getHeader(headers, "Subject") || "(No Subject)",
+      from: getHeader(headers, "From") || "Unknown Sender",
+      to: getHeader(headers, "To"),
+      date: getHeader(headers, "Date"),
+      cc: getHeader(headers, "Cc"),
+      bcc: getHeader(headers, "Bcc"),
+      replyTo: getHeader(headers, "Reply-To"),
+      body: content.text,
+      htmlBody: content.html,
+      attachments: content.attachments,
+      hasAttachments: content.attachments.length > 0,
+      unread: labelIds.includes("UNREAD"),
+      starred: labelIds.includes("STARRED"),
+      important: labelIds.includes("IMPORTANT"),
+      spam: labelIds.includes("SPAM"),
+      trash: labelIds.includes("TRASH"),
+      isDraft: labelIds.includes("DRAFT"),
+      labelIds,
+    };
+  });
+
+  return { ...res.data, messages: processedMessages };
+}
+
+// ─── MARK AS READ ─────────────────────────────────────────────────────────────
+export async function markAsRead(threadId, read = true, email) {
+  const gmail = await initializeGmailClient(email);
+  const res = await gmail.users.threads.modify({
+    userId: "me",
+    id: threadId,
+    requestBody: {
+      addLabelIds: read ? [] : ["UNREAD"],
+      removeLabelIds: read ? ["UNREAD"] : [],
+    },
+  });
+  return { success: true, ...res.data };
+}
+
+// ─── SEND EMAIL ───────────────────────────────────────────────────────────────
+export async function sendEmailWithAttachments(to, subject, message, cc = "", bcc = "", attachments = [], files = [], email) {
+  if (!email) throw new Error("email required");
+  const gmail = await initializeGmailClient(email);
+  const fromEmail = email;
+
+  const emailList = processEmailList(to);
+  if (!emailList.length) throw new Error(`Invalid recipient: ${to}`);
+
+  const allAttachments = [];
+  for (const att of attachments) {
+    if (att.content && att.filename) {
+      if (att.size > ATTACHMENT_MAX_SIZE) throw new Error(`"${att.filename}" exceeds 25MB`);
+      allAttachments.push({ ...att, mimetype: att.mimetype || mime.lookup(att.filename) || "application/octet-stream" });
+    }
+  }
+  for (const file of files) {
+    if (file.buffer && file.originalname) {
+      if (file.size > ATTACHMENT_MAX_SIZE) throw new Error(`"${file.originalname}" exceeds 25MB`);
+      allAttachments.push({
+        filename: file.originalname,
+        content: file.buffer.toString("base64"),
+        mimetype: file.mimetype || mime.lookup(file.originalname) || "application/octet-stream",
+        size: file.size,
+      });
+    }
+  }
+
+  const boundary = `gmailbnd_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+  const nl = "\r\n";
+  const ccList = processEmailList(cc).join(", ");
+  const bccList = processEmailList(bcc).join(", ");
+
+  const parts = [
+    "MIME-Version: 1.0",
+    `To: ${emailList.join(", ")}`,
+    `From: ${fromEmail}`,
+    `Subject: ${subject || "(No Subject)"}`,
+  ];
+  if (ccList) parts.push(`Cc: ${ccList}`);
+  if (bccList) parts.push(`Bcc: ${bccList}`);
+  parts.push(`Content-Type: multipart/mixed; boundary="${boundary}"`, "");
+
+  parts.push(`--${boundary}`, `Content-Type: text/plain; charset="UTF-8"`, "Content-Transfer-Encoding: quoted-printable", "", message || " ", "");
+  parts.push(
+    `--${boundary}`,
+    `Content-Type: text/html; charset="UTF-8"`,
+    "Content-Transfer-Encoding: quoted-printable",
+    "",
+    `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6">${(message || " ").replace(/\n/g, "<br>")}</div>`,
+    ""
+  );
+
+  for (const att of allAttachments) {
+    const b64 = att.content.replace(/\s/g, "").match(/.{1,76}/g)?.join(nl) || att.content;
+    parts.push(
+      `--${boundary}`,
+      `Content-Type: ${att.mimetype}; name="${att.filename}"`,
+      `Content-Disposition: attachment; filename="${att.filename}"`,
+      "Content-Transfer-Encoding: base64",
+      "",
+      b64,
+      ""
+    );
+  }
+  parts.push(`--${boundary}--`, "");
+
+  const raw = Buffer.from(parts.join(nl), "utf8").toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const startTime = Date.now();
+  const res = await gmail.users.messages.send({ userId: "me", requestBody: { raw } });
+  const duration = (Date.now() - startTime) / 1000;
+  console.log(`✅ Email sent for ${email} in ${duration.toFixed(2)}s`);
+  return { success: true, id: res.data.id, threadId: res.data.threadId, labelIds: res.data.labelIds || [], sendTime: duration };
+}
+
+// sendEmail alias
+export async function sendEmail(to, subject, message, cc = "", bcc = "", attachments = [], files = [], email) {
+  return sendEmailWithAttachments(to, subject, message, cc, bcc, attachments, files, email);
+}
+
+// ─── SAVE DRAFT ───────────────────────────────────────────────────────────────
+export async function saveDraft(to, subject, message, cc = "", bcc = "", attachments = [], files = [], email) {
+  if (!email) throw new Error("email required");
+  const gmail = await initializeGmailClient(email);
+
+  const allAtts = [...attachments];
+  for (const file of files) {
+    if (file.buffer && file.originalname) {
+      allAtts.push({ filename: file.originalname, content: file.buffer.toString("base64"), mimetype: file.mimetype, size: file.size });
+    }
+  }
+
+  const boundary = `gmailbnd_${Date.now()}`;
+  const nl = "\r\n";
+  const parts = ["MIME-Version: 1.0", `To: ${to}`, `From: ${email}`, `Subject: ${subject || "(No Subject)"}`];
+  if (cc) parts.push(`Cc: ${cc}`);
+  if (bcc) parts.push(`Bcc: ${bcc}`);
+  parts.push(`Content-Type: multipart/mixed; boundary="${boundary}"`, "");
+  parts.push(`--${boundary}`, `Content-Type: text/plain; charset="UTF-8"`, "Content-Transfer-Encoding: quoted-printable", "", message || " ", "");
+
+  for (const att of allAtts) {
+    const b64 = att.content.replace(/\s/g, "").match(/.{1,76}/g)?.join(nl) || att.content;
+    parts.push(
+      `--${boundary}`,
+      `Content-Type: ${att.mimetype || "application/octet-stream"}; name="${att.filename}"`,
+      `Content-Disposition: attachment; filename="${att.filename}"`,
+      "Content-Transfer-Encoding: base64",
+      "",
+      b64,
+      ""
+    );
+  }
+  parts.push(`--${boundary}--`, "");
+
+  const raw = Buffer.from(parts.join(nl), "utf8").toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const res = await gmail.users.drafts.create({ userId: "me", requestBody: { message: { raw } } });
+  return { success: true, id: res.data.id };
+}
+
+// ─── GET DRAFTS ───────────────────────────────────────────────────────────────
+export async function getDrafts(maxResults = 20, email) {
+  if (!email) throw new Error("email required");
+  const gmail = await initializeGmailClient(email);
+  const listRes = await gmail.users.drafts.list({ userId: "me", maxResults });
+  const drafts = listRes.data.drafts || [];
+  if (!drafts.length) return [];
+
+  const results = await Promise.allSettled(
+    drafts.map((d) =>
+      gmail.users.messages.get({
+        userId: "me",
+        id: d.message.id,
+        format: "metadata",
+        metadataHeaders: ["Subject", "From", "To", "Date"],
+      })
+    )
+  );
+
+  return drafts.map((draft, idx) => {
+    if (results[idx].status !== "fulfilled") return null;
+    const msg = results[idx].value.data;
+    const headers = msg.payload?.headers || [];
+    const date = getHeader(headers, "Date");
+    return {
+      id: draft.id,
+      threadId: draft.message?.threadId,
+      snippet: msg.snippet || "",
+      subject: getHeader(headers, "Subject") || "(No Subject)",
+      from: getHeader(headers, "From") || email,
+      to: getHeader(headers, "To"),
+      date,
+      timestamp: date ? new Date(date).getTime() : Date.now(),
+      unread: false,
+      starred: false,
+      important: false,
+      isDraft: true,
+      messagesCount: 1,
+    };
+  }).filter(Boolean);
+}
+
+// ─── GET DRAFT (single) ───────────────────────────────────────────────────────
+export async function getDraft(draftId, email) {
+  if (!email) throw new Error("email required");
+  const gmail = await initializeGmailClient(email);
+  const res = await gmail.users.drafts.get({ userId: "me", id: draftId, format: "full" });
+  const message = res.data.message;
+  const headers = message?.payload?.headers || [];
+  const content = extractContent(message?.payload);
+  return {
+    messages: [{
+      id: message.id,
+      snippet: message.snippet,
+      subject: getHeader(headers, "Subject") || "(No Subject)",
+      from: getHeader(headers, "From"),
+      to: getHeader(headers, "To"),
+      cc: getHeader(headers, "Cc"),
+      bcc: getHeader(headers, "Bcc"),
+      date: getHeader(headers, "Date"),
       body: content.text,
       htmlBody: content.html,
       attachments: content.attachments,
       hasAttachments: content.attachments.length > 0,
       labelIds: message.labelIds || [],
       isDraft: true,
-    };
-
-    return {
-      messages: [processedMessage],
-    };
-  } catch (error) {
-    console.error("❌ Error getting draft:", error);
-    throw error;
-  }
+    }],
+  };
 }
 
-/**
- * Get single thread with full content
- */
-export async function getThread(threadId, email = null) {
-  try {
-    const gmail = await initializeGmailClient(email);
-    const res = await gmail.users.threads.get({
-      userId: "me",
-      id: threadId,
-    });
-
-    console.log(`✅ Fetched thread ${threadId}`);
-
-    const processedMessages = (res.data.messages || []).map((message) => {
-      const headers = message.payload?.headers || [];
-      const subject = headers.find((h) => h.name === "Subject")?.value || "No Subject";
-      const from = headers.find((h) => h.name === "From")?.value || "Unknown Sender";
-      const to = headers.find((h) => h.name === "To")?.value || "";
-      const date = headers.find((h) => h.name === "Date")?.value || "";
-      const cc = headers.find((h) => h.name === "Cc")?.value || "";
-      const bcc = headers.find((h) => h.name === "Bcc")?.value || "";
-
-      const labelIds = message.labelIds || [];
-      const content = extractContent(message.payload?.parts || [message.payload]);
-
-      return {
-        id: message.id,
-        snippet: message.snippet,
-        subject,
-        from,
-        to,
-        cc,
-        bcc,
-        date,
-        body: content.text,
-        htmlBody: content.html,
-        attachments: content.attachments,
-        hasAttachments: content.attachments.length > 0,
-        unread: labelIds.includes("UNREAD"),
-        starred: labelIds.includes("STARRED"),
-        important: labelIds.includes("IMPORTANT"),
-        spam: labelIds.includes("SPAM"),
-        trash: labelIds.includes("TRASH"),
-        drafts: labelIds.includes("DRAFT"),
-        labelIds: labelIds,
-      };
-    });
-
-    return {
-      ...res.data,
-      messages: processedMessages,
-    };
-  } catch (error) {
-    console.error("❌ Error getting thread:", error);
-    throw error;
-  }
+// ─── GET ATTACHMENT ───────────────────────────────────────────────────────────
+export async function getAttachment(messageId, attachmentId, email) {
+  const gmail = await initializeGmailClient(email);
+  const res = await gmail.users.messages.attachments.get({ userId: "me", messageId, id: attachmentId });
+  return { data: res.data.data, size: res.data.size };
 }
 
-/**
- * Get attachment
- */
-export async function getAttachment(messageId, attachmentId, email = null) {
-  try {
-    const gmail = await initializeGmailClient(email);
-    const res = await gmail.users.messages.attachments.get({
-      userId: "me",
-      messageId: messageId,
-      id: attachmentId,
-    });
-
-    return {
-      data: res.data.data,
-      size: res.data.size,
-    };
-  } catch (error) {
-    console.error("❌ Error fetching attachment:", error);
-    throw error;
-  }
+// ─── DELETE ───────────────────────────────────────────────────────────────────
+export async function deleteThread(threadId, email) {
+  const gmail = await initializeGmailClient(email);
+  await gmail.users.threads.delete({ userId: "me", id: threadId });
+  return { success: true };
 }
 
-/**
- * Delete thread
- */
-export async function deleteThread(threadId, email = null) {
-  try {
-    const gmail = await initializeGmailClient(email);
-
-    const res = await gmail.users.threads.delete({
-      userId: "me",
-      id: threadId,
-    });
-
-    console.log(`✅ Thread ${threadId} deleted`);
-    return { success: true, ...res.data };
-  } catch (error) {
-    console.error("❌ Error deleting thread:", error);
-    throw error;
-  }
+export async function deleteEmail(messageId, email) {
+  const gmail = await initializeGmailClient(email);
+  await gmail.users.messages.delete({ userId: "me", id: messageId });
+  return { success: true };
 }
 
-/**
- * Delete email
- */
-export async function deleteEmail(messageId, email = null) {
-  try {
-    const gmail = await initializeGmailClient(email);
-
-    const res = await gmail.users.messages.delete({
-      userId: "me",
-      id: messageId,
-    });
-
-    console.log(`✅ Email ${messageId} deleted`);
-    return { success: true, ...res.data };
-  } catch (error) {
-    console.error("❌ Error deleting email:", error);
-    throw error;
-  }
+export async function deleteDraft(draftId, email) {
+  const gmail = await initializeGmailClient(email);
+  await gmail.users.drafts.delete({ userId: "me", id: draftId });
+  return { success: true };
 }
 
-/**
- * Star/unstar thread
- */
-export async function starThread(threadId, star = true, email = null) {
-  try {
-    const gmail = await initializeGmailClient(email);
-
-    const res = await gmail.users.threads.modify({
-      userId: "me",
-      id: threadId,
-      requestBody: {
-        addLabelIds: star ? ["STARRED"] : [],
-        removeLabelIds: star ? [] : ["STARRED"],
-      },
-    });
-
-    console.log(`✅ Thread ${threadId} ${star ? "starred" : "unstarred"}`);
-    return { success: true, ...res.data };
-  } catch (error) {
-    console.error("❌ Error starring thread:", error);
-    throw error;
-  }
+// ─── THREAD ACTIONS ───────────────────────────────────────────────────────────
+export async function starThread(threadId, star = true, email) {
+  const gmail = await initializeGmailClient(email);
+  const res = await gmail.users.threads.modify({
+    userId: "me",
+    id: threadId,
+    requestBody: { addLabelIds: star ? ["STARRED"] : [], removeLabelIds: star ? [] : ["STARRED"] },
+  });
+  return { success: true, ...res.data };
 }
 
-/**
- * Bulk star/unstar threads
- */
-export async function bulkStarThreads(threadIds, star = true, email = null) {
-  try {
-    const gmail = await initializeGmailClient(email);
-    console.log(`⭐ Bulk ${star ? "starring" : "unstarring"} ${threadIds.length} threads...`);
+export async function bulkStarThreads(threadIds, star = true, email) {
+  const gmail = await initializeGmailClient(email);
+  const results = await Promise.allSettled(
+    threadIds.map((id) =>
+      gmail.users.threads.modify({
+        userId: "me",
+        id,
+        requestBody: { addLabelIds: star ? ["STARRED"] : [], removeLabelIds: star ? [] : ["STARRED"] },
+      })
+    )
+  );
+  const successful = results.filter((r) => r.status === "fulfilled").length;
+  return { success: true, message: `${star ? "Starred" : "Unstarred"} ${successful} threads`, count: successful };
+}
 
-    const starPromises = threadIds.map(async (threadId) => {
-      try {
-        await gmail.users.threads.modify({
-          userId: "me",
-          id: threadId,
-          requestBody: {
-            addLabelIds: star ? ["STARRED"] : [],
-            removeLabelIds: star ? [] : ["STARRED"],
-          },
-        });
-        return { success: true, threadId };
-      } catch (error) {
-        return { success: false, threadId, error: error.message };
-      }
-    });
+export async function markAsSpam(threadId, spam = true, email) {
+  const gmail = await initializeGmailClient(email);
+  const res = await gmail.users.threads.modify({
+    userId: "me",
+    id: threadId,
+    requestBody: { addLabelIds: spam ? ["SPAM"] : [], removeLabelIds: spam ? [] : ["SPAM"] },
+  });
+  return { success: true, ...res.data };
+}
 
-    const results = await Promise.allSettled(starPromises);
-    const successful = results.filter(
-      (r) => r.status === "fulfilled" && r.value.success,
+export async function markAsImportant(threadId, important = true, email) {
+  const gmail = await initializeGmailClient(email);
+  const res = await gmail.users.threads.modify({
+    userId: "me",
+    id: threadId,
+    requestBody: { addLabelIds: important ? ["IMPORTANT"] : [], removeLabelIds: important ? [] : ["IMPORTANT"] },
+  });
+  return { success: true, ...res.data };
+}
+
+export async function applyLabel(threadId, labelId, email) {
+  const gmail = await initializeGmailClient(email);
+  const res = await gmail.users.threads.modify({
+    userId: "me",
+    id: threadId,
+    requestBody: { addLabelIds: [labelId] },
+  });
+  return { success: true, ...res.data };
+}
+
+export async function moveToTrash(threadId, email) {
+  const gmail = await initializeGmailClient(email);
+  const res = await gmail.users.threads.trash({ userId: "me", id: threadId });
+  return { success: true, ...res.data };
+}
+
+export async function bulkMoveToTrash(threadIds, email) {
+  const gmail = await initializeGmailClient(email);
+  const results = await Promise.allSettled(
+    threadIds.map((id) => gmail.users.threads.trash({ userId: "me", id }))
+  );
+  const successful = results.filter((r) => r.status === "fulfilled").length;
+  return { success: true, message: `Moved ${successful} threads to trash`, count: successful };
+}
+
+export async function bulkDeleteThreads(threadIds, email) {
+  const gmail = await initializeGmailClient(email);
+  const results = await Promise.allSettled(
+    threadIds.map((id) => gmail.users.threads.delete({ userId: "me", id }))
+  );
+  const successful = results.filter((r) => r.status === "fulfilled").length;
+  return { success: true, message: `Deleted ${successful} threads`, count: successful };
+}
+
+export async function getLabels(email) {
+  const gmail = await initializeGmailClient(email);
+  const res = await gmail.users.labels.list({ userId: "me" });
+  return res.data.labels || [];
+}
+
+// ─── EMAIL SUGGESTIONS ────────────────────────────────────────────────────────
+export async function getEmailSuggestions(query, limit = 10, email) {
+  if (!email || !query || query.length < 2) return [];
+  const gmail = await initializeGmailClient(email);
+  const emailSet = new Set();
+
+  const [r1, r2] = await Promise.allSettled([
+    gmail.users.messages.list({ userId: "me", maxResults: 30, q: `from:${query} OR to:${query}` }),
+    gmail.users.messages.list({ userId: "me", maxResults: 15, q: `in:sent ${query}` }),
+  ]);
+
+  const processMessages = async (messages = []) => {
+    await Promise.allSettled(
+      messages.slice(0, 8).map(async (msg) => {
+        try {
+          const r = await gmail.users.messages.get({
+            userId: "me",
+            id: msg.id,
+            format: "metadata",
+            metadataHeaders: ["From", "To", "Cc"],
+          });
+          (r.data.payload?.headers || []).forEach((h) => {
+            if (["From", "To", "Cc"].includes(h.name)) {
+              extractAllEmails(h.value).forEach((e) => emailSet.add(e));
+            }
+          });
+        } catch { }
+      })
     );
+  };
 
-    console.log(`✅ Bulk ${star ? "star" : "unstar"} completed: ${successful.length} successful`);
+  if (r1.status === "fulfilled") await processMessages(r1.value.data.messages || []);
+  if (r2.status === "fulfilled") await processMessages(r2.value.data.messages || []);
 
-    return {
-      success: true,
-      message: `${star ? "Starred" : "Unstarred"} ${successful.length} threads successfully`,
-      count: successful.length,
-    };
-  } catch (error) {
-    console.error("❌ Error in bulk star:", error);
-    throw error;
-  }
+  const lower = query.toLowerCase();
+  return Array.from(emailSet).filter((e) => e.toLowerCase().includes(lower)).slice(0, limit);
 }
 
-/**
- * Mark as spam
- */
-export async function markAsSpam(threadId, spam = true, email = null) {
-  try {
-    const gmail = await initializeGmailClient(email);
-
-    const res = await gmail.users.threads.modify({
-      userId: "me",
-      id: threadId,
-      requestBody: {
-        addLabelIds: spam ? ["SPAM"] : [],
-        removeLabelIds: spam ? [] : ["SPAM"],
-      },
-    });
-
-    console.log(`✅ Thread ${threadId} ${spam ? "marked as spam" : "removed from spam"}`);
-    return { success: true, ...res.data };
-  } catch (error) {
-    console.error("❌ Error marking as spam:", error);
-    throw error;
-  }
+export async function getAllActiveAccounts() {
+  const accounts = await GmailToken.find({ is_active: true }).sort({ last_connected: -1 });
+  return accounts.map((a) => ({ email: a.email, last_connected: a.last_connected }));
 }
 
-/**
- * Mark as important
- */
-export async function markAsImportant(threadId, important = true, email = null) {
-  try {
-    const gmail = await initializeGmailClient(email);
-
-    const res = await gmail.users.threads.modify({
-      userId: "me",
-      id: threadId,
-      requestBody: {
-        addLabelIds: important ? ["IMPORTANT"] : [],
-        removeLabelIds: important ? [] : ["IMPORTANT"],
-      },
-    });
-
-    console.log(`✅ Thread ${threadId} ${important ? "marked as important" : "removed from important"}`);
-    return { success: true, ...res.data };
-  } catch (error) {
-    console.error("❌ Error marking as important:", error);
-    throw error;
-  }
+export async function listAllThreads(email) {
+  const gmail = await initializeGmailClient(email);
+  const res = await gmail.users.threads.list({ userId: "me", maxResults: 100, q: "in:inbox" });
+  return (res.data.threads || []).map((t) => ({ id: t.id, snippet: t.snippet }));
 }
 
-/**
- * Apply label to thread
- */
-export async function applyLabel(threadId, labelId, email = null) {
-  try {
-    const gmail = await initializeGmailClient(email);
-
-    const res = await gmail.users.threads.modify({
-      userId: "me",
-      id: threadId,
-      requestBody: {
-        addLabelIds: [labelId],
-      },
-    });
-
-    console.log(`✅ Label applied to thread ${threadId}`);
-    return { success: true, ...res.data };
-  } catch (error) {
-    console.error("❌ Error applying label:", error);
-    throw error;
-  }
+export async function watchInbox(email) {
+  await initializeGmailClient(email);
+  return { historyId: Date.now().toString() };
 }
 
-/**
- * Move to trash
- */
-export async function moveToTrash(threadId, email = null) {
-  try {
-    const gmail = await initializeGmailClient(email);
-
-    const res = await gmail.users.threads.trash({
-      userId: "me",
-      id: threadId,
-    });
-
-    console.log(`✅ Thread ${threadId} moved to trash`);
-    return { success: true, ...res.data };
-  } catch (error) {
-    console.error("❌ Error moving to trash:", error);
-    throw error;
-  }
-}
-
-/**
- * Bulk move to trash
- */
-export async function bulkMoveToTrash(threadIds, email = null) {
-  try {
-    const gmail = await initializeGmailClient(email);
-    console.log(`🗑️ Bulk moving ${threadIds.length} threads to trash...`);
-
-    const trashPromises = threadIds.map(async (threadId) => {
-      try {
-        await gmail.users.threads.trash({ userId: "me", id: threadId });
-        return { success: true, threadId };
-      } catch (error) {
-        return { success: false, threadId, error: error.message };
-      }
-    });
-
-    const results = await Promise.allSettled(trashPromises);
-    const successful = results.filter(
-      (r) => r.status === "fulfilled" && r.value.success,
-    );
-
-    console.log(`✅ Bulk move to trash completed: ${successful.length} successful`);
-
-    return {
-      success: true,
-      message: `Moved ${successful.length} threads to trash`,
-      count: successful.length,
-    };
-  } catch (error) {
-    console.error("❌ Error in bulk move to trash:", error);
-    throw error;
-  }
-}
-
-/**
- * Bulk delete threads
- */
-export async function bulkDeleteThreads(threadIds, email = null) {
-  try {
-    const gmail = await initializeGmailClient(email);
-    console.log(`🗑️ Bulk deleting ${threadIds.length} threads...`);
-
-    const deletePromises = threadIds.map(async (threadId) => {
-      try {
-        await gmail.users.threads.delete({ userId: "me", id: threadId });
-        return { success: true, threadId };
-      } catch (error) {
-        return { success: false, threadId, error: error.message };
-      }
-    });
-
-    const results = await Promise.allSettled(deletePromises);
-    const successful = results.filter(
-      (r) => r.status === "fulfilled" && r.value.success,
-    );
-
-    console.log(`✅ Bulk delete completed: ${successful.length} successful`);
-
-    return {
-      success: successful.length > 0,
-      message: `Deleted ${successful.length} threads successfully`,
-      count: successful.length,
-    };
-  } catch (error) {
-    console.error("❌ Error in bulk delete:", error);
-    throw error;
-  }
-}
-
-/**
- * Get labels
- */
-export async function getLabels(email = null) {
-  try {
-    const gmail = await initializeGmailClient(email);
-
-    const res = await gmail.users.labels.list({ userId: "me" });
-    return res.data.labels || [];
-  } catch (error) {
-    console.error("❌ Error getting labels:", error);
-    throw error;
-  }
-}
-
-/**
- * Get email suggestions
- */
-export async function getEmailSuggestions(query, limit = 10, email = null) {
-  try {
-    const gmail = await initializeGmailClient(email);
-
-    if (!query || query.length < 2) {
-      return [];
-    }
-
-    const res = await gmail.users.messages.list({
-      userId: "me",
-      maxResults: 50,
-      q: `from:${query} OR to:${query} OR cc:${query}`,
-    });
-
-    const messages = res.data.messages || [];
-    const emailSet = new Set();
-
-    for (const message of messages.slice(0, 10)) {
-      try {
-        const msgRes = await gmail.users.messages.get({
-          userId: "me",
-          id: message.id,
-          format: "metadata",
-          metadataHeaders: ["From", "To", "Cc"],
-        });
-
-        const headers = msgRes.data.payload?.headers || [];
-
-        const fromHeader = headers.find((h) => h.name === "From");
-        if (fromHeader?.value) {
-          extractAllEmails(fromHeader.value).forEach((e) => emailSet.add(e));
-        }
-
-        const toHeader = headers.find((h) => h.name === "To");
-        if (toHeader?.value) {
-          extractAllEmails(toHeader.value).forEach((e) => emailSet.add(e));
-        }
-
-        const ccHeader = headers.find((h) => h.name === "Cc");
-        if (ccHeader?.value) {
-          extractAllEmails(ccHeader.value).forEach((e) => emailSet.add(e));
-        }
-      } catch (err) {
-        console.error(`Error processing message ${message.id}:`, err.message);
-      }
-    }
-
-    const sentRes = await gmail.users.messages.list({
-      userId: "me",
-      maxResults: 20,
-      q: `in:sent ${query}`,
-    });
-
-    const sentMessages = sentRes.data.messages || [];
-
-    for (const message of sentMessages.slice(0, 5)) {
-      try {
-        const msgRes = await gmail.users.messages.get({
-          userId: "me",
-          id: message.id,
-          format: "metadata",
-          metadataHeaders: ["To", "Cc"],
-        });
-
-        const headers = msgRes.data.payload?.headers || [];
-
-        const toHeader = headers.find((h) => h.name === "To");
-        if (toHeader?.value) {
-          extractAllEmails(toHeader.value).forEach((e) => emailSet.add(e));
-        }
-
-        const ccHeader = headers.find((h) => h.name === "Cc");
-        if (ccHeader?.value) {
-          extractAllEmails(ccHeader.value).forEach((e) => emailSet.add(e));
-        }
-      } catch (err) {
-        console.error(`Error processing sent message ${message.id}:`, err.message);
-      }
-    }
-
-    let suggestions = Array.from(emailSet);
-    if (query) {
-      const lowerQuery = query.toLowerCase();
-      suggestions = suggestions.filter((e) =>
-        e.toLowerCase().includes(lowerQuery),
-      );
-    }
-
-    return suggestions.slice(0, limit);
-  } catch (error) {
-    console.error("❌ Error getting email suggestions:", error);
-    return [];
-  }
-}
-
-/**
- * Watch inbox
- */
-export async function watchInbox() {
-  try {
-    await initializeGmailClient();
-    console.log("🔔 Using polling for real-time updates");
-    return { historyId: Date.now().toString() };
-  } catch (error) {
-    console.error("❌ Error starting inbox watch:", error);
-    throw error;
-  }
-}
-
-/**
- * Stop watch
- */
-export async function stopWatch(userId) {
-  try {
-    const gmail = await initializeGmailClient();
-    await gmail.users.stop({ userId: userId });
-    console.log("🔕 Inbox watch stopped");
-  } catch (error) {
-    console.error("❌ Error stopping inbox watch:", error);
-    throw error;
-  }
-}
-
-/**
- * List all threads
- */
-export async function listAllThreads() {
-  try {
-    const gmail = await initializeGmailClient();
-
-    const res = await gmail.users.threads.list({
-      userId: "me",
-      maxResults: 100,
-      q: "in:inbox",
-    });
-
-    const threads = res.data.threads || [];
-    console.log(`✅ Fetched ${threads.length} threads`);
-
-    return threads.map((thread) => ({
-      id: thread.id,
-      snippet: thread.snippet,
-    }));
-  } catch (error) {
-    console.error("❌ Error listing all threads:", error);
-    throw error;
-  }
-}
-
-/**
- * Send simple email without attachments
- */
-export async function sendEmail(
-  to,
-  subject,
-  message,
-  cc = "",
-  bcc = "",
-  attachments = [],
-  files = [],
-  email = null,
-) {
-  if ((attachments && attachments.length > 0) || (files && files.length > 0)) {
-    return await sendEmailWithAttachments(to, subject, message, cc, bcc, attachments, files, email);
-  }
-
-  try {
-    const startTime = Date.now();
-    console.log("📧 Sending simple email...");
-
-    const emailList = processEmailList(to);
-    if (emailList.length === 0) {
-      throw new Error(`Invalid recipient email address: ${to}`);
-    }
-
-    const gmail = await initializeGmailClient(email);
-
-    const tokenDoc = await GmailToken.findOne({ is_active: true });
-    if (!tokenDoc) {
-      throw new Error("No active Gmail account found");
-    }
-    const fromEmail = tokenDoc.email;
-
-    const emailLines = [
-      `To: ${to}`,
-      `From: ${fromEmail}`,
-      `Subject: ${subject || "(No Subject)"}`,
-    ];
-
-    const ccList = processEmailList(cc);
-    const bccList = processEmailList(bcc);
-
-    if (ccList.length > 0) emailLines.push(`Cc: ${ccList.join(", ")}`);
-    if (bccList.length > 0) emailLines.push(`Bcc: ${bccList.join(", ")}`);
-
-    emailLines.push(
-      'Content-Type: text/plain; charset="UTF-8"',
-      "Content-Transfer-Encoding: quoted-printable",
-      "MIME-Version: 1.0",
-      "",
-      message || "",
-    );
-
-    const emailStr = emailLines.join("\r\n");
-
-    const base64Email = Buffer.from(emailStr)
-      .toString("base64")
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/, "");
-
-    const res = await gmail.users.messages.send({
-      userId: "me",
-      requestBody: { raw: base64Email },
-    });
-
-    const duration = (Date.now() - startTime) / 1000;
-    console.log(`✅ Simple email sent in ${duration.toFixed(2)}s`);
-
-    return {
-      success: true,
-      ...res.data,
-      sendTime: duration,
-    };
-  } catch (error) {
-    console.error("❌ Error sending simple email:", error);
-    throw error;
-  }
-}
-
-// ============= HELPER FUNCTIONS =============
-
-function extractContent(parts) {
-  if (!parts) return { text: "", html: "", attachments: [] };
-
-  let text = "";
-  let html = "";
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+function extractContent(payload) {
+  if (!payload) return { text: "", html: "", attachments: [] };
+  let text = "", html = "";
   const attachments = [];
 
-  function processPart(part, depth = 0) {
+  function processPart(part) {
     if (!part) return;
-
     const mimeType = part.mimeType || "";
-    const filename = part.filename || "";
     const body = part.body || {};
 
-    if (filename && body.attachmentId) {
-      attachments.push({
-        id: body.attachmentId,
-        filename: filename,
-        mimeType: mimeType,
-        size: body.size || 0,
-      });
+    if (part.filename && body.attachmentId) {
+      attachments.push({ id: body.attachmentId, filename: part.filename, mimeType, size: body.size || 0 });
       return;
     }
 
-    if (mimeType === "text/plain" && body.data) {
-      text = Buffer.from(body.data, "base64").toString("utf-8");
+    if (mimeType === "text/plain" && body.data && !text) {
+      try { text = Buffer.from(body.data, "base64").toString("utf-8"); } catch { }
     } else if (mimeType === "text/html" && body.data) {
-      html = Buffer.from(body.data, "base64").toString("utf-8");
-    } else if (part.parts) {
-      part.parts.forEach((nestedPart) => processPart(nestedPart, depth + 1));
+      try { html = Buffer.from(body.data, "base64").toString("utf-8"); } catch { }
     }
+
+    if (part.parts) part.parts.forEach(processPart);
   }
 
-  if (Array.isArray(parts)) {
-    parts.forEach((part) => processPart(part));
-  } else {
-    processPart(parts);
-  }
-
+  processPart(payload);
   return { text, html, attachments };
 }
 
 function validateEmailAddress(email) {
-  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return re.test(email);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function processEmailList(emailString) {
-  if (!emailString) return [];
-  return emailString
-    .split(",")
-    .map((email) => email.trim())
-    .filter((email) => email && validateEmailAddress(email));
+function processEmailList(str) {
+  if (!str) return [];
+  return str.split(",").map((e) => e.trim()).filter((e) => e && validateEmailAddress(e));
 }
 
 function extractAllEmails(str) {
   if (!str) return [];
-  const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi;
-  const matches = str.match(emailRegex);
-  return matches ? matches : [];
-}
-
-export async function getAllActiveAccounts() {
-  try {
-    const accounts = await GmailToken.find({ is_active: true }).sort({
-      last_connected: -1,
-    });
-    return accounts.map((account) => ({
-      email: account.email,
-      last_connected: account.last_connected,
-    }));
-  } catch (error) {
-    console.error("❌ Error getting active accounts:", error);
-    return [];
-  }
-}
-
-export async function switchAccount(email) {
-  try {
-    currentGmailClient = null;
-    currentUserEmail = null;
-
-    const gmail = await initializeGmailClient(email);
-
-    return {
-      success: true,
-      email: email,
-      message: `Switched to account: ${email}`,
-    };
-  } catch (error) {
-    console.error("❌ Error switching account:", error);
-    throw error;
-  }
-}
-
-export async function deleteDraft(draftId, email = null) {
-  try {
-    const gmail = await initializeGmailClient(email);
-    await gmail.users.drafts.delete({
-      userId: 'me',
-      id: draftId,
-    });
-    console.log(`✅ Draft ${draftId} deleted`);
-    return { success: true };
-  } catch (error) {
-    console.error('❌ Error deleting draft:', error);
-    throw error;
-  }
+  return str.match(/([a-zA-Z0-9._+-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi) || [];
 }

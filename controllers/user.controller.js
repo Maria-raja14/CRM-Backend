@@ -62,9 +62,13 @@ export default {
     }
   },
 
+  
+
+
   getUsers: async (req, res) => {
     try {
-      const users = await User.find().populate("role");
+      // Exclude the seeded admin user from the list
+      const users = await User.find({ email: { $ne: "admin@gmail.com" } }).populate("role");
 
       res.json({
         users,
@@ -74,6 +78,7 @@ export default {
       res.status(500).json({ message: err.message });
     }
   },
+
   getMe: async (req, res) => {
     try {
       const user = await User.findById(req.user.id).populate("role");
@@ -182,65 +187,112 @@ export default {
     }
   },
 
-  // ✅ FIXED loginUser
+
+
   loginUser: async (req, res) => {
-    try {
-      const { email, password } = req.body;
-      const user = await User.findOne({ email })
-        .populate("role")
-        .select("+password");
+  try {
 
-      if (!user || !(await user.matchPassword(password))) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
+    const { email, password } = req.body;
 
-      const now = new Date();
-      // ✅ Always push a new login entry (even if multiple times per day)
-      user.loginHistory.push({ login: now });
-      await user.save({ validateBeforeSave: false });
+    const user = await User.findOne({ email })
+      .populate("role")
+      .select("+password");
 
-      res.json({
-        message: "Login successful",
-        _id: user._id,
-        name: `${user.firstName} ${user.lastName}`,
-        email: user.email,
-        profileImage: user.profileImage,
-        role: user.role,
-        token: generateToken(user._id),
+    if (!user)
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
       });
-    } catch (err) {
-      console.error("Login error:", err);
-      res.status(500).json({ message: err.message });
+
+    const isMatch = await user.matchPassword(password);
+
+    if (!isMatch)
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+
+    // ✅ FIX: Ensure loginHistory exists
+    if (!user.loginHistory) {
+      user.loginHistory = [];
     }
-  },//old one
+
+    // push login entry
+    user.loginHistory.push({
+      login: new Date(),
+    });
+
+    await user.save({ validateBeforeSave: false });
+
+    res.status(200).json({
+      success: true,
+      message: "Login successful",
+      _id: user._id,
+      name: `${user.firstName} ${user.lastName}`,
+      email: user.email,
+      profileImage: user.profileImage,
+      role: user.role,
+      token: generateToken(user._id),
+    });
+
+  }
+  catch (error) {
+
+    console.error("Login error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+
+  }
+},
 
 
 
-  // ✅ FIXED logoutUser
+
+
+
   logoutUser: async (req, res) => {
-    try {
-      const user = await User.findById(req.user.id);
-      if (!user) return res.status(404).json({ message: "User not found" });
+  try {
 
-      const now = new Date();
+    const user = await User.findById(req.user.id);
 
-      // ✅ Find the latest login without logout
-      const latestEntry = [...user.loginHistory]
-        .reverse()
-        .find((e) => !e.logout);
-      if (latestEntry) {
-        latestEntry.logout = now;
-        await user.save({ validateBeforeSave: false });
-      } else {
-        console.warn("⚠️ No open login session found for logout update");
-      }
+    if (!user)
+      return res.status(404).json({
+        message: "User not found"
+      });
 
-      res.json({ message: "Logout successful" });
-    } catch (err) {
-      console.error("Logout error:", err);
-      res.status(500).json({ message: err.message });
+    if (!user.loginHistory || user.loginHistory.length === 0) {
+      return res.json({
+        message: "Logout successful"
+      });
     }
-  },
+
+    const latestEntry = [...user.loginHistory]
+      .reverse()
+      .find(entry => !entry.logout);
+
+    if (latestEntry) {
+      latestEntry.logout = new Date();
+      await user.save({ validateBeforeSave: false });
+    }
+
+    res.json({
+      message: "Logout successful"
+    });
+
+  }
+  catch (error) {
+
+    console.error(error);
+
+    res.status(500).json({
+      message: error.message
+    });
+
+  }
+},
 
   // Add this to your existing user controller
   updatePassword: async (req, res) => {
@@ -279,64 +331,127 @@ export default {
     }
   },
 
-  forgotPassword: async (req, res) => {
-    try {
-      const { email } = req.body;
-      const user = await User.findOne({ email });
+  
 
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
 
-      const resetToken = user.getResetPasswordToken();
-      await user.save({ validateBeforeSave: false });
+forgotPassword : async (req, res) =>
+{
+  try
+  {
+    const { email } = req.body;
 
-      // const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
-      const resetUrl = `https://crm.stagingzar.com/reset-password/${resetToken}`;
-      const message = `
-        <h2>Password Reset</h2>
-        <p>You requested a password reset</p>
-        <p>Click this link to reset your password:</p>
-        <a href="${resetUrl}">${resetUrl}</a>
-      `;
+    const user = await User.findOne({ email });
 
-      await sendEmail({
-        to: user.email,
-        subject: "Password Reset",
-        html: message,
+    if (!user)
+    {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
       });
-
-      res.json({ message: "Reset link sent to your email" });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ message: err.message });
     }
-  },
 
-  resetPassword: async (req, res) => {
-    try {
-      const resetPasswordToken = crypto
-        .createHash("sha256")
-        .update(req.params.token)
-        .digest("hex");
+    // Generate token
+    const resetToken = user.getResetPasswordToken();
 
-      const user = await User.findOne({
-        resetPasswordToken,
-        resetPasswordExpire: { $gt: Date.now() },
+    await user.save({ validateBeforeSave: false });
+
+    // SELECT FRONTEND URL based on environment
+    const frontendUrl =
+      process.env.NODE_ENV === "production"
+        ? process.env.FRONTEND_URL_LIVE
+        : process.env.FRONTEND_URL_LOCAL;
+
+    // Final reset link
+    const resetUrl =
+      `${frontendUrl}/reset-password/${resetToken}`;
+
+    console.log("Reset URL:", resetUrl);
+
+    const message = `
+      <h2>Password Reset</h2>
+      <p>You requested password reset</p>
+      <p>Click below link:</p>
+      <a href="${resetUrl}" target="_blank">${resetUrl}</a>
+      <p>This link expires in 15 minutes.</p>
+    `;
+
+    await sendEmail({
+      to: user.email,
+      subject: "Password Reset",
+      html: message,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Reset link sent successfully",
+    });
+
+  }
+  catch (error)
+  {
+    console.log(error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+},
+
+
+  
+
+
+resetPassword : async (req, res) =>
+{
+  try
+  {
+    const token = req.params.token;
+
+    console.log("Received Token:", token);
+
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
+
+    console.log("Hashed Token:", hashedToken);
+
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user)
+    {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired token",
       });
-
-      if (!user) {
-        return res.status(400).json({ message: "Invalid or expired token" });
-      }
-
-      user.password = req.body.password;
-      user.resetPasswordToken = undefined;
-      user.resetPasswordExpire = undefined;
-      await user.save();
-
-      res.json({ message: "Password reset successful" });
-    } catch (err) {
-      res.status(500).json({ message: err.message });
     }
-  },
+
+    user.password = req.body.password;
+
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password reset successful",
+    });
+
+  }
+  catch (error)
+  {
+    console.log(error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+},
+
 };

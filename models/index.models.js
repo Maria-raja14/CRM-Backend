@@ -21,7 +21,8 @@ import Meeting from './meeting.models.js'
 import GmailToken from "./GmailToken.js";
 import WhatsAppMessage from "./WhatsAppMessage.js";
 
-export {User,Role,Admin,AllDeals,Activity,deal,Invoice,lastreason,Meeting,GmailToken,WhatsAppMessage  };
+
+export {User,Role,Admin,AllDeals,Activity,deal,Invoice,lastreason,Meeting,GmailToken,WhatsAppMessage};
 
 
 
