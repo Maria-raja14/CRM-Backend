@@ -62,51 +62,11 @@ export default {
         lossNotes,
       } = req.body;
 
-// Create Manual Deal Controller (already correct, but including for reference)
-createManualDeal: async (req, res) => {
-  try {
-    const {
-      dealName,
-      assignTo,
-      dealValue,
-      currency,
-      stage,
-      notes,
-      phoneNumber,
-      email,
-      source,
-      companyName,
-      industry,
-      requirement,
-      address,
-      country,
-    } = req.body;
-
-    // Validation
-    if (!dealName || !phoneNumber || !companyName) {
-      return res.status(400).json({
-        message: "dealName, phoneNumber & companyName are required",
-      });
-    }
-
-    const allowedStages = [
-      "Qualification",
-      "Proposal Sent-Negotiation",
-      "Invoices Sent",
-      "Closed Won",
-      "Closed Lost",
-    ];
-
-    const dealStage =
-      stage && allowedStages.includes(stage) ? stage : "Qualification";
-
-    // Format dealValue with commas
-    let formattedValue = "0";
-    if (dealValue && currency) {
-      const numericValue = Number(dealValue.toString().replace(/,/g, ""));
-      if (!isNaN(numericValue)) {
-        const withCommas = new Intl.NumberFormat("en-IN").format(numericValue);
-        formattedValue = `${withCommas} ${currency}`;
+      // Validation
+      if (!dealName || !phoneNumber || !companyName) {
+        return res.status(400).json({
+          message: "dealName, phoneNumber & companyName are required",
+        });
       }
 
       const allowedStages = [
@@ -396,76 +356,12 @@ createManualDeal: async (req, res) => {
       const deal = await Deal.findById(req.params.id);
       if (!deal) return res.status(404).json({ message: "Deal not found" });
 
-
-
-    // Parse form data from req.body (it comes as stringified JSON sometimes)
-    const {
-      dealName,
-      dealValue,
-      currency,
-      stage,
-      assignTo,
-      notes,
-      phoneNumber,
-      email,
-      source,
-      companyName,
-      industry,
-      requirement,
-      address,
-      country,
-      existingAttachments,
-    } = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-
-    const deal = await Deal.findById(req.params.id);
-    if (!deal) return res.status(404).json({ message: "Deal not found" });
-
-    // Permission check
-    if (
-      req.user.role.name !== "Admin" &&
-      deal.assignedTo?.toString() !== req.user._id.toString()
-    ) {
-      return res.status(403).json({ message: "Access denied" });
-    }
-
-    // Validate stage
-    const allowedStages = [
-      "Qualification",
-      "Proposal Sent-Negotiation",
-      "Invoices Sent",
-      "Closed Won",
-      "Closed Lost",
-    ];
-    if (stage && !allowedStages.includes(stage)) {
-      return res.status(400).json({ message: "Invalid stage" });
-    }
-
-    // Build update object
-    const updateFields = {
-      ...(dealName && { dealName }),
-      ...(assignTo && { assignedTo: assignTo }),
-      ...(stage && { stage }),
-      ...(notes !== undefined && { notes }),
-      ...(phoneNumber && { phoneNumber }),
-      ...(email && { email }),
-      ...(source && { source }),
-      ...(companyName && { companyName }),
-      ...(industry && { industry }),
-      ...(requirement && { requirement }),
-      ...(address && { address }),
-      ...(country && { country }),
-      updatedAt: new Date(),
-    };
-
-    // Handle deal value
-    if (dealValue !== undefined && dealValue !== null && dealValue !== "") {
-      const numericValue = Number(dealValue.toString().replace(/,/g, ""));
-      if (!isNaN(numericValue)) {
-        const finalCurrency = currency || deal.currency || "INR";
-        updateFields.value = `${new Intl.NumberFormat("en-IN").format(
-          numericValue
-        )} ${finalCurrency}`;
-        updateFields.currency = finalCurrency;
+      // Permission check
+      if (
+        req.user.role.name !== "Admin" &&
+        deal.assignedTo?.toString() !== req.user._id.toString()
+      ) {
+        return res.status(403).json({ message: "Access denied" });
       }
 
       // Validate stage
