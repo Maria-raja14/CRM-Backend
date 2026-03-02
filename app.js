@@ -89,6 +89,7 @@
 
 // startServer();
 
+console.log("🔥 app.js LOADED");
 
 import express from "express";
 import dotenv from "dotenv";
@@ -102,10 +103,18 @@ import jwt from "jsonwebtoken";
 import connectDB from "./config/db.js";
 import routes from "./routes/index.routes.js";
 import fileRoutes from "./routes/files.routes.js";
+
+import emailRoutes from "./routes/email.routes.js";
+import templateRoutes from "./routes/emailTemplate.routes.js";
+import "./cron/emailCron.js"; // ← this runs your cron automatically
+import publicRoutes from "./routes/public.routes.js";
+import settingsRoutes from "./routes/settingsRoutes.js";
 import { initSocket } from "./realtime/socket.js";
 import { startFollowUpCron } from "./controllers/followups.cron.js";
 import { startActivityReminderCron } from "./controllers/activityReminder.cron.js";
 import { startProposalFollowUpCron } from "./controllers/proposalFollowUpCron.controller.js";
+
+
 
 dotenv.config();
 
@@ -140,6 +149,11 @@ const authenticateToken = (req, res, next) => {
 
 app.use("/api", routes);
 app.use("/api/files", fileRoutes);
+app.use("/api/email", emailRoutes);
+app.use("/api/email-templates", templateRoutes);
+app.use("/api", publicRoutes);
+app.use("/api/settings", settingsRoutes);
+
 // Protected file download endpoint
 app.get("/api/files/download", authenticateToken, (req, res) => {
   try {

@@ -67,8 +67,8 @@ createManualDeal: async (req, res) => {
 
     const allowedStages = [
       "Qualification",
-      "Negotiation",
-      "Proposal Sent",
+      "Proposal Sent-Negotiation",
+      "Invoices Sent",
       "Closed Won",
       "Closed Lost",
     ];
@@ -248,8 +248,8 @@ createManualDeal: async (req, res) => {
       const { stage } = req.body;
       const allowedStages = [
         "Qualification",
-        "Negotiation",
-        "Proposal Sent",
+        "Proposal Sent-Negotiation",
+        "Invoices Sent",
         "Closed Won",
         "Closed Lost",
       ];
@@ -325,8 +325,8 @@ updateDeal: async (req, res) => {
     // Validate stage
     const allowedStages = [
       "Qualification",
-      "Negotiation",
-      "Proposal Sent",
+      "Proposal Sent-Negotiation",
+      "Invoices Sent",
       "Closed Won",
       "Closed Lost",
     ];

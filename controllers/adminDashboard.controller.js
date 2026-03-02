@@ -80,6 +80,7 @@ getDashboardSummary: async (req, res) => {
         },
       ]);
 
+      
       // Convert to object like { USD: 1000, AED: 500, JPY: 2000 }
       const revenueByCurrency = {};
       revenueByCurrencyAgg.forEach(item => {

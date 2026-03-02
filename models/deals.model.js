@@ -66,9 +66,9 @@ const dealSchema = new mongoose.Schema({
     type: String,
     enum: [
       "Qualification",
-      "Negotiation",
+      "Proposal Sent-Negotiation",
 
-      "Proposal Sent",
+      "Invoices Sent",
       "Closed Won",
       "Closed Lost",
     ],
