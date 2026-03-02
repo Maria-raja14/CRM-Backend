@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
 const dealSchema = new mongoose.Schema({
+<<<<<<< Updated upstream
   leadId: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: "Lead" 
@@ -30,12 +31,26 @@ const dealSchema = new mongoose.Schema({
     min: 0,
     max: 100 
   },
+=======
+  leadId: { type: mongoose.Schema.Types.ObjectId, ref: "Lead" },
+  dealTitle: { type: String, require: true },
+  dealName: { type: String, required: true },
+  assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  value: { type: String, required: true }, // store "$44", "₹5000", "TJS11111"
+  currency: { type: String, default: "INR" }, // Add this field
+
+>>>>>>> Stashed changes
   stage: {
     type: String,
     enum: [
       "Qualification",
       "Proposal Sent-Negotiation",
+<<<<<<< Updated upstream
       "Invoice Sent",
+=======
+
+      "Invoices Sent",
+>>>>>>> Stashed changes
       "Closed Won",
       "Closed Lost",
     ],
