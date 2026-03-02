@@ -334,37 +334,108 @@ export default {
   
 
 
-forgotPassword : async (req, res) =>
-{
-  try
-  {
+// forgotPassword : async (req, res) =>
+// {
+//   try
+//   {
+//     const { email } = req.body;
+
+//     const user = await User.findOne({ email });
+
+//     if (!user)
+//     {
+//       return res.status(404).json({
+//         success: false,
+//         message: "User not found",
+//       });
+//     }
+
+//     // Generate token
+//     const resetToken = user.getResetPasswordToken();
+
+//     await user.save({ validateBeforeSave: false });
+
+//     // SELECT FRONTEND URL based on environment
+//     const frontendUrl =
+//       process.env.NODE_ENV === "production"
+//         ? process.env.FRONTEND_URL_LIVE
+//         : process.env.FRONTEND_URL_LOCAL;
+
+//     // Final reset link
+//     const resetUrl =
+//       `${frontendUrl}/reset-password/${resetToken}`;
+
+//     console.log("Reset URL:", resetUrl);
+
+//     const message = `
+//       <h2>Password Reset</h2>
+//       <p>You requested password reset</p>
+//       <p>Click below link:</p>
+//       <a href="${resetUrl}" target="_blank">${resetUrl}</a>
+//       <p>This link expires in 15 minutes.</p>
+//     `;
+
+//     await sendEmail({
+//       to: user.email,
+//       subject: "Password Reset",
+//       html: message,
+//     });
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Reset link sent successfully",
+//     });
+
+//   }
+//   catch (error)
+//   {
+//     console.log(error);
+
+//     res.status(500).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// },//old one..
+
+
+  forgotPassword: async (req, res) => {
+  try {
     const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
 
     const user = await User.findOne({ email });
 
-    if (!user)
-    {
+    if (!user) {
       return res.status(404).json({
         success: false,
         message: "User not found",
       });
     }
 
-    // Generate token
+    // Generate reset token
     const resetToken = user.getResetPasswordToken();
-
     await user.save({ validateBeforeSave: false });
 
-    // SELECT FRONTEND URL based on environment
-    const frontendUrl =
-      process.env.NODE_ENV === "production"
-        ? process.env.FRONTEND_URL_LIVE
-        : process.env.FRONTEND_URL_LOCAL;
+    // ✅ Just use one FRONTEND_URL
+    const frontendUrl = process.env.FRONTEND_URL;
 
-    // Final reset link
-    const resetUrl =
-      `${frontendUrl}/reset-password/${resetToken}`;
+    if (!frontendUrl) {
+      return res.status(500).json({
+        success: false,
+        message: "FRONTEND_URL not configured",
+      });
+    }
 
+    const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+
+    console.log("NODE_ENV:", process.env.NODE_ENV);
     console.log("Reset URL:", resetUrl);
 
     const message = `
@@ -381,23 +452,20 @@ forgotPassword : async (req, res) =>
       html: message,
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Reset link sent successfully",
     });
 
-  }
-  catch (error)
-  {
-    console.log(error);
+  } catch (error) {
+    console.error(error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Something went wrong",
     });
   }
 },
-
 
   
 
