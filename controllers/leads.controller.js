@@ -474,8 +474,22 @@ export default {
       const data = { ...req.body };
 
       // Handle file uploads
+      // Handle existing + new attachments
+
+      let existingAttachments = [];
+
+      if (req.body.existingAttachments) {
+        try {
+          existingAttachments = JSON.parse(req.body.existingAttachments);
+        } catch (err) {
+          console.error("Error parsing existingAttachments:", err);
+        }
+      }
+
+      let newAttachments = [];
+
       if (req.files?.length > 0) {
-        data.attachments = req.files.map((file) => ({
+        newAttachments = req.files.map((file) => ({
           name: file.originalname,
           path: `/uploads/leads/${file.filename}`,
           type: file.mimetype,
@@ -483,6 +497,12 @@ export default {
           uploadedAt: new Date(),
         }));
       }
+
+      // Merge both
+      if (existingAttachments.length > 0 || newAttachments.length > 0) {
+        data.attachments = [...existingAttachments, ...newAttachments];
+      }
+
 
       // ✅ AUTO ASSIGN (Round-robin Sales users)
       const autoAssignee = await pickNextSalesUser();

@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 import crypto from "crypto"; // Import crypto module
 
-const sendEmail = async ({ to, subject, html }) => {
+const sendEmail = async ({ to, subject, html, attachments = [] }) => {
   const transporter = nodemailer.createTransport({
     service: "Gmail",
     auth: {
@@ -15,6 +15,7 @@ const sendEmail = async ({ to, subject, html }) => {
     to,
     subject,
     html,
+    attachments,  // 🔥 MUST BE HERE
   });
 };
 

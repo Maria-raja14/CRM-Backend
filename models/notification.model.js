@@ -7,7 +7,7 @@ const Notification = new mongoose.Schema(
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // 👈 sender/salesman
     type: {
       type: String,
-      enum: ["followup", "activity", "deal", "admin", "activity_reminder"], // ✅ fixed
+      enum: ["followup", "activity", "deal", "admin", "activity_reminder", "contact_form"], // ✅ fixed
       default: "followup",
     },
     text: { type: String, required: true },

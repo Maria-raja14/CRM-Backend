@@ -89,6 +89,7 @@
 
 // startServer();
 
+console.log("🔥 app.js LOADED");
 
 
 
@@ -117,6 +118,12 @@ import routes from "./routes/index.routes.js";
 import fileRoutes from "./routes/files.routes.js";
 import callLogRoutes from "./routes/callLog.routes.js";
 import botRoutes from "./routes/bot.routes.js";
+
+import emailRoutes from "./routes/email.routes.js";
+import templateRoutes from "./routes/emailTemplate.routes.js";
+import "./cron/emailCron.js"; // ← this runs your cron automatically
+import publicRoutes from "./routes/public.routes.js";
+import settingsRoutes from "./routes/settingsRoutes.js";
 import { initSocket } from "./realtime/socket.js";
 import { startFollowUpCron } from "./controllers/followups.cron.js";
 import { startActivityReminderCron } from "./controllers/activityReminder.cron.js";
@@ -124,6 +131,8 @@ import { startProposalFollowUpCron } from "./controllers/proposalFollowUpCron.co
 import lostDealRoutes from "./routes/lostDealRoutes.js";
 import clientLTVRoutes from "./routes/clientLTVRoutes.js";
 import { startDealFollowUpCron } from "./controllers/dealFollowup.cron.js";
+
+
 
 
 dotenv.config();
@@ -181,6 +190,10 @@ app.use("/api/deals", lostDealRoutes);
 app.use("/api/cltv", clientLTVRoutes);
 app.use("/api/calllogs", callLogRoutes); // Call log tracking routes
 app.use("/api/bot", botRoutes); // Bot command routes
+app.use("/api/email", emailRoutes);
+app.use("/api/email-templates", templateRoutes);
+app.use("/api", publicRoutes);
+app.use("/api/settings", settingsRoutes);
 
 // Protected file download endpoint
 app.get("/api/files/download", authenticateToken, (req, res) => {
