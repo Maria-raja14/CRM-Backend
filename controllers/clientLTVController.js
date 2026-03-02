@@ -66,47 +66,84 @@ const calculateDaysSinceFollowUp = (lastFollowUpDate) => {
 const classifyDeal = ({
   totalRevenue = 0,
   supportTickets = 0,
-  clientHealthScore = 0,
+  clientHealthScore = 50,
   daysSinceFollowUp = 0,
+  progress = "average",
 }) => {
-  // Safety: prevent negative days
+
+  // -----------------------------
+  // 1️⃣ Force Safe Number Conversion
+  // -----------------------------
+  totalRevenue = Number(totalRevenue);
+  supportTickets = Number(supportTickets);
+  clientHealthScore = Number(clientHealthScore);
+  daysSinceFollowUp = Number(daysSinceFollowUp);
+
+  if (isNaN(totalRevenue)) totalRevenue = 0;
+  if (isNaN(supportTickets)) supportTickets = 0;
+  if (isNaN(clientHealthScore)) clientHealthScore = 50;
+  if (isNaN(daysSinceFollowUp)) daysSinceFollowUp = 0;
+
+  // Clamp values
+  clientHealthScore = Math.min(100, Math.max(0, clientHealthScore));
   daysSinceFollowUp = Math.max(0, daysSinceFollowUp);
 
-  // 1️⃣ UPSELL (Highest Priority)
-  // High value, low support, excellent health
-  if (
-    supportTickets < 3 &&
-    totalRevenue > 500000 &&
-    clientHealthScore > 80
-  ) {
-    return "Upsell";
-  }
+  // -----------------------------
+  // 2️⃣ Normalize Progress
+  // -----------------------------
+  const normalizedProgress = String(progress)
+    .trim()
+    .toLowerCase();
 
-  // 2️⃣ TOP VALUE
-  // High value, moderate support, good health, recent follow-up
-  if (
-    supportTickets < 5 &&
-    totalRevenue > 500000 &&
-    clientHealthScore > 70 &&
-    daysSinceFollowUp < 15
-  ) {
-    return "Top Value";
-  }
+  // -----------------------------
+  // DEBUG (Remove After Testing)
+  // -----------------------------
+  // console.log("CLASSIFY DEBUG:", {
+  //   totalRevenue,
+  //   supportTickets,
+  //   clientHealthScore,
+  //   daysSinceFollowUp,
+  //   normalizedProgress,
+  // });
 
-  // 3️⃣ DORMANT
-  // Low value, high support (>=5 tickets), long inactivity
-  // Note: Using >=5 as per business rule (5 or more tickets = high support)
-  if (
-    supportTickets >= 5 &&
-    totalRevenue < 500000 &&
-    daysSinceFollowUp > 60
-  ) {
+  // =============================
+  // 1️⃣ DORMANT (Highest Priority)
+  // =============================
+  if (daysSinceFollowUp > 90) {
     return "Dormant";
   }
 
-  // 4️⃣ AT RISK (Fallback - catches all remaining deals)
-  // Everything else falls here - guarantees no deal is missed
-  return "At Risk";
+  // =============================
+  // 2️⃣ UPSELL (Very Strict)
+  // =============================
+  const isUpsell =
+    normalizedProgress === "excellent" &&
+    totalRevenue >= 500000 &&
+    clientHealthScore >= 80 &&
+    supportTickets <= 2 &&
+    daysSinceFollowUp <= 30;
+
+  if (isUpsell) {
+    return "Upsell";
+  }
+
+  // =============================
+  // 3️⃣ AT RISK
+  // =============================
+  const isAtRisk =
+    normalizedProgress === "poor" ||
+    clientHealthScore < 70 ||
+    supportTickets >= 5 ||
+    daysSinceFollowUp > 30;
+
+  if (isAtRisk) {
+    return "At Risk";
+  }
+
+  // =============================
+  // 4️⃣ TOP VALUE (Default Safe)
+  // =============================
+  return "Top Value";
 };
 
 // Value category based on deal amount (for reporting only)
@@ -233,11 +270,12 @@ const calculateMetricsFromReview = async (companyId, companyName, reviewData) =>
 
     // Prepare metrics object for classification
     const metrics = {
-      totalRevenue,
-      supportTickets,
-      clientHealthScore: reviewData.clientHealthScore || 50,
-      daysSinceFollowUp
-    };
+  totalRevenue,
+  supportTickets,
+  clientHealthScore: reviewData.clientHealthScore || 50,
+  daysSinceFollowUp,
+  progress: reviewData.progress   // ✅ ADD THIS
+};
 
     // Get classification with proper priority (guaranteed to return one of the 4)
     const classification = classifyDeal(metrics);
@@ -1026,34 +1064,34 @@ const resolvePricingRisk = async (req, res) => {
 
 const getPricingRecommendation = async (req, res) => {
   try {
-    const { companyId } = req.params;
+    const { companyName } = req.params;
+    const decodedName = decodeURIComponent(companyName);
     
-    const client = await ClientLTV.findOne({ companyId }).lean();
+    console.log("Pricing recommendation requested for:", decodedName);
+    
+    // Find client by company name (not companyId)
+    const client = await ClientLTV.findOne({ companyName: decodedName }).lean();
+    
     if (!client) {
-      return res.status(404).json({ 
+      // Return a 200 with a message instead of 404, so frontend can handle gracefully
+      return res.status(200).json({ 
         success: false, 
-        message: "Client not found" 
+        message: "Client not found in CLV system",
+        data: null
       });
     }
 
-    const deal = await Deal.findById(companyId).lean();
-    if (!deal) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Deal not found" 
-      });
-    }
-
-    const latestReview = await ClientReview.findOne({ companyId })
+    // Get the latest review
+    const latestReview = await ClientReview.findOne({ companyId: client.companyId })
       .sort({ reviewedAt: -1 })
       .lean();
 
     // Prepare metrics for pricing calculation
     const metrics = {
-      progress: latestReview?.progress || "Average",
+      progress: latestReview?.progress || client.progress || "Average",
       supportTickets: client.totalSupportTickets || 0,
-      clientHealthScore: latestReview?.clientHealthScore || 50,
-      delivered: latestReview?.delivered || false,
+      clientHealthScore: latestReview?.clientHealthScore || client.clientHealthScore || 50,
+      delivered: latestReview?.delivered || client.delivered || false,
       totalRevenue: client.customerLifetimeValue || 0
     };
 
@@ -1061,14 +1099,19 @@ const getPricingRecommendation = async (req, res) => {
 
     res.json({
       success: true,
-      data: pricing
+      data: {
+        ...pricing,
+        classification: client.classification
+      }
     });
 
   } catch (error) {
     console.error("Error in getPricingRecommendation:", error);
-    res.status(500).json({ 
+    // Return a 200 with error message instead of 500
+    res.status(200).json({ 
       success: false, 
-      message: error.message 
+      message: error.message || "Error calculating pricing recommendation",
+      data: null
     });
   }
 };
