@@ -10,7 +10,10 @@ import dealsRoutes from "./deals.route.js";
 import adminDashboard from "./adminDashboard.routes.js";
 import notificationRoutes from "./notification.routes.js";
 import salesRoutes from "./salesReports.routes.js"
-
+import aiRoutes from "./ai.routes.js"; // ✅ ADD THIS LINE
+import streakRoutes from "./streak.routes.js"; // ✅ ADD THIS LINE
+import callLogRoutes from "./callLog.routes.js";
+import botRoutes from "./bot.routes.js";
 const router = express.Router();
 
 router.use("/users", userRoutes);
@@ -27,6 +30,10 @@ router.use("/proposal", proposalRoutes);
 router.use("/dashboard", adminDashboard);
 router.use("/notification", notificationRoutes);
 router.use("/sales", salesRoutes);
+router.use("/ai", aiRoutes); // ✅ ADD THIS LINE
+router.use("/streak", streakRoutes); // ✅ ADD THIS LINE
+router.use("/calllogs", callLogRoutes);
+router.use("/bot", botRoutes);
 
 
 export default router;
