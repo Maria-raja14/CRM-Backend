@@ -165,9 +165,6 @@ app.use("/api/files", fileRoutes);
 app.use("/api/calllogs", callLogRoutes); // Call log tracking routes
 app.use("/api/bot", botRoutes); // Bot command routes
 
-// Optional: If you want the /api/calls/command endpoint as well
-app.use("/api/calls", botRoutes);
-
 // Protected file download endpoint
 app.get("/api/files/download", authenticateToken, (req, res) => {
   try {

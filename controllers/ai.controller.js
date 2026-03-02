@@ -18,8 +18,71 @@ const aiController = async (req, res) => {
       ? req.user.role.name
       : req.user.role;
     const lower = message.toLowerCase();
-    // SECTION 1: DEALS - ALL DEALS FUNCTIONS
-    // 1A: DEALS BY SALESPERSON
+    
+    // SECTION 1: DEALS - STAGE-BASED FILTERS FIRST
+    // 1A: DEALS WON - MOVED TO TOP
+    if (lower.includes("deals won") || lower.includes("won deals") || (lower.includes("won") && lower.includes("deal"))) {
+      let query = { stage: "Closed Won" };
+      if (roleName !== "Admin") query.assignedTo = userId;
+      const deals = await Deal.find(query)
+        .populate("assignedTo", "firstName lastName email")
+        .sort({ createdAt: -1 });
+      return res.json({
+        success: true,
+        intent: "deals-won",
+        message: `You have ${deals.length} won deals.`,
+        count: deals.length,
+        data: deals.map(deal => formatDeal(deal))
+      });
+    }
+    
+    // 1B: DEALS LOST - MOVED TO SECOND
+    if (lower.includes("deals lost") || lower.includes("lost deals") || (lower.includes("lost") && lower.includes("deal"))) {
+      let query = { stage: "Closed Lost" };
+      if (roleName !== "Admin") query.assignedTo = userId;
+      const deals = await Deal.find(query)
+        .populate("assignedTo", "firstName lastName email")
+        .sort({ createdAt: -1 });
+      return res.json({
+        success: true,
+        intent: "deals-lost",
+        message: `You have ${deals.length} lost deals.`,
+        count: deals.length,
+        data: deals.map(deal => formatDeal(deal))
+      });
+    }
+    
+    // 1C: OPEN DEALS
+    if (lower.includes("open deals") || lower.includes("deals open") || (lower.includes("open") && lower.includes("deal"))) {
+      let query = { stage: { $nin: ["Closed Won", "Closed Lost"] } };
+      if (roleName !== "Admin") query.assignedTo = userId;
+      const deals = await Deal.find(query)
+        .populate("assignedTo", "firstName lastName email")
+        .sort({ createdAt: -1 });
+      return res.json({
+        success: true,
+        intent: "deals-open",
+        message: `You have ${deals.length} open deals.`,
+        count: deals.length,
+        data: deals.map(deal => formatDeal(deal))
+      });
+    }
+    
+    // 1D: MY DEALS
+    if (lower.includes("my deals") || lower === "my deals") {
+      const deals = await Deal.find({ assignedTo: userId })
+        .populate("assignedTo", "firstName lastName email")
+        .sort({ createdAt: -1 });
+      return res.json({
+        success: true,
+        intent: "my-deals",
+        message: `You have ${deals.length} deal${deals.length !== 1 ? 's' : ''} assigned to you.`,
+        count: deals.length,
+        data: deals.map(deal => formatDeal(deal))
+      });
+    }
+    
+    // 1E: DEALS BY SALESPERSON
     if (lower.includes("deals by") || lower.includes("deals of") || lower.includes("assigned to") || lower.includes("handled by")) {
       let searchName = lower
         .replace(/deals by|deals of|assigned to|handled by|show|get|find|search|for|name/gi, '')
@@ -65,7 +128,8 @@ const aiController = async (req, res) => {
         }
       }
     }
-    // 1B: SPECIFIC DEAL BY NAME
+    
+    // 1F: SPECIFIC DEAL BY NAME
     if (lower.includes("deal ") && !lower.includes("deals ")) {
       let searchTerm = lower
         .replace(/deal|show|get|find|search|for|about|named|called/gi, '')
@@ -100,12 +164,15 @@ const aiController = async (req, res) => {
         }
       }
     }
-    // 1C: DEALS BY COMPANY NAME
+    
+    // 1G: DEALS BY COMPANY NAME - MOVED TO LAST
     if (!lower.includes("deals by") && !lower.includes("handled by") &&
       !lower.includes("deal ") && !lower.includes("leads") &&
       !lower.includes("won") && !lower.includes("lost") &&
       !lower.includes("open") && !lower.includes("hot") &&
-      !lower.includes("warm") && !lower.includes("cold")) {
+      !lower.includes("warm") && !lower.includes("cold") &&
+      !lower.includes("my")) {  // Added "my" to exclude "my deals"
+      
       let searchTerm = message.trim();
       console.log("🏢 SEARCHING DEALS BY COMPANY:", searchTerm);
       const deals = await Deal.find({
@@ -123,65 +190,71 @@ const aiController = async (req, res) => {
         });
       }
     }
-    // 1D: DEALS WON
-    if (lower.includes("deals won") || lower.includes("won deals") || (lower.includes("won") && lower.includes("deal"))) {
-      let query = { stage: "Closed Won" };
-      if (roleName !== "Admin") query.assignedTo = userId;
-      const deals = await Deal.find(query)
-        .populate("assignedTo", "firstName lastName email")
+    
+    // SECTION 2: LEADS - STAGE-BASED FILTERS FIRST
+    // 2A: HOT LEADS
+    if (lower.includes("hot leads") || lower.includes("leads hot") || (lower.includes("hot") && lower.includes("lead"))) {
+      let query = { status: "Hot" };
+      if (roleName !== "Admin") query.assignTo = userId;
+      const leads = await Lead.find(query)
+        .populate("assignTo", "firstName lastName email")
         .sort({ createdAt: -1 });
       return res.json({
         success: true,
-        intent: "deals-won",
-        message: `You have ${deals.length} won deals.`,
-        count: deals.length,
-        data: deals.map(deal => formatDeal(deal))
+        intent: "leads-hot",
+        message: `You have ${leads.length} hot leads.`,
+        count: leads.length,
+        data: leads.map(lead => formatLead(lead))
       });
     }
-    // 1E: DEALS LOST
-    if (lower.includes("deals lost") || lower.includes("lost deals") || (lower.includes("lost") && lower.includes("deal"))) {
-      let query = { stage: "Closed Lost" };
-      if (roleName !== "Admin") query.assignedTo = userId;
-      const deals = await Deal.find(query)
-        .populate("assignedTo", "firstName lastName email")
+    
+    // 2B: WARM LEADS
+    if (lower.includes("warm leads") || lower.includes("leads warm") || (lower.includes("warm") && lower.includes("lead"))) {
+      let query = { status: "Warm" };
+      if (roleName !== "Admin") query.assignTo = userId;
+      const leads = await Lead.find(query)
+        .populate("assignTo", "firstName lastName email")
         .sort({ createdAt: -1 });
       return res.json({
         success: true,
-        intent: "deals-lost",
-        message: `You have ${deals.length} lost deals.`,
-        count: deals.length,
-        data: deals.map(deal => formatDeal(deal))
+        intent: "leads-warm",
+        message: `You have ${leads.length} warm leads.`,
+        count: leads.length,
+        data: leads.map(lead => formatLead(lead))
       });
     }
-    // 1F: OPEN DEALS
-    if (lower.includes("open deals") || lower.includes("deals open") || (lower.includes("open") && lower.includes("deal"))) {
-      let query = { stage: { $nin: ["Closed Won", "Closed Lost"] } };
-      if (roleName !== "Admin") query.assignedTo = userId;
-      const deals = await Deal.find(query)
-        .populate("assignedTo", "firstName lastName email")
+    
+    // 2C: COLD LEADS
+    if (lower.includes("cold leads") || lower.includes("leads cold") || (lower.includes("cold") && lower.includes("lead"))) {
+      let query = { status: "Cold" };
+      if (roleName !== "Admin") query.assignTo = userId;
+      const leads = await Lead.find(query)
+        .populate("assignTo", "firstName lastName email")
         .sort({ createdAt: -1 });
       return res.json({
         success: true,
-        intent: "deals-open",
-        message: `You have ${deals.length} open deals.`,
-        count: deals.length,
-        data: deals.map(deal => formatDeal(deal))
+        intent: "leads-cold",
+        message: `You have ${leads.length} cold leads.`,
+        count: leads.length,
+        data: leads.map(lead => formatLead(lead))
       });
     }
-    // 1G: MY DEALS
-    if (lower.includes("my deals") || lower === "my deals") {
-      const deals = await Deal.find({ assignedTo: userId })
-        .populate("assignedTo", "firstName lastName email")
+    
+    // 2D: MY LEADS
+    if (lower.includes("my leads") || lower === "my leads") {
+      const leads = await Lead.find({ assignTo: userId })
+        .populate("assignTo", "firstName lastName email")
         .sort({ createdAt: -1 });
       return res.json({
         success: true,
-        intent: "my-deals",
-        message: `You have ${deals.length} deal${deals.length !== 1 ? 's' : ''} assigned to you.`,
-        count: deals.length,
-        data: deals.map(deal => formatDeal(deal))
+        intent: "my-leads",
+        message: `You have ${leads.length} lead${leads.length !== 1 ? 's' : ''} assigned to you.`,
+        count: leads.length,
+        data: leads.map(lead => formatLead(lead))
       });
     }
-    // 2A: LEADS BY SALESPERSON
+    
+    // 2E: LEADS BY SALESPERSON
     if (lower.includes("leads by") || lower.includes("leads of") || lower.includes("assigned to") || lower.includes("handled by")) {
       let searchName = lower
         .replace(/leads by|leads of|assigned to|handled by|show|get|find|search|for|name/gi, '')
@@ -227,7 +300,8 @@ const aiController = async (req, res) => {
         }
       }
     }
-    // 2B: SPECIFIC LEAD BY NAME
+    
+    // 2F: SPECIFIC LEAD BY NAME
     if (lower.includes("lead ") && !lower.includes("leads ")) {
       let searchTerm = lower
         .replace(/lead|show|get|find|search|for|about|named|called/gi, '')
@@ -262,12 +336,15 @@ const aiController = async (req, res) => {
         }
       }
     }
-    // 2C: LEADS BY COMPANY NAME
+    
+    // 2G: LEADS BY COMPANY NAME - MOVED TO LAST
     if (!lower.includes("leads by") && !lower.includes("handled by") &&
       !lower.includes("lead ") && !lower.includes("deals") &&
       !lower.includes("won") && !lower.includes("lost") &&
       !lower.includes("open") && !lower.includes("hot") &&
-      !lower.includes("warm") && !lower.includes("cold")) {
+      !lower.includes("warm") && !lower.includes("cold") &&
+      !lower.includes("my")) {  // Added "my" to exclude "my leads"
+      
       let searchTerm = message.trim();
       console.log("🏢 SEARCHING LEADS BY COMPANY:", searchTerm);
       const leads = await Lead.find({
@@ -285,64 +362,7 @@ const aiController = async (req, res) => {
         });
       }
     }
-    // 2D: HOT LEADS
-    if (lower.includes("hot leads") || lower.includes("leads hot") || (lower.includes("hot") && lower.includes("lead"))) {
-      let query = { status: "Hot" };
-      if (roleName !== "Admin") query.assignTo = userId;
-      const leads = await Lead.find(query)
-        .populate("assignTo", "firstName lastName email")
-        .sort({ createdAt: -1 });
-      return res.json({
-        success: true,
-        intent: "leads-hot",
-        message: `You have ${leads.length} hot leads.`,
-        count: leads.length,
-        data: leads.map(lead => formatLead(lead))
-      });
-    }
-    // 2E: WARM LEADS
-    if (lower.includes("warm leads") || lower.includes("leads warm") || (lower.includes("warm") && lower.includes("lead"))) {
-      let query = { status: "Warm" };
-      if (roleName !== "Admin") query.assignTo = userId;
-      const leads = await Lead.find(query)
-        .populate("assignTo", "firstName lastName email")
-        .sort({ createdAt: -1 });
-      return res.json({
-        success: true,
-        intent: "leads-warm",
-        message: `You have ${leads.length} warm leads.`,
-        count: leads.length,
-        data: leads.map(lead => formatLead(lead))
-      });
-    }
-    // 2F: COLD LEADS
-    if (lower.includes("cold leads") || lower.includes("leads cold") || (lower.includes("cold") && lower.includes("lead"))) {
-      let query = { status: "Cold" };
-      if (roleName !== "Admin") query.assignTo = userId;
-      const leads = await Lead.find(query)
-        .populate("assignTo", "firstName lastName email")
-        .sort({ createdAt: -1 });
-      return res.json({
-        success: true,
-        intent: "leads-cold",
-        message: `You have ${leads.length} cold leads.`,
-        count: leads.length,
-        data: leads.map(lead => formatLead(lead))
-      });
-    }
-    // 2G: MY LEADS
-    if (lower.includes("my leads") || lower === "my leads") {
-      const leads = await Lead.find({ assignTo: userId })
-        .populate("assignTo", "firstName lastName email")
-        .sort({ createdAt: -1 });
-      return res.json({
-        success: true,
-        intent: "my-leads",
-        message: `You have ${leads.length} lead${leads.length !== 1 ? 's' : ''} assigned to you.`,
-        count: leads.length,
-        data: leads.map(lead => formatLead(lead))
-      });
-    }
+    
     // FALLBACK
     return res.json({
       success: true,
@@ -359,7 +379,8 @@ const aiController = async (req, res) => {
     });
   }
 };
-// HELPER FUNCTIONS
+
+// HELPER FUNCTIONS (keep your existing ones)
 function formatDeal(deal) {
   return {
     _id: deal._id,
@@ -384,6 +405,7 @@ function formatDeal(deal) {
     type: "deal"
   };
 }
+
 function formatLead(lead) {
   return {
     _id: lead._id,
