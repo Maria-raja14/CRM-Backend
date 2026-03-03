@@ -1,16 +1,33 @@
-import express from 'express';
-import { sendMessage, getMessageHistory } from '../controllers/whatsapp.controller.js';
-import { handleIncomingMessage } from '../services/twilio.service.js';
+
+
+
+import express from "express";
+import {
+  inboundWebhook,
+  sendMessage,
+  sendTemplate,
+  sendMedia,
+  getConversations,
+  getMessages,
+  updateConversation,
+  statusCallback,
+  getUnreadCount,
+} from "../controllers/whatsapp.controller.js";
 
 const router = express.Router();
 
-// Send WhatsApp message
-router.post('/send', sendMessage);
+// ── Twilio Webhooks (no auth — Twilio calls these) ───────────────────────────
+router.post("/webhook", inboundWebhook);          // Inbound message webhook
+router.post("/status", statusCallback);           // Delivery status callback
 
-// Get message history for a phone number
-router.get('/history/:phoneNumber', getMessageHistory);
+// ── CRM Internal API ─────────────────────────────────────────────────────────
+router.get("/conversations", getConversations);                    // List all chats
+router.get("/messages/:contactNumber", getMessages);               // Chat history
+router.patch("/conversations/:id", updateConversation);            // Rename / assign
+router.get("/unread-count", getUnreadCount);                       // Badge count
 
-// Webhook for incoming messages (Twilio will POST here)
-router.post('/webhook', handleIncomingMessage);
+router.post("/send", sendMessage);                // Send plain text
+router.post("/send-template", sendTemplate);      // Send template
+router.post("/send-media", sendMedia);            // Send media
 
 export default router;
