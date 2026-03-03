@@ -19,7 +19,7 @@
 
 import mongoose from "mongoose";
 
-const whatsappMessageSchema = new mongoose.Schema(
+const WhatsappMessageSchema = new mongoose.Schema(
   {
     // The contact's phone number (e.g. whatsapp:+91XXXXXXXXXX)
     contactNumber: {
@@ -91,8 +91,8 @@ const whatsappMessageSchema = new mongoose.Schema(
 );
 
 // Index for fast conversation fetch
-whatsappMessageSchema.index({ contactNumber: 1, createdAt: 1 });
-whatsappMessageSchema.index({ read: 1, direction: 1 });
+WhatsappMessageSchema.index({ contactNumber: 1, createdAt: 1 });
+WhatsappMessageSchema.index({ read: 1, direction: 1 });
 
-const WhatsappMessage = mongoose.model("WhatsappMessage", whatsappMessageSchema);
+const WhatsappMessage = mongoose.model("WhatsappMessage", WhatsappMessageSchema);
 export default WhatsappMessage;

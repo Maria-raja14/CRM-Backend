@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const whatsappConversationSchema = new mongoose.Schema(
+const WhatsappConversationSchema = new mongoose.Schema(
   {
     // Unique contact number (whatsapp:+91XXXXXXXXXX)
     contactNumber: {
@@ -62,11 +62,11 @@ const whatsappConversationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-whatsappConversationSchema.index({ lastMessageAt: -1 });
-whatsappConversationSchema.index({ unreadCount: -1 });
+WhatsappConversationSchema.index({ lastMessageAt: -1 });
+WhatsappConversationSchema.index({ unreadCount: -1 });
 
 const WhatsappConversation = mongoose.model(
   "WhatsappConversation",
-  whatsappConversationSchema
+  WhatsappConversationSchema
 );
 export default WhatsappConversation;

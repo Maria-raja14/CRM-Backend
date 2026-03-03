@@ -1,9 +1,5 @@
-
-
-
-
-import WhatsappMessage from "../models/whatsAppMessage.js";
-import WhatsappConversation from "../models/whatsappconversation.model.js";
+import WhatsappConversation from "../models/Whatsappconversation.model.js";
+import WhatsappMessage from "../models/WhatsAppMessage.js";
 import {
   sendTextMessage,
   sendTemplateMessage,
@@ -11,7 +7,11 @@ import {
   normaliseWhatsappNumber,
   displayNumber,
 } from "../services/twilio.service.js";
-import { notifyUser, notifyAdmins, connectedUsers } from "../realtime/socket.js";
+import {
+  notifyUser,
+  notifyAdmins,
+  connectedUsers,
+} from "../realtime/socket.js";
 
 // ─── Helper: upsert conversation on every message ────────────────────────────
 const upsertConversation = async ({
@@ -31,10 +31,8 @@ const upsertConversation = async ({
 
   const conv = await WhatsappConversation.findOneAndUpdate(
     { contactNumber },
-    incrementUnread
-      ? { ...update, $inc: { unreadCount: 1 } }
-      : update,
-    { upsert: true, new: true, setDefaultsOnInsert: true }
+    incrementUnread ? { ...update, $inc: { unreadCount: 1 } } : update,
+    { upsert: true, new: true, setDefaultsOnInsert: true },
   );
   return conv;
 };
@@ -46,7 +44,7 @@ const upsertConversation = async ({
 export const inboundWebhook = async (req, res) => {
   try {
     const {
-      From,         // whatsapp:+91XXXXXXXXXX
+      From, // whatsapp:+91XXXXXXXXXX
       Body,
       MessageSid,
       NumMedia,
@@ -116,7 +114,9 @@ export const sendMessage = async (req, res) => {
 
     const toFormatted = normaliseWhatsappNumber(to);
 
-    console.log(`📤 Send request | raw to: "${to}" | normalised: "${toFormatted}"`);
+    console.log(
+      `📤 Send request | raw to: "${to}" | normalised: "${toFormatted}"`,
+    );
 
     const twilioMsg = await sendTextMessage(toFormatted, body);
 
@@ -144,7 +144,7 @@ export const sendMessage = async (req, res) => {
       createdAt: message.createdAt,
     };
     Object.keys(connectedUsers).forEach((uid) =>
-      notifyUser(uid, "whatsapp_message_sent", payload)
+      notifyUser(uid, "whatsapp_message_sent", payload),
     );
 
     res.status(201).json({ success: true, message });
@@ -179,10 +179,12 @@ const getEnhancedTip = (err) => {
     return "The 'From' phone number is not a WhatsApp-enabled number. Verify TWILIO_WHATSAPP_FROM in .env – it must be a Twilio WhatsApp sender (sandbox: whatsapp:+14155238886) or a WhatsApp-enabled Twilio number.";
   }
   if (msg.includes("Channel") || msg.includes("From address")) {
-    return "Twilio could not find a WhatsApp Channel with the specified From address. Verify that:\n" +
-           "1. TWILIO_WHATSAPP_FROM is set correctly in .env (e.g., 'whatsapp:+14155238886' for sandbox).\n" +
-           "2. Your Twilio account has WhatsApp enabled and the number is correctly configured.\n" +
-           "3. If using the sandbox, ensure the sandbox number is exactly as shown in the Twilio Console (including country code).";
+    return (
+      "Twilio could not find a WhatsApp Channel with the specified From address. Verify that:\n" +
+      "1. TWILIO_WHATSAPP_FROM is set correctly in .env (e.g., 'whatsapp:+14155238886' for sandbox).\n" +
+      "2. Your Twilio account has WhatsApp enabled and the number is correctly configured.\n" +
+      "3. If using the sandbox, ensure the sandbox number is exactly as shown in the Twilio Console (including country code)."
+    );
   }
   if (msg.includes("not a valid")) {
     return "Phone number format is invalid. Include country code e.g. +919361444764";
@@ -203,12 +205,18 @@ export const sendTemplate = async (req, res) => {
   try {
     const { to, contentSid, variables, sentBy } = req.body;
     if (!to || !contentSid)
-      return res.status(400).json({ message: "to and contentSid are required" });
+      return res
+        .status(400)
+        .json({ message: "to and contentSid are required" });
 
     const toFormatted = normaliseWhatsappNumber(to);
     const sid = contentSid || process.env.TWILIO_CONTENT_SID;
 
-    const twilioMsg = await sendTemplateMessage(toFormatted, sid, variables || {});
+    const twilioMsg = await sendTemplateMessage(
+      toFormatted,
+      sid,
+      variables || {},
+    );
 
     const message = await WhatsappMessage.create({
       contactNumber: toFormatted,
@@ -297,7 +305,12 @@ export const getConversations = async (req, res) => {
 
     const total = await WhatsappConversation.countDocuments(query);
 
-    res.json({ conversations, total, page: parseInt(page), limit: parseInt(limit) });
+    res.json({
+      conversations,
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -323,11 +336,11 @@ export const getMessages = async (req, res) => {
     // Mark inbound messages as read
     await WhatsappMessage.updateMany(
       { contactNumber, direction: "inbound", read: false },
-      { read: true }
+      { read: true },
     );
     await WhatsappConversation.findOneAndUpdate(
       { contactNumber },
-      { unreadCount: 0 }
+      { unreadCount: 0 },
     );
 
     res.json({ messages, total });
@@ -352,7 +365,8 @@ export const updateConversation = async (req, res) => {
     const conv = await WhatsappConversation.findByIdAndUpdate(id, update, {
       new: true,
     });
-    if (!conv) return res.status(404).json({ message: "Conversation not found" });
+    if (!conv)
+      return res.status(404).json({ message: "Conversation not found" });
     res.json(conv);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -369,14 +383,14 @@ export const statusCallback = async (req, res) => {
     if (MessageSid) {
       await WhatsappMessage.findOneAndUpdate(
         { messageSid: MessageSid },
-        { status: MessageStatus }
+        { status: MessageStatus },
       );
       // Real-time status update to all connected users
       Object.keys(connectedUsers).forEach((uid) =>
         notifyUser(uid, "whatsapp_status_update", {
           messageSid: MessageSid,
           status: MessageStatus,
-        })
+        }),
       );
     }
     res.status(200).send("OK");
