@@ -1,49 +1,39 @@
 import express from "express";
 import { protect } from "../middlewares/auth.middleware.js";
-import {
-  calculateClientCLV,
-  calculateAllCLV,
-  getCLVDashboard,
-  getClientCLV,
-  createSupportTicket,
-  createRenewal,
-  getWonDeals,
-  createClientReview,
-  getPricingRisks,
-  resolvePricingRisk,
-  getPricingRecommendation
-} from "../controllers/clientLTVController.js";
+import clientLTVController from "../controllers/clientLTVController.js";
+
 
 const router = express.Router();
 router.use(protect);
 
 // Dashboard
-router.get("/dashboard", getCLVDashboard);
+router.get("/dashboard",clientLTVController.getCLVDashboard);
 
 // Won deals for client review
-router.get("/won-deals", getWonDeals);
+router.get("/won-deals", clientLTVController.getWonDeals);
 
 // Client reviews
-router.post("/client-review", createClientReview);
+router.post("/client-review", clientLTVController.createClientReview);
+
 
 // Client details
-router.get("/client/:companyName", getClientCLV);
+router.get("/client/:companyName",clientLTVController.getClientCLV);
 
 // CLV calculations
-router.post("/calculate-all", calculateAllCLV);
-router.post("/calculate/:companyName", calculateClientCLV);
+router.post("/calculate-all",clientLTVController.calculateAllCLV);
+router.post("/calculate/:companyName",clientLTVController.calculateClientCLV);
 
 // Support tickets
-router.post("/tickets", createSupportTicket);
+router.post("/tickets",clientLTVController.createSupportTicket);
 
-// Renewals
-router.post("/renewals", createRenewal);
+// Renewals.
+router.post("/renewals", clientLTVController.createRenewal);
 
 // Pricing risks
-router.get("/pricing-risks", getPricingRisks);
-router.patch("/pricing-risks/:id/resolve", resolvePricingRisk);
+router.get("/pricing-risks", clientLTVController.getPricingRisks);
+router.patch("/pricing-risks/:id/resolve", clientLTVController.resolvePricingRisk);
 
 // Pricing recommendation
-router.get("/pricing-recommendation/:companyId", getPricingRecommendation);
+router.get("/pricing-recommendation/:companyId", clientLTVController.getPricingRecommendation);
 
 export default router;

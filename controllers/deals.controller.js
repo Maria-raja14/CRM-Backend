@@ -3,7 +3,7 @@ import Lead from "../models/leads.model.js";
 import sendEmail from "../services/email.js";
 import { notifyUser } from "../realtime/socket.js";
 // Import CLV calculation function (adjust path as needed)
-import { calculateClientCLV } from "./clientLTVController.js";
+import clientLTVController from "./clientLTVController.js";
 
 export default {
   // 1️⃣ Convert Lead → Deal

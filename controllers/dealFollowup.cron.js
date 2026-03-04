@@ -7,15 +7,15 @@ import moment from "moment";
 import { sendNotification } from "../services/notificationService.js";
 
 const SHOULD_REMIND_EVERY_MINUTES = 1440; // 24 hours
+export default{
 
-const getAdminUserIds = async () => {
+getAdminUserIds : async () => {
   const adminRole = await Role.findOne({ name: "Admin" });
   if (!adminRole) return [];
   const admins = await User.find({ role: adminRole._id }, "_id");
   return admins.map((a) => a._id.toString());
-};
-
-export function startDealFollowUpCron() {
+},
+startDealFollowUpCron() {
   cron.schedule("* * * * *", async () => {
     const nowUtc = moment.utc();
     console.log("📊 Deal Follow-up Cron Running:", nowUtc.format("YYYY-MM-DD HH:mm:ss"));
@@ -90,4 +90,5 @@ export function startDealFollowUpCron() {
       console.error("❌ Deal followUp cron error:", err);
     }
   });
+}
 }

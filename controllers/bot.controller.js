@@ -1,8 +1,11 @@
 import Lead from "../models/leads.model.js";
 import CallLog from "../models/callLog.model.js";
 import { v4 as uuidv4 } from 'uuid';
-export const parseCallCommand = async (req, res) => {
-  try {
+
+export default {
+
+  parseCallCommand: async (req, res) => {
+    try {
     const { command } = req.body;
     const userId = req.user._id;
     const userRole = req.user.role.name;
@@ -102,8 +105,8 @@ export const parseCallCommand = async (req, res) => {
       message: error.message
     });
   }
-};
-export const getSuggestions = async (req, res) => {
+},
+getSuggestions : async (req, res) => {
   try {
     const userId = req.user._id;
     const userRole = req.user.role.name;
@@ -130,5 +133,6 @@ export const getSuggestions = async (req, res) => {
       success: false,
       message: error.message
     });
+    }
   }
 };

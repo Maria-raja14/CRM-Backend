@@ -1,8 +1,12 @@
 import express from "express";
-import { protect } from "../middlewares/auth.middleware.js";
 import aiController from "../controllers/ai.controller.js";
+import { protect } from "../middlewares/auth.middleware.js";
 const router = express.Router();
-router.get("/chat", protect, aiController);
-router.post("/chat", protect, aiController);
-export default router;
 
+// POST /api/ai/process
+router.post("/chat", protect, aiController.processMessage); // ✅ call the function
+
+// GET /api/ai/process (optional GET endpoint)
+router.get("/chat", protect, aiController.processMessage);
+
+export default router;

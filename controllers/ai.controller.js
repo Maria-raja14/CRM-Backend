@@ -2,8 +2,10 @@ import Deal from "../models/deals.model.js";
 import Lead from "../models/leads.model.js";
 import User from "../models/user.model.js";
 
-const aiController = async (req, res) => {
-  try {
+export default {
+
+  processMessage: async (req, res) => {
+    try {
     const payload = req.method === "GET" ? req.query : req.body;
     const { message } = payload;
 
@@ -378,6 +380,7 @@ const aiController = async (req, res) => {
       error: err.message
     });
   }
+}
 };
 
 // HELPER FUNCTIONS (keep your existing ones)
@@ -431,4 +434,3 @@ function formatLead(lead) {
   };
 }
 
-export default aiController;

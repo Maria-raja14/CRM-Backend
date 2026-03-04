@@ -12,17 +12,19 @@ import Role from "../models/role.model.js";
 dayjs.extend(utc);
 
 const SHOULD_REMIND_EVERY_MINUTES = 1440;
+export default{
+
 
 // ✅ Get all admin IDs
-const getAdminUserIds = async () => {
+getAdminUserIds :async () => {
   const adminRole = await Role.findOne({ name: "Admin" });
   if (!adminRole) return [];
   const admins = await User.find({ role: adminRole._id }, "_id");
   return admins.map((a) => a._id.toString());
-};
+},
 
 //  Safe notification creator with deduplication
-const sendNotification = async (
+sendNotification : async (
   userId,
   title,
   text,
@@ -57,9 +59,9 @@ const sendNotification = async (
   );
 
   return notif;
-};
+},
 
-export function startActivityReminderCron() {
+startActivityReminderCron() {
   cron.schedule("* * * * *", async () => {
     const now = dayjs().utc();
     console.log("🕒 Activity Reminder Cron:", now.format());
@@ -120,4 +122,5 @@ export function startActivityReminderCron() {
       console.error("❌ Activity reminder cron error:", err.message);
     }
   });
+}
 }

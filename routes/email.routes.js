@@ -1,12 +1,6 @@
 import express from "express";
 import multer from "multer";
-import sendBulkEmail, { 
-  getEmailHistory, 
-  getScheduledEmails, 
-  updateScheduledEmail, 
-  getSingleEmail, 
-  deleteEmail 
-} from "../controllers/massEmail.controller.js";
+import indexControllers from "../controllers/index.controllers.js";
 import { protect } from "../middlewares/auth.middleware.js";
 
 const upload = multer({
@@ -20,28 +14,28 @@ const router = express.Router();
 router.post(
   "/send-bulk",
   protect,
-  upload.array("attachments"),
+  upload.array("attachments"),indexControllers.massEmailController.
   sendBulkEmail
 );
 
 // GET /api/email/history
-router.get("/history", protect, getEmailHistory);
+router.get("/history", protect, indexControllers.massEmailController.getEmailHistory);
 
 // GET /api/email/scheduled
-router.get("/scheduled", protect, getScheduledEmails);
+router.get("/scheduled", protect, indexControllers.massEmailController.getScheduledEmails);
 
 // IMPORTANT FIX: Use upload.array with the correct field name
 router.put(
   "/update/:id", 
   protect, 
   upload.array("newAttachments"), // This was the issue - missing 'upload.'
-  updateScheduledEmail
+  indexControllers.massEmailController.updateScheduledEmail
 );
 
 // DELETE /api/email/delete/:id
-router.delete("/delete/:id", protect, deleteEmail);
+router.delete("/delete/:id", protect, indexControllers.massEmailController.deleteEmail);
 
 // GET /api/email/:id
-router.get("/:id", protect, getSingleEmail);
+router.get("/:id", protect, indexControllers.massEmailController.getSingleEmail);
 
 export default router;

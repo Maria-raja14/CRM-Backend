@@ -2,7 +2,10 @@
 import LostDealReason from "../models/lostDealReasonModel.js";
 import Deal from "../models/deals.model.js";
 
-export const saveLostDealReason = async (req, res) => {
+
+export default{
+
+saveLostDealReason : async (req, res) => {
   try {
     const { dealId, reason, notes } = req.body;
     const userId = req.user?._id || null;
@@ -84,9 +87,9 @@ await deal.save();
           : undefined,
     });
   }
-};
+},
 
-export const getLostDealReasons = async (req, res) => {
+getLostDealReasons :async (req, res) => {
   try {
     const lostReasons = await LostDealReason.find()
       .populate("dealId", "dealName stage value")
@@ -104,4 +107,5 @@ export const getLostDealReasons = async (req, res) => {
       message: "Server error",
     });
   }
+}
 };
