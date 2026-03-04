@@ -56,12 +56,9 @@ export const getLostDealAnalytics = async (req, res) => {
       }
     }
 
-    // Build query for lost deals
+    // Build query for lost deals - Only "Closed Lost" stage deals
     let dealQuery = { 
-      $or: [
-        { stage: "Closed Lost" },
-        { stage: "Lost" }
-      ]
+      stage: "Closed Lost"
     };
     
     // Apply date filter
@@ -77,6 +74,11 @@ export const getLostDealAnalytics = async (req, res) => {
     // Apply industry filter
     if (industry) {
       dealQuery.industry = industry;
+    }
+
+    // Apply assignedTo filter
+    if (assignedTo) {
+      dealQuery.assignedTo = assignedTo;
     }
 
     // Role-based access control
@@ -109,7 +111,8 @@ export const getLostDealAnalytics = async (req, res) => {
       return {
         ...dealObj,
         parsedValue,
-        stageLost: dealObj.stage, // Use the stage where it was lost
+        stageLostAt: dealObj.stageLostAt || dealObj.stage, // Use stageLostAt if available, otherwise current stage
+        lostDate: dealObj.lostDate || dealObj.updatedAt,
         daysInPipeline: Math.round(
           (new Date(dealObj.updatedAt) - new Date(dealObj.createdAt)) / 
           (1000 * 60 * 60 * 24)
@@ -136,30 +139,28 @@ export const getLostDealAnalytics = async (req, res) => {
     // 5. Recent Lost Deals
     const recentLostDeals = enhancedLostDeals.slice(0, 20);
 
-    // 6. Time to Loss Analysis (removed as requested)
-
-    // 7. Industry Analysis
+    // 6. Industry Analysis
     const industryAnalysis = aggregateIndustryAnalysis(enhancedLostDeals);
 
-    // 8. Deal Size Analysis
+    // 7. Deal Size Analysis
     const dealSizeAnalysis = aggregateDealSizeAnalysis(enhancedLostDeals);
 
-    // 9. High Value Deals (over ₹1,00,000)
+    // 8. High Value Deals (over ₹1,00,000)
     const highValueDeals = enhancedLostDeals
       .filter(deal => (deal.parsedValue || 0) >= 100000)
       .sort((a, b) => (b.parsedValue || 0) - (a.parsedValue || 0))
       .slice(0, 10);
 
-    // 10. Statistical Analysis
+    // 9. Statistical Analysis
     const statisticalAnalysis = calculateStatisticalAnalysis(
       enhancedLostDeals, 
       monthlyTrend
     );
 
-    // 11. Stage Analysis
+    // 10. Stage Analysis - Where deals were lost
     const stageAnalysis = calculateStageAnalysis(enhancedLostDeals);
 
-    // 12. Recovery Metrics
+    // 11. Recovery Metrics - Based on deals lost at "Closed Won" stage
     const recoveryMetrics = calculateRecoveryMetrics(enhancedLostDeals);
 
     res.status(200).json({
@@ -201,7 +202,7 @@ export const exportLostDealReport = async (req, res) => {
     
     if (format === "csv") {
       // Generate CSV
-      let csv = "Date Lost,Deal Name,Stage Lost,Value,Loss Reason,Owner,Recovery Potential\n";
+      let csv = "Date Lost,Deal Name,Stage Lost At,Value,Loss Reason,Owner,Recovery Potential\n";
       
       // You'll need to access the data from the response
       // This is a simplified version - in production you'd want to fetch the data directly
@@ -257,7 +258,7 @@ const aggregateMonthlyTrend = (deals, timeframe) => {
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
     
     const monthDeals = deals.filter(deal => {
-      const dealDate = new Date(deal.updatedAt);
+      const dealDate = new Date(deal.lostDate || deal.updatedAt);
       return dealDate.getMonth() === date.getMonth() && 
              dealDate.getFullYear() === date.getFullYear();
     });
@@ -296,14 +297,14 @@ const aggregateTopLostUsers = (deals) => {
           userStats[userId] = {
             _id: userId,
             lostDeals: 0,
-            totalValue: 0,
+            lostValue: 0,
             firstName: deal.assignedTo.firstName,
             lastName: deal.assignedTo.lastName,
             email: deal.assignedTo.email,
           };
         }
         userStats[userId].lostDeals++;
-        userStats[userId].totalValue += deal.parsedValue || 0;
+        userStats[userId].lostValue += deal.parsedValue || 0;
       }
     }
   });
@@ -422,22 +423,19 @@ const calculateStatisticalAnalysis = (deals, monthlyTrend) => {
 const calculateStageAnalysis = (deals) => {
   const stageMap = new Map();
   
-  // Define stage order
+  // Define stage order based on your schema
   const stageOrder = [
-    "Prospect",
-    "Qualified",
-    "Proposal Sent",
-    "Negotiation",
-    "Demo",
+    "Qualification",
+    "Proposal Sent-Negotiation",
     "Invoice Sent",
+    "Closed Won",
     "Closed Lost",
-    "Lost",
     "Unknown"
   ];
 
   deals.forEach(deal => {
-    // Get the stage where the deal was lost
-    const stage = deal.stage || "Unknown";
+    // Get the stage where the deal was lost (from stageLostAt field)
+    const stage = deal.stageLostAt || deal.stage || "Unknown";
     const value = deal.parsedValue || 0;
 
     if (!stageMap.has(stage)) {
@@ -466,60 +464,50 @@ const calculateStageAnalysis = (deals) => {
     }))
     .sort((a, b) => {
       // Sort by stage order
-      return stageOrder.indexOf(a.stage) - stageOrder.indexOf(b.stage);
+      const indexA = stageOrder.indexOf(a.stage);
+      const indexB = stageOrder.indexOf(b.stage);
+      return indexA - indexB;
     });
 
   return stageAnalysis;
 };
 
 const calculateStageRecoveryPotential = (stage, totalValue) => {
-  const recoveryRates = {
-    "Prospect": 0.10,
-    "Qualified": 0.15,
-    "Proposal Sent": 0.25,
-    "Negotiation": 0.35,
-    "Demo": 0.30,
-    "Invoice Sent": 0.45,
-    "Closed Lost": 0.20,
-    "Lost": 0.20,
-    "Unknown": 0.10,
-  };
-
-  const rate = recoveryRates[stage] || 0.10;
-  return Math.round(totalValue * rate);
+  // Only deals lost at "Closed Won" stage are considered recoverable
+  if (stage === "Closed Won") {
+    return Math.round(totalValue * 0.2); // 20% recovery rate for Closed Won stage
+  }
+  return 0; // No recovery potential for other stages
 };
 
 const getStageRecoveryRate = (stage) => {
-  const rates = {
-    "Prospect": 10,
-    "Qualified": 15,
-    "Proposal Sent": 25,
-    "Negotiation": 35,
-    "Demo": 30,
-    "Invoice Sent": 45,
-    "Closed Lost": 20,
-    "Lost": 20,
-    "Unknown": 10,
-  };
-  return rates[stage] || 10;
+  // Only Closed Won stage has recovery potential
+  if (stage === "Closed Won") {
+    return 20; // 20% recovery rate
+  }
+  return 0;
 };
 
 const calculateRecoveryMetrics = (deals) => {
-  const stageAnalysis = calculateStageAnalysis(deals);
+  // Filter deals that were lost at "Closed Won" stage
+  const closedWonLostDeals = deals.filter(deal => 
+    deal.stageLostAt === "Closed Won" || deal.stage === "Closed Won"
+  );
   
-  const totalRecoveryPotential = stageAnalysis.reduce(
-    (sum, stage) => sum + (stage.recoveryPotential || 0), 
+  const totalRecoveryPotential = closedWonLostDeals.reduce(
+    (sum, deal) => sum + Math.round((deal.parsedValue || 0) * 0.2), // 20% recovery rate
     0
   );
 
-  const averageRecoveryRate = stageAnalysis.length > 0
-    ? Math.round(stageAnalysis.reduce((sum, stage) => sum + (stage.recoveryRate || 0), 0) / stageAnalysis.length)
-    : 0;
+  const averageRecoveryRate = closedWonLostDeals.length > 0 ? 20 : 0;
 
-  const bestStageForRecovery = stageAnalysis.length > 0
-    ? stageAnalysis.reduce((best, stage) => 
-        (stage.recoveryRate || 0) > (best?.recoveryRate || 0) ? stage : best
-      , stageAnalysis[0])
+  const bestStageForRecovery = closedWonLostDeals.length > 0 
+    ? {
+        stage: "Closed Won",
+        count: closedWonLostDeals.length,
+        totalValue: closedWonLostDeals.reduce((sum, deal) => sum + (deal.parsedValue || 0), 0),
+        recoveryRate: 20
+      }
     : null;
 
   return {

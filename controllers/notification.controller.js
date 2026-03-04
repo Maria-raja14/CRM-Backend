@@ -2,6 +2,7 @@
 import Notification from "../models/notification.model.js";
 import User from "../models/user.model.js"
 import Lead from "../models/leads.model.js";
+import Deal from "../models/deals.model.js";
 
 export default {
   // Get notifications for a user
@@ -27,6 +28,40 @@ export default {
 //   }
 // },
 // controllers/notification.controller.js
+
+createNotification: async (req, res) => {
+  try {
+    const {
+      userId,
+      title,
+      message,
+      type,
+      relatedId,
+      relatedModel,
+      scheduledFor,
+      read,
+    } = req.body;
+
+    const notification = await Notification.create({
+      userId,
+      title,
+      text: message,   // ⚠ IMPORTANT: Your frontend sends "message" but DB uses "text"
+      type,
+      meta: {
+        dealId: relatedModel === "Deal" ? relatedId : undefined,
+        leadId: relatedModel === "Lead" ? relatedId : undefined,
+        proposalId: relatedModel === "Proposal" ? relatedId : undefined,
+      },
+      scheduledFor,
+      read: read || false,
+    });
+
+    res.status(201).json(notification);
+  } catch (err) {
+    console.error("Create notification error:", err);
+    res.status(500).json({ message: err.message });
+  }
+},
 getUserNotifications: async (req, res) => {
   try {
     const { userId } = req.params;
@@ -54,6 +89,19 @@ getUserNotifications: async (req, res) => {
         if (lead?.assignTo) {
           notif.profileImage = lead.assignTo.profileImage?.replace(/\\/g, "/") || null;
           notif.userName = `${lead.assignTo.firstName} ${lead.assignTo.lastName}`;
+        }
+      }
+      // Handle deal followups
+      else if (notif.type === "followup" && notif.meta?.dealId) {
+        const deal = await Deal.findById(notif.meta.dealId)
+          .populate("assignedTo", "profileImage firstName lastName");
+
+        if (deal?.assignedTo) {
+          notif.profileImage =
+            deal.assignedTo.profileImage?.replace(/\\/g, "/") || null;
+
+          notif.userName =
+            `${deal.assignedTo.firstName} ${deal.assignedTo.lastName}`;
         }
       }
       

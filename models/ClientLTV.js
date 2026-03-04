@@ -81,6 +81,12 @@ const clientLTFSchema = new mongoose.Schema(
     
     // Client health
     clientHealthScore: { type: Number, default: 50, min: 0, max: 100 },
+
+    // Add this after clientHealthScore or with other boolean fields
+delivered: {
+  type: Boolean,
+  default: false
+},
     
     // Pricing recommendation
     suggestedMinPrice: { type: Number },

@@ -123,7 +123,7 @@ import { startActivityReminderCron } from "./controllers/activityReminder.cron.j
 import { startProposalFollowUpCron } from "./controllers/proposalFollowUpCron.controller.js";
 import lostDealRoutes from "./routes/lostDealRoutes.js";
 import clientLTVRoutes from "./routes/clientLTVRoutes.js";
-import { startDealFollowUpCron } from "./controllers/dealFollowup.cron.js";
+import { startDealFollowUpCron } from "./controllers/dealFollowups.cron.js";
 
 
 dotenv.config();
