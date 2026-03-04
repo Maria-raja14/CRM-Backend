@@ -64,14 +64,14 @@ const aggregateTopLostUsers = (deals) => {
           userStats[userId] = {
             _id: userId,
             lostDeals: 0,
-            totalValue: 0,
+            lostValue: 0,
             firstName: deal.assignedTo.firstName,
             lastName: deal.assignedTo.lastName,
             email: deal.assignedTo.email,
           };
         }
         userStats[userId].lostDeals++;
-        userStats[userId].totalValue += deal.parsedValue || 0;
+        userStats[userId].lostValue += deal.parsedValue || 0;
       }
     }
   });
