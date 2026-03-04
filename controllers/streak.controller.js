@@ -1,29 +1,22 @@
+import mongoose from 'mongoose';
+
 import Streak from '../models/streak.model.js';
 import User from '../models/user.model.js';
 import Deal from '../models/deals.model.js';
 import Lead from '../models/leads.model.js';
-// Helper function to update user metrics - CORRECTED FORMULA
+// Helper function outside
 async function updateUserMetrics(userId) {
   try {
-    // ✅ STEP 1: Get TOTAL LEADS from Lead model (DENOMINATOR)
-    const totalLeads = await Lead.countDocuments({ 
-      assignTo: userId 
-      // Count ALL leads assigned to this user - regardless of status
-    });
-    // ✅ STEP 2: Get QUALIFICATION DEALS from Deal model (NUMERATOR)
+    const totalLeads = await Lead.countDocuments({ assignTo: userId });
     const qualificationDeals = await Deal.countDocuments({
       assignedTo: userId,
-      stage: { $regex: new RegExp('^qualification$', 'i') } // Case insensitive
+      stage: { $regex: new RegExp('^qualification$', 'i') }
     });
-  // ✅ STEP 3: CORRECT CONVERSION RATE FORMULA
-    const conversionRate = totalLeads > 0 
-      ? (qualificationDeals / totalLeads) * 100 
-      : 0;
+    const conversionRate = totalLeads > 0 ? (qualificationDeals / totalLeads) * 100 : 0;
     return {
-      totalLeads,              
-      qualificationDeals,    
-      conversionRate,          // (qualificationDeals / totalLeads) × 100
-      // Keep backward compatibility names
+      totalLeads,
+      qualificationDeals,
+      conversionRate,
       totalQualificationDeals: qualificationDeals,
       convertedLeadsToQualification: qualificationDeals,
       totalDeals: qualificationDeals,
@@ -42,14 +35,20 @@ async function updateUserMetrics(userId) {
     };
   }
 }
+
+// Then your export object
+export default {
+
 // ✅ Get user login history from USER MODEL
-export const getUserLoginHistory = async (req, res) => {
+getUserLoginHistory : async (req, res) => {
   try {
     const { userId } = req.params;
     const currentUser = req.user;
-    if (!userId) {
-      return res.status(400).json({ message: "User ID is required" });
-    }
+     // ✅ Validate ObjectId
+      if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+        return res.status(400).json({ success: false, message: 'Invalid or missing userId' });
+      }
+
     const isAdmin = currentUser.role?.name === "Admin" || currentUser.role === "Admin";
     const isOwnData = currentUser._id.toString() === userId;
     if (!isAdmin && !isOwnData) {
@@ -198,9 +197,9 @@ export const getUserLoginHistory = async (req, res) => {
       error: error.message 
     });
   }
-};
+},
 // ✅ Update streak on login
-export const updateStreakFromLogin = async (req, res) => {
+updateStreakFromLogin : async (req, res) => {
   try {
     const { userId } = req.params;
     const user = await User.findById(userId).select("loginHistory");
@@ -259,9 +258,9 @@ export const updateStreakFromLogin = async (req, res) => {
     console.error('Error in updateStreakFromLogin:', error);
     res.status(500).json({ error: error.message });
   }
-};
+},
 // ✅ FIXED: Get leaderboard data - CORRECT CONVERSION RATE FORMULA
-export const getLeaderboard = async (req, res) => {
+getLeaderboard : async (req, res) => {
   try {
     const userData = req.user;
     const currentUserId = userData?._id;
@@ -341,9 +340,9 @@ export const getLeaderboard = async (req, res) => {
     console.error('Error in getLeaderboard:', error);
     res.status(500).json({ error: error.message });
   }
-};
+},
 // Get individual user streak
-export const getUserStreak = async (req, res) => {
+getUserStreak : async (req, res) => {
   try {
     const { userId } = req.params;
     const streak = await Streak.findOne({ userId })
@@ -357,9 +356,9 @@ export const getUserStreak = async (req, res) => {
     console.error('Error in getUserStreak:', error);
     res.status(500).json({ error: error.message });
   }
-};
+},
 // Get sales users endpoin
-export const getSalesUsers = async (req, res) => {
+getSalesUsers : async (req, res) => {
   try {
     const users = await User.find()
       .populate("role", "name")
@@ -372,4 +371,5 @@ export const getSalesUsers = async (req, res) => {
     console.error("❌ Error fetching sales users:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
+}
 };

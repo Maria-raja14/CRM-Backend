@@ -10,10 +10,16 @@ import dealsRoutes from "./deals.route.js";
 import adminDashboard from "./adminDashboard.routes.js";
 import notificationRoutes from "./notification.routes.js";
 import salesRoutes from "./salesReports.routes.js"
-import aiRoutes from "./ai.routes.js"; // ✅ ADD THIS LINE
-import streakRoutes from "./streak.routes.js"; // ✅ ADD THIS LINE
+import aiRoutes from "./ai.routes.js"; 
+import streakRoutes from "./streak.routes.js"; 
 import callLogRoutes from "./callLog.routes.js";
 import botRoutes from "./bot.routes.js";
+import clientLTVRoutes from "./clientLTVRoutes.js";
+import contactFormRoutes from "./public.routes.js";
+import emailTemplateRoutes from "./emailTemplate.routes.js";
+import lostDealRoutes from "./lostDealRoutes.js";
+import settingsRoutes from "./settingsRoutes.js";
+import emailRoutes from "./email.routes.js"
 const router = express.Router();
 
 router.use("/users", userRoutes);
@@ -30,10 +36,14 @@ router.use("/proposal", proposalRoutes);
 router.use("/dashboard", adminDashboard);
 router.use("/notification", notificationRoutes);
 router.use("/sales", salesRoutes);
-router.use("/ai", aiRoutes); // ✅ ADD THIS LINE
-router.use("/streak", streakRoutes); // ✅ ADD THIS LINE
+router.use("/ai", aiRoutes);
+router.use("/streak", streakRoutes); 
 router.use("/calllogs", callLogRoutes);
 router.use("/bot", botRoutes);
-
-
+router.use("/public", contactFormRoutes);
+router.use("/email-templates", emailTemplateRoutes);
+router.use("/lost-deals", lostDealRoutes);
+router.use("/settings", settingsRoutes);
+router.use("/client-ltv", clientLTVRoutes);
+router.use("/email",emailRoutes);
 export default router;

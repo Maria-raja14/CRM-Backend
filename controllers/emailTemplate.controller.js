@@ -1,7 +1,8 @@
 import EmailTemplate from "../models/emailTemplate.model.js";
 
 // 🔹 Get all templates (Admin + Assigned users)
-export const getTemplates = async (req, res) => {
+export default{
+   getTemplates : async (req, res) => {
   try {
     const templates = await EmailTemplate.find().sort({ createdAt: -1 });
 
@@ -13,10 +14,10 @@ export const getTemplates = async (req, res) => {
     console.error("Fetch templates error:", error);
     res.status(500).json({ message: "Failed to fetch templates" });
   }
-};
+},
 
 // 🔹 Create template (Admin only)
-export const createTemplate = async (req, res) => {
+createTemplate : async (req, res) => {
   try {
     const { title, subject, content } = req.body;
 
@@ -41,4 +42,5 @@ export const createTemplate = async (req, res) => {
     console.error("Create template error:", error);
     res.status(500).json({ message: "Failed to create template" });
   }
+}
 };

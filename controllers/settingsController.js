@@ -4,7 +4,9 @@ import Settings from "../models/Settings.js";
  * GET SETTINGS
  * Used to fetch current company settings (logo etc.)
  */
-export const getSettings = async (req, res) => {
+export default {
+
+getSettings : async (req, res) => {
   try {
     let settings = await Settings.findOne();
 
@@ -18,13 +20,13 @@ export const getSettings = async (req, res) => {
     console.error("Get Settings Error:", error);
     res.status(500).json({ message: "Server Error" });
   }
-};
+},
 
 /**
  * UPDATE COMPANY LOGO
  * Upload image + save path in database
  */
-export const updateLogo = async (req, res) => {
+updateLogo : async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: "Logo file is required" });
@@ -52,12 +54,12 @@ export const updateLogo = async (req, res) => {
     console.error("Update Logo Error:", error);
     res.status(500).json({ message: "Server Error" });
   }
-};
+},
 /**
  * UPDATE FAVICON
  * Upload favicon + save path in database
  */
-export const updateFavicon = async (req, res) => {
+updateFavicon : async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: "Favicon file is required" });
@@ -85,11 +87,11 @@ export const updateFavicon = async (req, res) => {
     console.error("Update Favicon Error:", error);
     res.status(500).json({ message: "Server Error" });
   }
-};
+},
 /**
  * UPDATE COMPANY NAME (Browser Title)
  */
-export const updateCompanyName = async (req, res) => {
+updateCompanyName : async (req, res) => {
   try {
     const { companyName } = req.body;
 
@@ -117,4 +119,5 @@ export const updateCompanyName = async (req, res) => {
     console.error("Update Company Name Error:", error);
     res.status(500).json({ message: "Server Error" });
   }
+}
 };

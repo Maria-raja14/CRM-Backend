@@ -1,9 +1,7 @@
 import express from "express";
 import { protect } from "../middlewares/auth.middleware.js";
-import {
-  createTemplate,
-  getTemplates,
-} from "../controllers/emailTemplate.controller.js";
+import indexControllers from "../controllers/index.controllers.js";
+
 
 const router = express.Router();
 
@@ -18,9 +16,9 @@ const isAdmin = (req, res, next) => {
 };
 
 // 👥 Admin + assigned users can VIEW templates
-router.get("/", protect, getTemplates);
+router.get("/", protect, indexControllers.emailTemplateController.getTemplates);
 
 // 🔒 Only admin can CREATE templates
-router.post("/", protect, isAdmin, createTemplate);
+router.post("/", protect, isAdmin, indexControllers.emailTemplateController.createTemplate);
 
 export default router;

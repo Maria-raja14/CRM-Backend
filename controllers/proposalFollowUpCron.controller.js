@@ -8,15 +8,14 @@ import moment from "moment";
 import { sendNotification } from "../services/notificationService.js";
 
 const REMIND_GAP_MINUTES = 120;
-
-const getAdminUserIds = async () => {
+export default{
+getAdminUserIds : async () => {
   const adminRole = await Role.findOne({ name: "Admin" });
   if (!adminRole) return [];
   const admins = await User.find({ role: adminRole._id }, "_id");
   return admins.map(a => a._id.toString());
-};
-
-export function startProposalFollowUpCron() {
+},
+startProposalFollowUpCron() {
   cron.schedule("* * * * *", async () => {
     const nowUtc = moment.utc();
     console.log("📄 Proposal Follow-up Cron Running:", nowUtc.format("YYYY-MM-DD HH:mm:ss"));
@@ -98,4 +97,5 @@ export function startProposalFollowUpCron() {
       console.error("❌ Proposal follow-up cron error:", err);
     }
   });
+}
 }

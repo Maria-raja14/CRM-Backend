@@ -2,7 +2,8 @@ import MassEmail from "../models/massEmail.model.js";
 import fs from "fs";
 import sendEmail from "../utils/sendEmail.js";
 
-const sendBulkEmail = async (req, res) => {
+export default{
+sendBulkEmail : async (req, res) => {
   try {
     let { recipients, templateTitle, subject, content, scheduledFor } = req.body;
     const logoUrl = "https://res.cloudinary.com/djpljugqo/image/upload/v1771404424/TZI_Logo-04_-_Copy-removebg-preview_o6ocur.png";
@@ -93,10 +94,8 @@ const sendBulkEmail = async (req, res) => {
     console.error("Bulk email error:", err);
     res.status(500).json({ message: "Failed to send bulk emails" });
   }
-};
-
-export default sendBulkEmail;
-export const getEmailHistory = async (req, res) => {
+},
+getEmailHistory : async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 5;
@@ -135,9 +134,9 @@ export const getEmailHistory = async (req, res) => {
     console.error("History error:", error);
     res.status(500).json({ message: "Failed to fetch history" });
   }
-};
+},
 
-export const getScheduledEmails = async (req, res) => {
+getScheduledEmails : async (req, res) => {
   try {
     let filter = { status: "scheduled" };
 
@@ -164,9 +163,9 @@ export const getScheduledEmails = async (req, res) => {
     console.error("Scheduled fetch error:", error);
     res.status(500).json({ message: "Failed to fetch scheduled emails" });
   }
-};
+},
 
-export const cancelScheduledEmail = async (req, res) => {
+cancelScheduledEmail : async (req, res) => {
   try {
     const emailId = req.params.id;
 
@@ -194,9 +193,9 @@ export const cancelScheduledEmail = async (req, res) => {
     console.error("Cancel error:", error);
     res.status(500).json({ message: "Failed to cancel email" });
   }
-};
+},
 
-export const getSingleEmail = async (req, res) => {
+getSingleEmail : async (req, res) => {
   try {
     const email = await MassEmail.findById(req.params.id);
 
@@ -213,9 +212,9 @@ export const getSingleEmail = async (req, res) => {
     console.error("Get single email error:", error);
     res.status(500).json({ message: "Failed to fetch email" });
   }
-};
+},
 
-export const updateScheduledEmail = async (req, res) => {
+updateScheduledEmail : async (req, res) => {
   try {
     const { subject, content, recipients, scheduledFor } = req.body;
     const { newAttachments, existingAttachments, removedAttachments } = req.body;
@@ -305,9 +304,9 @@ export const updateScheduledEmail = async (req, res) => {
     console.error("Update error:", error);
     res.status(500).json({ message: "Failed to update email" });
   }
-};
+},
 
-export const deleteEmail = async (req, res) => {
+deleteEmail : async (req, res) => {
   try {
     const email = await MassEmail.findById(req.params.id);
 
@@ -332,4 +331,5 @@ export const deleteEmail = async (req, res) => {
       message: "Failed to delete email",
     });
   }
+}
 };

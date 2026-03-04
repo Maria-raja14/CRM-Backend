@@ -118,7 +118,8 @@ import { sendNotification } from "../services/notificationService.js";
 const SHOULD_REMIND_EVERY_MINUTES = 1440; // 24 hours
 
 // ✅ Get Admin UserIds
-const getAdminUserIds = async () => {
+export default{
+getAdminUserIds : async () => {
   const adminRole = await Role.findOne({ name: "Admin" });
   if (!adminRole) {
     console.log("⚠️ No Admin role found in DB");
@@ -126,10 +127,10 @@ const getAdminUserIds = async () => {
   }
   const admins = await User.find({ role: adminRole._id }, "_id");
   return admins.map((a) => a._id.toString());
-};
+},
 
 // ---------- Follow-Up Cron (every minute) ----------
-export function startFollowUpCron() {
+startFollowUpCron() {
   cron.schedule("* * * * *", async () => {
     const nowUtc = moment.utc();
     console.log("🕒 Lead Follow-up Cron Running:", nowUtc.format("YYYY-MM-DD HH:mm:ss"));
@@ -209,4 +210,5 @@ export function startFollowUpCron() {
       console.error("❌ Lead followUp cron error:", err);
     }
   });
+}
 }
