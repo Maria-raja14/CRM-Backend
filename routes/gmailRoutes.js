@@ -468,7 +468,7 @@ router.get("/oauth2callback", async (req, res) => {
   const isLocal = host?.includes("localhost") || host?.includes("127.0.0.1");
   const frontendUrl = isLocal
     ? process.env.FRONTEND_URL_LOCAL || "http://localhost:5173"
-    : process.env.FRONTEND_URL_LIVE || "https://crm.stagingzar.com";
+    : process.env.FRONTEND_URL || "https://uenjoytours.cloud";
   const redirectUri = isLocal
     ? process.env.GMAIL_REDIRECT_URI
     : process.env.GMAIL_LIVE_REDIRECT_URI;
