@@ -1,8 +1,13 @@
+
+
+
+
+
 // import multer from "multer";
 // import path from "path";
 // import fs from "fs";
 
-// // ✅ Ensure both directories exist on startup
+// // ✅ Ensure all upload directories exist on startup
 // ["uploads/deals", "uploads/leads", "uploads/users"].forEach((dir) => {
 //   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 // });
@@ -11,7 +16,22 @@
 //   // ✅ FIXED: Route to correct folder based on which endpoint is called
 //   destination: (req, file, cb) => {
 //     const url = req.originalUrl || req.baseUrl || "";
-//     const uploadPath = url.includes("/deals") ? "uploads/deals" : "uploads/leads";
+
+//     let uploadPath = "uploads/leads"; // default
+
+//     if (url.includes("/deals")) {
+//       uploadPath = "uploads/deals";
+//     } else if (url.includes("/users")) {
+//       uploadPath = "uploads/users";
+//     } else if (url.includes("/leads")) {
+//       uploadPath = "uploads/leads";
+//     }
+
+//     // Ensure folder exists (safety net)
+//     if (!fs.existsSync(uploadPath)) {
+//       fs.mkdirSync(uploadPath, { recursive: true });
+//     }
+
 //     cb(null, uploadPath);
 //   },
 
@@ -28,7 +48,11 @@
 // // ✅ Allow images + all common document types
 // const fileFilter = (req, file, cb) => {
 //   const allowedMimes = [
-//     "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp",
+//     "image/jpeg",
+//     "image/jpg",
+//     "image/png",
+//     "image/gif",
+//     "image/webp",
 //     "application/pdf",
 //     "application/msword",
 //     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -60,7 +84,6 @@
 
 
 
-
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -71,7 +94,6 @@ import fs from "fs";
 });
 
 const storage = multer.diskStorage({
-  // ✅ FIXED: Route to correct folder based on which endpoint is called
   destination: (req, file, cb) => {
     const url = req.originalUrl || req.baseUrl || "";
 
@@ -138,4 +160,31 @@ const upload = multer({
   fileFilter,
 });
 
+// ✅ KEY FIX: Middleware to normalize file paths after multer saves them.
+// Multer on some OS/configs saves file.path as "\uploads\leads\file.ext" or
+// "/uploads/leads/file.ext" (with leading slash). We strip the leading slash
+// so the DB always stores "uploads/leads/file.ext" (no leading slash, forward slashes).
+// This ensures: SERVER_URL + "/" + file.path = correct URL with no double-slash.
+const normalizePaths = (req, res, next) => {
+  if (req.files && req.files.length > 0) {
+    req.files = req.files.map((file) => ({
+      ...file,
+      // Normalize: replace backslashes, strip leading slash
+      path: file.path
+        .replace(/\\/g, "/")           // Windows backslash → forward slash
+        .replace(/^\/+/, ""),          // Remove any leading slashes
+    }));
+  }
+  if (req.file) {
+    req.file = {
+      ...req.file,
+      path: req.file.path
+        .replace(/\\/g, "/")
+        .replace(/^\/+/, ""),
+    };
+  }
+  next();
+};
+
+export { normalizePaths };
 export default upload;
