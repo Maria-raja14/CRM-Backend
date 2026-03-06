@@ -1,6 +1,3 @@
-
-
-
 import express from "express";
 import {
   inboundWebhook,
@@ -30,4 +27,4 @@ router.post("/send", sendMessage);                // Send plain text
 router.post("/send-template", sendTemplate);      // Send template
 router.post("/send-media", sendMedia);            // Send media
 
-export default router;
+export default router;//original
