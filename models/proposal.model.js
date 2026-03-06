@@ -39,4 +39,7 @@ const ProposalSchema = new mongoose.Schema(
 
 const Proposal = mongoose.model("Proposal", ProposalSchema);
 
-export default Proposal;
+export default Proposal;//original
+
+
+
