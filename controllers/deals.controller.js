@@ -277,52 +277,56 @@ export default {
   },
 
   // 3️⃣ Update deal stage
-  updateStage: async (req, res) => {
-    try {
-      const { stage } = req.body;
-      const allowedStages = [
-        "Qualification",
-        "Proposal Sent-Negotiation",
-        "Invoice Sent",
-        "Closed Won",
-        "Closed Lost",
-      ];
-      if (!allowedStages.includes(stage))
-        return res.status(400).json({ message: "Invalid stage" });
+  // 3️⃣ Update deal stage
+updateStage: async (req, res) => {
+  try {
+    const { stage } = req.body;
+    const allowedStages = [
+      "Qualification",
+      "Proposal Sent-Negotiation",
+      "Invoice Sent",
+      "Closed Won",
+      "Closed Lost",
+    ];
+    if (!allowedStages.includes(stage))
+      return res.status(400).json({ message: "Invalid stage" });
 
-      const deal = await Deal.findById(req.params.id).populate(
-        "assignedTo",
-        "email"
-      );
-      if (!deal) return res.status(404).json({ message: "Deal not found" });
+    const deal = await Deal.findById(req.params.id).populate(
+      "assignedTo",
+      "email"
+    );
+    if (!deal) return res.status(404).json({ message: "Deal not found" });
 
-      // Check if user has permission to update this deal
-      if (
-        req.user.role.name !== "Admin" &&
-        deal.assignedTo._id.toString() !== req.user._id.toString()
-      ) {
-        return res.status(403).json({
-          message: "Access denied: You can only update deals assigned to you",
-        });
-      }
+    // Check if user has permission to update this deal
+    if (
+      req.user.role.name !== "Admin" &&
+      deal.assignedTo._id.toString() !== req.user._id.toString()
+    ) {
+      return res.status(403).json({
+        message: "Access denied: You can only update deals assigned to you",
+      });
+    }
 
-      const previousStage = deal.stage;
-      deal.stage = stage;
-      await deal.save();
+    const previousStage = deal.stage;
+    deal.stage = stage;
+    await deal.save();
 
-      // 🔥 If moved to Closed Won, trigger CLV recalculation
-      if (stage === "Closed Won" && previousStage !== "Closed Won") {
-        // Run in background, don't wait
-        calculateClientCLV(deal.companyName).catch(err =>
+    // 🔥 If moved to Closed Won, trigger CLV recalculation
+    if (stage === "Closed Won" && previousStage !== "Closed Won") {
+      // Run in background, don't wait
+      if (deal.companyName && deal.companyName.trim() !== "") {
+        // Using the imported controller
+        clientLTVController.calculateClientCLV(deal.companyName).catch(err =>
           console.error("Background CLV recalculation error:", err)
         );
       }
-
-      res.status(200).json(deal);
-    } catch (err) {
-      res.status(500).json({ message: err.message });
     }
-  },
+
+    res.status(200).json(deal);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+},
 
   updateDeal: async (req, res) => {
     try {
@@ -495,14 +499,16 @@ export default {
       .populate("assignedTo", "firstName lastName email")
       .populate("followUpHistory.changedBy", "firstName lastName email");
 
-      // 🔥 If stage changed to Closed Won, trigger CLV recalculation
-      if (stage === "Closed Won" && deal.stage !== "Closed Won") {
-        // Use the updated deal's companyName
-        calculateClientCLV(updatedDeal.companyName).catch(err =>
-          console.error("Background CLV recalculation error:", err)
-        );
-      }
-
+      // In updateDeal function - at the end where CLV is triggered
+// 🔥 If stage changed to Closed Won, trigger CLV recalculation
+if (stage === "Closed Won" && deal.stage !== "Closed Won") {
+  // Use the updated deal's companyName
+  if (updatedDeal.companyName && updatedDeal.companyName.trim() !== "") {
+    clientLTVController.calculateClientCLV(updatedDeal.companyName).catch(err =>
+      console.error("Background CLV recalculation error:", err)
+    );
+  }
+}
       res.status(200).json({
         message: "Deal updated successfully",
         deal: updatedDeal,

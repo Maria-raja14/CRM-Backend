@@ -216,7 +216,7 @@ getSingleEmail : async (req, res) => {
 
 updateScheduledEmail : async (req, res) => {
   try {
-    const { subject, content, recipients, scheduledFor } = req.body;
+    const { subject, content, recipients, scheduledFor, templateTitle } = req.body;
     const { newAttachments, existingAttachments, removedAttachments } = req.body;
     
     // Parse JSON strings if they come as strings
@@ -286,6 +286,7 @@ updateScheduledEmail : async (req, res) => {
     email.subject = subject || email.subject;
     email.content = content || email.content;
     email.recipients = recipientsArray || email.recipients;
+    email.templateTitle = templateTitle || email.templateTitle;
     email.attachments = finalAttachments;
     
     if (scheduledFor) {

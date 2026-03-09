@@ -30,38 +30,77 @@ async function getSupportMetrics(companyId) {
   return { total, open, lastSupportDate, avgResolutionHours, perMonth, supportPoints };
 }
 
-// Calculate follow-up count
-async function getFollowUpCount(dealId) {
+// CRITICAL FIX: Get follow-up metrics directly from deal
+// CRITICAL FIX: Get follow-up metrics directly from deal using action dates
+async function getFollowUpMetrics(dealId) {
   const deal = await Deal.findById(dealId).lean();
-  return deal?.followUpHistory?.length || 0;
+  
+  if (!deal) return { count: 0, lastDate: null, daysSince: 365 };
+  
+  // Get count from followUpHistory
+  const followUpCount = deal.followUpHistory?.length || 0;
+  
+  // Get the most recent follow-up action date from history
+  let lastFollowUpDate = null;
+  
+  if (deal.followUpHistory && deal.followUpHistory.length > 0) {
+    // Sort history by action date (most recent first)
+    const sortedHistory = [...deal.followUpHistory].sort((a, b) => {
+      const dateA = a.date ? new Date(a.date).getTime() : 0;
+      const dateB = b.date ? new Date(b.date).getTime() : 0;
+      return dateB - dateA;
+    });
+    
+    // Use the action date (when follow-up was done) not the scheduled date
+    lastFollowUpDate = sortedHistory[0]?.date || null;
+    
+    console.log(`📅 Deal ${dealId} - Most recent follow-up action:`, {
+      actionDate: lastFollowUpDate,
+      scheduledDate: sortedHistory[0]?.followUpDate,
+      action: sortedHistory[0]?.action
+    });
+  } else if (deal.followUpDate) {
+    // If no history but there's a current follow-up date
+    lastFollowUpDate = deal.followUpDate;
+    console.log(`📅 Deal ${dealId} - Using current follow-up date:`, lastFollowUpDate);
+  }
+  
+  // Calculate days since last follow-up
+  const daysSince = calculateDaysSinceFollowUp(lastFollowUpDate);
+  
+  console.log(`📊 Deal ${dealId} - Follow-up metrics:`, {
+    historyCount: deal.followUpHistory?.length,
+    calculatedCount: followUpCount,
+    lastDate: lastFollowUpDate,
+    daysSince: daysSince
+  });
+  
+  return { 
+    count: followUpCount, 
+    lastDate: lastFollowUpDate,
+    daysSince 
+  };
 }
 
-/**
- * Calculate days since follow-up dynamically with safety check for negative values
- */
+// Calculate days since follow-up
 const calculateDaysSinceFollowUp = (lastFollowUpDate) => {
   if (!lastFollowUpDate) return 365; // Default if no follow-up
   
-  const diffTime = Date.now() - new Date(lastFollowUpDate).getTime();
+  const lastDate = new Date(lastFollowUpDate);
+  const now = new Date();
+  
+  // Set both to start of day for accurate day calculation
+  lastDate.setHours(0, 0, 0, 0);
+  now.setHours(0, 0, 0, 0);
+  
+  const diffTime = now - lastDate;
   const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
   
-  // Ensure we never return negative days (future dates)
   return Math.max(0, days);
 };
 
 /**
- * 🚀 PRODUCTION READY CLASSIFICATION LOGIC
- * 
- * Priority Order (Strict):
- * 1️⃣ Upsell (Highest Priority)
- * 2️⃣ Top Value
- * 3️⃣ Dormant
- * 4️⃣ At Risk (Fallback - catches everything else)
- * 
- * This guarantees:
- * ✅ No overlap
- * ✅ No missing deals
- * ✅ Exactly ONE classification per deal
+ * 🚀 CLASSIFICATION LOGIC
  */
 const classifyDeal = ({
   totalRevenue = 0,
@@ -71,9 +110,7 @@ const classifyDeal = ({
   progress = "average",
 }) => {
 
-  // -----------------------------
-  // 1️⃣ Force Safe Number Conversion
-  // -----------------------------
+  // Force Safe Number Conversion
   totalRevenue = Number(totalRevenue);
   supportTickets = Number(supportTickets);
   clientHealthScore = Number(clientHealthScore);
@@ -88,34 +125,15 @@ const classifyDeal = ({
   clientHealthScore = Math.min(100, Math.max(0, clientHealthScore));
   daysSinceFollowUp = Math.max(0, daysSinceFollowUp);
 
-  // -----------------------------
-  // 2️⃣ Normalize Progress
-  // -----------------------------
-  const normalizedProgress = String(progress)
-    .trim()
-    .toLowerCase();
+  // Normalize Progress
+  const normalizedProgress = String(progress).trim().toLowerCase();
 
-  // -----------------------------
-  // DEBUG (Remove After Testing)
-  // -----------------------------
-  // console.log("CLASSIFY DEBUG:", {
-  //   totalRevenue,
-  //   supportTickets,
-  //   clientHealthScore,
-  //   daysSinceFollowUp,
-  //   normalizedProgress,
-  // });
-
-  // =============================
-  // 1️⃣ DORMANT (Highest Priority)
-  // =============================
+  // DORMANT
   if (daysSinceFollowUp > 90) {
     return "Dormant";
   }
 
-  // =============================
-  // 2️⃣ UPSELL (Very Strict)
-  // =============================
+  // UPSELL
   const isUpsell =
     normalizedProgress === "excellent" &&
     totalRevenue >= 500000 &&
@@ -127,9 +145,7 @@ const classifyDeal = ({
     return "Upsell";
   }
 
-  // =============================
-  // 3️⃣ AT RISK
-  // =============================
+  // AT RISK
   const isAtRisk =
     normalizedProgress === "poor" ||
     clientHealthScore < 70 ||
@@ -140,13 +156,11 @@ const classifyDeal = ({
     return "At Risk";
   }
 
-  // =============================
-  // 4️⃣ TOP VALUE (Default Safe)
-  // =============================
+  // TOP VALUE
   return "Top Value";
 };
 
-// Value category based on deal amount (for reporting only)
+// Value category based on deal amount
 const getValueCategory = (amount) => {
   if (amount > 500000) return "High Value";
   if (amount >= 100000 && amount <= 500000) return "Medium Value";
@@ -154,9 +168,7 @@ const getValueCategory = (amount) => {
 };
 
 /**
- * 📊 PRODUCTION READY PRICING CALCULATION
- * 
- * Fixed: No filtering of zero values to maintain correct averages
+ * PRICING CALCULATION
  */
 const calculatePricingRecommendation = (metrics) => {
   const { progress, supportTickets, clientHealthScore, totalRevenue, delivered } = metrics;
@@ -176,7 +188,7 @@ const calculatePricingRecommendation = (metrics) => {
   if (supportTickets > 10) supportDiscount = 0;
   else if (supportTickets > 5) supportDiscount = 20;
   else if (supportTickets > 2) supportDiscount = 30;
-  else supportDiscount = 30; // Base for low tickets
+  else supportDiscount = 30;
   
   // Health score discount
   let healthDiscount = 0;
@@ -187,12 +199,10 @@ const calculatePricingRecommendation = (metrics) => {
   // Delivery bonus
   const deliveryBonus = delivered ? 15 : 0;
   
-  // Calculate final discount (include all factors, even zeros)
+  // Calculate final discount
   const discounts = [progressDiscount, supportDiscount, healthDiscount, deliveryBonus];
-  
   const averageDiscount = discounts.reduce((a, b) => a + b, 0) / discounts.length;
-    
-  const finalDiscount = Math.min(Math.round(averageDiscount), 50); // Cap at 50%
+  const finalDiscount = Math.min(Math.round(averageDiscount), 50);
   
   // Suggested price range
   const minPrice = Math.round(totalRevenue * (1 - finalDiscount / 100));
@@ -213,19 +223,11 @@ const calculatePricingRecommendation = (metrics) => {
 };
 
 /**
- * ⚡ OPTIMIZED: Remove clients without active won deals
- * 
- * Before: 1 query per client (500 clients = 500 queries)
- * After: 2 queries total (regardless of client count)
- * 
- * Note: This assumes 1 deal = 1 company in the current architecture
+ * Clean up invalid clients
  */
 const cleanupInvalidClients = async () => {
   try {
-    // Get all active won deal IDs in one query
     const activeWonDealIds = await Deal.find({ stage: "Closed Won" }).distinct("_id");
-    
-    // Delete clients that don't have an active won deal in one query
     const result = await ClientLTV.deleteMany({
       companyId: { $nin: activeWonDealIds }
     });
@@ -241,6 +243,157 @@ const cleanupInvalidClients = async () => {
   }
 };
 
+/**
+ * CRITICAL: Recalculate metrics from deal data
+ */
+const recalculateMetricsFromDeal = async (companyId, companyName) => {
+  try {
+    console.log(`🔄 Recalculating metrics for ${companyName} from deal data...`);
+
+    // Get the deal
+    const deal = await Deal.findById(companyId).lean();
+    if (!deal) {
+      console.error(`Deal not found for companyId: ${companyId}`);
+      return null;
+    }
+
+    // Only process Closed Won deals
+    if (deal.stage !== "Closed Won") {
+      console.log(`⚠️ Deal ${companyName} is not Closed Won - removing from CLV`);
+      await ClientLTV.findOneAndDelete({ companyId });
+      return null;
+    }
+
+    // Get the latest review
+    const latestReview = await ClientReview.findOne({ companyId }).sort({ reviewedAt: -1 }).lean();
+
+    // Parse numeric value
+    const numericMatch = deal.value?.toString().match(/\d+/g);
+    const totalRevenue = numericMatch ? parseInt(numericMatch.join('')) : 0;
+
+    // Get support metrics
+    const supportMetrics = await getSupportMetrics(companyId);
+    const supportTickets = supportMetrics.total;
+
+    // CRITICAL: Get follow-up metrics directly from deal
+    const followUpMetrics = await getFollowUpMetrics(companyId);
+    const followUpCount = followUpMetrics.count;
+    const lastFollowUpDate = followUpMetrics.lastDate;
+    const daysSinceFollowUp = followUpMetrics.daysSince;
+
+    console.log(`📊 CRITICAL - Follow-up for ${companyName}:`, {
+      dealId: companyId,
+      followUpCount,
+      lastFollowUpDate,
+      daysSinceFollowUp,
+      historyLength: deal.followUpHistory?.length
+    });
+
+    // Use review data if available
+    const progress = latestReview?.progress || "Average";
+    const clientHealthScore = latestReview?.clientHealthScore || 50;
+    const delivered = latestReview?.delivered || false;
+
+    // Prepare metrics for classification
+    const metrics = {
+      totalRevenue,
+      supportTickets,
+      clientHealthScore,
+      daysSinceFollowUp,
+      progress
+    };
+
+    // Get classification
+    const classification = classifyDeal(metrics);
+    
+    // Generate reason
+    let reason = "";
+    switch(classification) {
+      case "Upsell":
+        reason = `Upsell: ${supportTickets} tickets, revenue > ₹500k, health ${clientHealthScore}`;
+        break;
+      case "Top Value":
+        reason = `Top value: revenue > ₹500k, ${supportTickets} tickets, health ${clientHealthScore}, recent follow-up`;
+        break;
+      case "Dormant":
+        reason = `Dormant: ${supportTickets} tickets, value < ₹500k, no follow-up for ${daysSinceFollowUp} days`;
+        break;
+      case "At Risk":
+        reason = `At risk: Does not meet Upsell, Top Value, or Dormant criteria`;
+        break;
+    }
+    
+    // Calculate value category
+    const valueCategory = getValueCategory(totalRevenue);
+    
+    // Get risk factors
+    const riskFactors = [];
+    if (daysSinceFollowUp > 60) riskFactors.push(`No follow-up for ${daysSinceFollowUp} days`);
+    if (supportTickets > 10) riskFactors.push(`${supportTickets} support tickets`);
+    if (clientHealthScore < 50) riskFactors.push(`Low health score: ${clientHealthScore}`);
+    
+    // Calculate pricing recommendation
+    const pricing = calculatePricingRecommendation({
+      progress,
+      supportTickets,
+      clientHealthScore,
+      totalRevenue,
+      delivered
+    });
+
+    // Update or create ClientLTV
+    let clientLTV = await ClientLTV.findOne({ companyId });
+
+    if (!clientLTV) {
+      clientLTV = new ClientLTV({
+        companyId,
+        companyName
+      });
+    }
+
+    // CRITICAL: Update all fields with special attention to follow-up metrics
+    clientLTV.totalRevenue = totalRevenue;
+    clientLTV.totalDeals = 1;
+    clientLTV.lastFollowUpDate = lastFollowUpDate;
+    clientLTV.daysSinceFollowUp = daysSinceFollowUp; // This MUST update
+    clientLTV.totalSupportTickets = supportTickets;
+    clientLTV.supportPoints = supportMetrics.supportPoints;
+    clientLTV.followUpCount = followUpCount;
+    clientLTV.openSupportTickets = supportMetrics.open;
+    clientLTV.lastSupportDate = supportMetrics.lastSupportDate;
+    clientLTV.riskFactors = riskFactors;
+    clientLTV.classification = classification;
+    clientLTV.classificationReason = reason;
+    clientLTV.valueCategory = valueCategory;
+    clientLTV.customerLifetimeValue = totalRevenue;
+    clientLTV.clientHealthScore = clientHealthScore;
+    clientLTV.delivered = delivered;
+    clientLTV.progress = progress;
+    if (latestReview) {
+      clientLTV.latestReview = latestReview._id;
+    }
+    clientLTV.suggestedMinPrice = pricing.suggestedMinPrice;
+    clientLTV.suggestedMaxPrice = pricing.suggestedMaxPrice;
+    clientLTV.recommendedDiscount = pricing.recommendedDiscount;
+    clientLTV.lastClassificationUpdate = new Date();
+
+    await clientLTV.save();
+    
+    console.log(`✅ CRITICAL - Updated ${companyName}:`, {
+      oldDaysSince: clientLTV.daysSinceFollowUp,
+      newDaysSince: daysSinceFollowUp,
+      followUpCount,
+      lastFollowUpDate,
+      classification
+    });
+
+    return clientLTV;
+  } catch (error) {
+    console.error("Error in recalculateMetricsFromDeal:", error);
+    throw error;
+  }
+};
+
 // Core function to calculate metrics from review data
 const calculateMetricsFromReview = async (companyId, companyName, reviewData) => {
   try {
@@ -253,34 +406,43 @@ const calculateMetricsFromReview = async (companyId, companyName, reviewData) =>
       return null;
     }
 
-    // Parse numeric value safely - extract all digits
-    // Note: Long-term solution is to store numeric value in DB
+    // Parse numeric value
     const numericMatch = deal.value?.toString().match(/\d+/g);
     const totalRevenue = numericMatch ? parseInt(numericMatch.join('')) : 0;
 
+    // Use supportTickets from reviewData (manual override)
+    const supportTickets = reviewData.supportTickets !== undefined 
+      ? reviewData.supportTickets 
+      : 0;
+    
     // Get support metrics
     const supportMetrics = await getSupportMetrics(companyId);
-    const supportTickets = supportMetrics.total;
+    
+    // CRITICAL: Get follow-up metrics from deal
+    const followUpMetrics = await getFollowUpMetrics(companyId);
+    const followUpCount = followUpMetrics.count;
+    const lastFollowUpDate = followUpMetrics.lastDate;
+    const daysSinceFollowUp = followUpMetrics.daysSince;
 
-    // Get follow-up count
-    const followUpCount = await getFollowUpCount(companyId);
+    console.log(`📊 Review - Follow-up for ${companyName}:`, {
+      count: followUpCount,
+      lastDate: lastFollowUpDate,
+      daysSince: daysSinceFollowUp
+    });
 
-    // Always recalculate days since follow-up dynamically with safety
-    const daysSinceFollowUp = calculateDaysSinceFollowUp(reviewData.lastFollowUp || deal.followUpDate);
-
-    // Prepare metrics object for classification
+    // Prepare metrics for classification
     const metrics = {
-  totalRevenue,
-  supportTickets,
-  clientHealthScore: reviewData.clientHealthScore || 50,
-  daysSinceFollowUp,
-  progress: reviewData.progress   // ✅ ADD THIS
-};
+      totalRevenue,
+      supportTickets,
+      clientHealthScore: reviewData.clientHealthScore || 50,
+      daysSinceFollowUp,
+      progress: reviewData.progress
+    };
 
-    // Get classification with proper priority (guaranteed to return one of the 4)
+    // Get classification
     const classification = classifyDeal(metrics);
     
-    // Generate reason based on classification
+    // Generate reason
     let reason = "";
     switch(classification) {
       case "Upsell":
@@ -297,10 +459,10 @@ const calculateMetricsFromReview = async (companyId, companyName, reviewData) =>
         break;
     }
     
-    // Calculate value category (for reporting only)
+    // Calculate value category
     const valueCategory = getValueCategory(totalRevenue);
     
-    // Get risk factors (for display only)
+    // Get risk factors
     const riskFactors = [];
     if (daysSinceFollowUp > 60) riskFactors.push(`No follow-up for ${daysSinceFollowUp} days`);
     if (supportTickets > 10) riskFactors.push(`${supportTickets} support tickets`);
@@ -328,7 +490,7 @@ const calculateMetricsFromReview = async (companyId, companyName, reviewData) =>
     // Update all fields
     clientLTV.totalRevenue = totalRevenue;
     clientLTV.totalDeals = 1;
-    clientLTV.lastFollowUpDate = reviewData.lastFollowUp || deal.followUpDate;
+    clientLTV.lastFollowUpDate = lastFollowUpDate;
     clientLTV.daysSinceFollowUp = daysSinceFollowUp;
     clientLTV.totalSupportTickets = supportTickets;
     clientLTV.supportPoints = supportMetrics.supportPoints;
@@ -341,7 +503,7 @@ const calculateMetricsFromReview = async (companyId, companyName, reviewData) =>
     clientLTV.valueCategory = valueCategory;
     clientLTV.customerLifetimeValue = totalRevenue;
     clientLTV.clientHealthScore = reviewData.clientHealthScore;
-    clientLTV.delivered = reviewData.delivered || false;
+    clientLTV.delivered = reviewData.delivered === true ? true : false;
     clientLTV.progress = reviewData.progress;
     clientLTV.latestReview = reviewData._id;
     clientLTV.suggestedMinPrice = pricing.suggestedMinPrice;
@@ -350,13 +512,10 @@ const calculateMetricsFromReview = async (companyId, companyName, reviewData) =>
     clientLTV.lastClassificationUpdate = new Date();
 
     await clientLTV.save();
-    console.log(`✅ Metrics calculated for ${companyName}:`, {
-      classification,
-      valueCategory,
+    console.log(`✅ Review - Updated ${companyName}:`, {
       daysSinceFollowUp,
-      supportTickets,
-      clientHealthScore: reviewData.clientHealthScore,
-      reason
+      followUpCount,
+      classification
     });
 
     return clientLTV;
@@ -366,10 +525,9 @@ const calculateMetricsFromReview = async (companyId, companyName, reviewData) =>
   }
 };
 
-// ---------- CONTROLLER METHODS (EXPORTED) ----------
+// ---------- CONTROLLER METHODS ----------
 
 export default {
-  // Controller for API endpoint POST /api/cltv/calculate/:companyName
   calculateClientCLV: async (req, res) => {
     try {
       const { companyName } = req.params;
@@ -377,7 +535,6 @@ export default {
 
       console.log("🔵 API: calculateClientCLV called for:", decodedName);
 
-      // Find the deal by company name
       const deal = await Deal.findOne({ companyName: decodedName }).lean();
 
       if (!deal) {
@@ -387,7 +544,6 @@ export default {
         });
       }
 
-      // If deal is not in Closed Won stage, remove from CLV
       if (deal.stage !== "Closed Won") {
         console.log(`⚠️ Deal for ${decodedName} is not Closed Won - removing from CLV`);
         await ClientLTV.findOneAndDelete({ companyId: deal._id });
@@ -398,7 +554,6 @@ export default {
         });
       }
 
-      // Find the latest review
       const latestReview = await ClientReview.findOne({ companyId: deal._id })
         .sort({ reviewedAt: -1 })
         .lean();
@@ -410,7 +565,6 @@ export default {
         });
       }
 
-      // Calculate metrics from the review
       const result = await calculateMetricsFromReview(
         deal._id,
         decodedName,
@@ -433,113 +587,115 @@ export default {
   },
 
   getWonDeals: async (req, res) => {
-    try {
-      const { page = 1, limit = 5, classification = "all" } = req.query;
-      const skip = (page - 1) * limit;
+  try {
+    const { page = 1, limit = 5, classification = "all" } = req.query;
+    const skip = (page - 1) * limit;
 
-      // Build filter query
-      let filterQuery = { stage: "Closed Won" };
-      
-      // First, get all deals
-      const deals = await Deal.find(filterQuery)
-        .populate("assignedTo", "firstName lastName")
-        .sort({ wonAt: -1, createdAt: -1 })
-        .lean();
+    let filterQuery = { stage: "Closed Won" };
+    
+    const deals = await Deal.find(filterQuery)
+      .populate("assignedTo", "firstName lastName")
+      .sort({ wonAt: -1, createdAt: -1 })
+      .lean();
 
-      const total = deals.length;
+    if (!deals || deals.length === 0) {
+      return res.json({ 
+        success: true, 
+        data: [],
+        pagination: { total: 0, page: 1, pages: 1 }
+      });
+    }
 
-      if (!deals || deals.length === 0) {
-        return res.json({ 
-          success: true, 
-          data: [],
-          pagination: { total: 0, page: 1, pages: 1 }
-        });
+    // Get CLV data
+    const clvData = await ClientLTV.find().lean();
+    const clvMap = {};
+    clvData.forEach(c => {
+      if (c.companyId) {
+        clvMap[c.companyId.toString()] = c;
       }
+    });
 
-      // Get existing reviews
-      const reviews = await ClientReview.find().lean();
-      const reviewMap = {};
-      reviews.forEach(r => {
-        if (r.companyId) reviewMap[r.companyId.toString()] = r;
-      });
+    // Get reviews for status
+    const reviews = await ClientReview.find().lean();
+    const reviewMap = {};
+    reviews.forEach(r => {
+      if (r.companyId) reviewMap[r.companyId.toString()] = r;
+    });
 
-      // Get CLV data for classification
-      const clvData = await ClientLTV.find().lean();
-      const clvMap = {};
-      clvData.forEach(c => {
-        if (c.companyId) clvMap[c.companyId.toString()] = c;
-      });
-
-      // Get ticket counts
-      const companyIds = deals.map(d => d._id).filter(id => id);
-      const ticketCounts = await SupportTicket.aggregate([
-        { $match: { companyId: { $in: companyIds } } },
-        { $group: { _id: "$companyId", count: { $sum: 1 } } }
-      ]);
-
-      const ticketMap = {};
-      ticketCounts.forEach(t => {
-        if (t._id) ticketMap[t._id.toString()] = t.count;
-      });
-
-      // Format all deals first
-      let formattedDeals = deals.map(deal => ({
+    // Format deals using CLV data with DYNAMIC days calculation
+    let formattedDeals = deals.map(deal => {
+      const dealId = deal._id.toString();
+      const clvEntry = clvMap[dealId];
+      const reviewEntry = reviewMap[dealId];
+      
+      // DYNAMIC CALCULATION: Calculate days since follow-up right now
+      let dynamicDaysSinceFollowUp = 365; // Default
+      
+      if (clvEntry?.lastFollowUpDate) {
+        const lastDate = new Date(clvEntry.lastFollowUpDate);
+        const now = new Date();
+        
+        // Set both to start of day for accurate calculation
+        lastDate.setHours(0, 0, 0, 0);
+        now.setHours(0, 0, 0, 0);
+        
+        const diffTime = now - lastDate;
+        dynamicDaysSinceFollowUp = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+      }
+      
+      return {
         _id: deal._id,
         clientName: deal.dealName || "Unnamed",
         companyName: deal.companyName || "Unknown",
         companyId: deal._id,
         dealId: deal._id,
         dealValue: deal.value || "0",
-        delivered: reviewMap[deal._id.toString()]?.delivered || false,
+        delivered: clvEntry?.delivered === true ? true : false,
         assignedTo: deal.assignedTo 
           ? `${deal.assignedTo.firstName || ''} ${deal.assignedTo.lastName || ''}`.trim()
           : "Unassigned",
         salespersonId: deal.assignedTo?._id,
-        supportTicketCount: ticketMap[deal._id.toString()] || 0,
-        wonAt: deal.wonAt || deal.createdAt,
-        reviewStatus: reviewMap[deal._id.toString()] ? "Submitted" : "Pending",
-        reviewProgress: reviewMap[deal._id.toString()]?.progress || null,
-        hasReview: !!reviewMap[deal._id.toString()],
-        classification: clvMap[deal._id.toString()]?.classification || "At Risk",
-        clientHealthScore: reviewMap[deal._id.toString()]?.clientHealthScore || 50,
-        daysSinceFollowUp: clvMap[deal._id.toString()]?.daysSinceFollowUp || 0
-      }));
+        supportTicketCount: clvEntry?.totalSupportTickets || 0,
+        // USE DYNAMIC VALUE instead of stored value
+        daysSinceFollowUp: dynamicDaysSinceFollowUp,
+        reviewProgress: clvEntry?.progress || null,
+        classification: clvEntry?.classification || "At Risk",
+        clientHealthScore: clvEntry?.clientHealthScore || 50,
+        reviewStatus: reviewEntry ? "Submitted" : "Pending",
+        hasReview: !!reviewEntry
+      };
+    });
 
-      // Apply classification filter BEFORE pagination
-      if (classification !== "all") {
-        formattedDeals = formattedDeals.filter(deal => 
-          deal.classification === classification
-        );
-      }
-
-      // Apply pagination AFTER filtering
-      const paginatedDeals = formattedDeals.slice(skip, skip + parseInt(limit));
-      const filteredTotal = formattedDeals.length;
-      const pages = Math.ceil(filteredTotal / parseInt(limit));
-
-      res.json({ 
-        success: true, 
-        data: paginatedDeals,
-        pagination: {
-          total: filteredTotal,
-          page: parseInt(page),
-          pages: pages
-        }
-      });
-    } catch (error) {
-      console.error("Error in getWonDeals:", error);
-      res.status(500).json({ success: false, message: error.message });
+    if (classification !== "all") {
+      formattedDeals = formattedDeals.filter(deal => 
+        deal.classification === classification
+      );
     }
-  },
+
+    const paginatedDeals = formattedDeals.slice(skip, skip + parseInt(limit));
+    const filteredTotal = formattedDeals.length;
+    const pages = Math.ceil(filteredTotal / parseInt(limit));
+
+    res.json({ 
+      success: true, 
+      data: paginatedDeals,
+      pagination: {
+        total: filteredTotal,
+        page: parseInt(page),
+        pages: pages
+      }
+    });
+  } catch (error) {
+    console.error("Error in getWonDeals:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+},
 
   createClientReview: async (req, res) => {
     try {
-      // Log the entire request body
       console.log("=".repeat(50));
       console.log("🔵 RECEIVED REVIEW REQUEST:");
       console.log("Body:", JSON.stringify(req.body, null, 2));
-      console.log("User:", req.user?._id || req.user?.id);
-      console.log("=".repeat(50));
       
       const {
         companyId,
@@ -565,14 +721,14 @@ export default {
 
       const userId = req.user?._id || req.user?.id;
 
-      // Create review data (no follow-up field, added delivered)
+      // Create review data
       const reviewData = {
         companyId,
         companyName,
         clientName,
         dealId,
         dealValue: parseFloat(dealValue?.toString().replace(/[^0-9.-]+/g, '')) || 0,
-        delivered: delivered || false,
+        delivered: delivered === true ? true : false,
         salespersonId,
         salespersonName,
         supportTickets: parseInt(supportTickets) || 0,
@@ -582,6 +738,11 @@ export default {
         reviewedAt: new Date(),
         reviewedBy: userId
       };
+
+      console.log("📦 Saving review with:", {
+        supportTickets: reviewData.supportTickets,
+        delivered: reviewData.delivered
+      });
 
       // Save review
       const review = await ClientReview.findOneAndUpdate(
@@ -595,8 +756,19 @@ export default {
         clientReviewId: review._id
       });
 
+      // Create review object for metrics
+      const reviewForMetrics = {
+        ...review.toObject(),
+        delivered: reviewData.delivered,
+        supportTickets: reviewData.supportTickets
+      };
+
       // Calculate all metrics from the review
-      const updatedClient = await calculateMetricsFromReview(companyId, companyName, review);
+      const updatedClient = await calculateMetricsFromReview(
+        companyId, 
+        companyName, 
+        reviewForMetrics
+      );
 
       res.status(201).json({
         success: true,
@@ -609,235 +781,102 @@ export default {
 
     } catch (error) {
       console.error("❌ Error in createClientReview:", error);
-      console.error("Error stack:", error.stack);
       res.status(500).json({ 
         success: false, 
-        message: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        message: error.message
       });
     }
   },
 
-  getCLVDashboard: async (req, res) => {
-    try {
-      console.log("Fetching CLV dashboard data...");
+  /**
+   * CRITICAL: Endpoint to sync follow-up data after updates
+   */
+  // In your controller, add this endpoint
+syncFollowUpData: async (req, res) => {
+  try {
+    const { companyName } = req.params;
+    const decodedName = decodeURIComponent(companyName);
 
-      // ⚡ OPTIMIZED: Clean up invalid clients in bulk (2 queries total)
-      await cleanupInvalidClients();
+    console.log("🔄 SYNC - Syncing follow-up data for:", decodedName);
 
-      // Get all remaining clients with reviews
-      const clients = await ClientLTV.find()
-        .populate("latestReview")
-        .lean();
-
-      console.log(`Found ${clients.length} clients in LTV collection`);
-      
-      // Classification counts - Using simple names that match the classifyDeal output
-      const classificationCounts = {
-        "Upsell": 0,
-        "Top Value": 0,
-        "Dormant": 0,
-        "At Risk": 0
-      };
-
-      // Value category counts for Total CLV modal
-      const valueCategoryCounts = {
-        "High Value": 0,
-        "Medium Value": 0,
-        "Low Value": 0,
-      };
-
-      clients.forEach(c => {
-        if (c.classification) {
-          classificationCounts[c.classification] = (classificationCounts[c.classification] || 0) + 1;
-        }
-        if (c.valueCategory) {
-          valueCategoryCounts[c.valueCategory] = (valueCategoryCounts[c.valueCategory] || 0) + 1;
-        }
+    const deal = await Deal.findOne({ companyName: decodedName }).lean();
+    
+    if (!deal) {
+      return res.status(404).json({
+        success: false,
+        message: "No deal found for this company"
       });
+    }
 
-      // Summary calculations
-      const totalCLV = clients.reduce((sum, c) => sum + (c.customerLifetimeValue || 0), 0);
-      const avgCLV = clients.length ? totalCLV / clients.length : 0;
+    // Only process Closed Won deals
+    if (deal.stage !== "Closed Won") {
+      return res.json({
+        success: true,
+        message: "Deal is not Closed Won - no CLV data to update",
+        data: null
+      });
+    }
+
+    // Get fresh follow-up metrics
+    const followUpMetrics = await getFollowUpMetrics(deal._id);
+    
+    console.log(`📊 SYNC - Fresh follow-up metrics for ${decodedName}:`, {
+      dealId: deal._id,
+      historyLength: deal.followUpHistory?.length,
+      calculatedCount: followUpMetrics.count,
+      lastDate: followUpMetrics.lastDate,
+      daysSince: followUpMetrics.daysSince
+    });
+
+    // Update ClientLTV
+    const updatedClient = await recalculateMetricsFromDeal(deal._id, decodedName);
+
+    res.json({
+      success: true,
+      data: {
+        followUpCount: followUpMetrics.count,
+        lastFollowUpDate: followUpMetrics.lastDate,
+        daysSinceFollowUp: followUpMetrics.daysSince,
+        client: updatedClient
+      },
+      message: "Follow-up data synced successfully. Days inactive updated."
+    });
+
+  } catch (error) {
+    console.error("Error in syncFollowUpData:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+},
+
+  refreshClientMetrics: async (req, res) => {
+    try {
+      const { companyName } = req.params;
+      const decodedName = decodeURIComponent(companyName);
+
+      console.log("🔄 Refreshing metrics for:", decodedName);
+
+      const deal = await Deal.findOne({ companyName: decodedName }).lean();
       
-      // Total clients with any risk (At Risk + Dormant)
-      const atRiskCount = classificationCounts["At Risk"] || 0;
-      const dormantCount = classificationCounts["Dormant"] || 0;
-      const totalRisky = atRiskCount + dormantCount;
-      const avgRiskScore = clients.length > 0 
-        ? Math.round((totalRisky / clients.length) * 100) 
-        : 0;
-
-      // Top Value Clients
-      const topClients = clients
-        .filter(c => c.classification === "Top Value")
-        .sort((a, b) => (b.customerLifetimeValue || 0) - (a.customerLifetimeValue || 0))
-        .slice(0, 10)
-        .map(c => ({
-          companyName: c.companyName,
-          clv: c.customerLifetimeValue,
-          classification: c.classification,
-          valueCategory: c.valueCategory,
-          daysSinceFollowUp: c.daysSinceFollowUp,
-          lastActivity: c.lastFollowUpDate,
-          progress: c.latestReview?.progress,
-          supportPoints: c.supportPoints,
-          supportTickets: c.totalSupportTickets,
-          followUpCount: c.followUpCount,
-          delivered: c.latestReview?.delivered,
-          clientHealthScore: c.clientHealthScore
-        }));
-
-      // At Risk clients
-      const riskyClients = clients
-        .filter(c => c.classification === "At Risk")
-        .slice(0, 10)
-        .map(c => ({
-          companyName: c.companyName,
-          daysSinceFollowUp: c.daysSinceFollowUp,
-          supportTickets: c.totalSupportTickets,
-          progress: c.progress,
-          supportPoints: c.supportPoints,
-          classificationReason: c.classificationReason,
-          delivered: c.latestReview?.delivered,
-          clientHealthScore: c.clientHealthScore
-        }));
-
-      // Dormant clients
-      const dormantClients = clients
-        .filter(c => c.classification === "Dormant")
-        .slice(0, 10)
-        .map(c => ({
-          companyName: c.companyName,
-          daysSinceFollowUp: c.daysSinceFollowUp,
-          lastFollowUp: c.lastFollowUpDate,
-          classificationReason: c.classificationReason,
-          supportTickets: c.totalSupportTickets,
-          delivered: c.latestReview?.delivered,
-          clientHealthScore: c.clientHealthScore
-        }));
-
-      // Upsell opportunities
-      const upsellClients = clients
-        .filter(c => c.classification === "Upsell")
-        .slice(0, 10)
-        .map(c => ({
-          companyName: c.companyName,
-          clv: c.customerLifetimeValue,
-          classification: c.classification,
-          progress: c.latestReview?.progress,
-          supportTickets: c.totalSupportTickets,
-          delivered: c.latestReview?.delivered,
-          clientHealthScore: c.clientHealthScore,
-          daysSinceFollowUp: c.daysSinceFollowUp
-        }));
-
-      // All clients list for modal (for completeness)
-      const allClientsList = clients
-        .slice(0, 20)
-        .map(c => ({
-          companyName: c.companyName,
-          dealValue: c.customerLifetimeValue,
-          progress: c.progress,
-          supportPoints: c.supportPoints,
-          followUpCount: c.followUpCount,
-          classification: c.classification,
-          classificationReason: c.classificationReason,
-          delivered: c.latestReview?.delivered,
-          supportTickets: c.totalSupportTickets,
-          clientHealthScore: c.clientHealthScore,
-          daysSinceFollowUp: c.daysSinceFollowUp
-        }));
-
-      // Recent reviews
-      const recentReviews = await ClientReview.find()
-        .sort({ reviewedAt: -1 })
-        .limit(5)
-        .populate("reviewedBy", "firstName lastName")
-        .lean();
-
-      // FIXED: Revenue trends - safely parse numeric values
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-      
-      const revenueTrends = await Deal.aggregate([
-        {
-          $match: {
-            stage: "Closed Won",
-            wonAt: { $exists: true, $ne: null, $gte: sixMonthsAgo }
-          }
-        },
-        {
-          $addFields: {
-            numericValue: {
-              $toDouble: {
-                $reduce: {
-                  input: { $regexFindAll: { input: "$value", regex: "\\d+" } },
-                  initialValue: "",
-                  in: { $concat: ["$$value", "$$this.match"] }
-                }
-              }
-            }
-          }
-        },
-        {
-          $group: {
-            _id: {
-              year: { $year: "$wonAt" },
-              month: { $month: "$wonAt" }
-            },
-            revenue: { $sum: "$numericValue" },
-            count: { $sum: 1 }
-          }
-        },
-        { $sort: { "_id.year": 1, "_id.month": 1 } },
-        { $limit: 12 }
-      ]);
-
-      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-      const formattedTrends = revenueTrends.map(item => ({
-        month: `${monthNames[item._id.month - 1]} ${item._id.year}`,
-        revenue: item.revenue || 0,
-        count: item.count || 0
-      }));
-
-      // Fill in missing months
-      const now = new Date();
-      const allMonths = [];
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const monthStr = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
-        const existing = formattedTrends.find(t => t.month === monthStr);
-        allMonths.push(existing || { month: monthStr, revenue: 0, count: 0 });
+      if (!deal) {
+        return res.status(404).json({
+          success: false,
+          message: "No deal found for this company"
+        });
       }
+
+      const updatedClient = await recalculateMetricsFromDeal(deal._id, decodedName);
 
       res.json({
         success: true,
-        data: {
-          summary: {
-            totalClients: clients.length,
-            totalCLV,
-            avgCLV,
-            avgRiskScore,
-            upsellCount: classificationCounts["Upsell"],
-            topValueCount: classificationCounts["Top Value"],
-            dormantCount: classificationCounts["Dormant"],
-            atRiskCount: classificationCounts["At Risk"],
-          },
-          valueCategories: valueCategoryCounts,
-          classificationDistribution: classificationCounts,
-          topClients,
-          riskyClients,
-          dormantClients,
-          upsellClients,
-          allClientsList,
-          recentReviews,
-          revenueTrends: allMonths,
-          pricingRiskAlerts: []
-        },
+        data: updatedClient,
+        message: "Client metrics refreshed successfully"
       });
+
     } catch (error) {
-      console.error("Dashboard error:", error);
+      console.error("Error in refreshClientMetrics:", error);
       res.status(500).json({
         success: false,
         message: error.message
@@ -845,98 +884,344 @@ export default {
     }
   },
 
-  getClientCLV: async (req, res) => {
-    try {
-      const { companyName } = req.params;
-      const decoded = decodeURIComponent(companyName);
+  getCLVDashboard: async (req, res) => {
+  try {
+    console.log("Fetching CLV dashboard data...");
 
-      const client = await ClientLTV.findOne({ companyName: decoded }).lean();
-      if (!client) {
-        return res.status(404).json({ success: false, message: "Client not found" });
+    await cleanupInvalidClients();
+
+    const clients = await ClientLTV.find()
+      .populate("latestReview")
+      .lean();
+
+    console.log(`Found ${clients.length} clients in LTV collection`);
+    
+    // Apply dynamic days calculation to all clients
+    const clientsWithDynamicDays = clients.map(client => {
+      let dynamicDaysSinceFollowUp = 365;
+      if (client.lastFollowUpDate) {
+        const lastDate = new Date(client.lastFollowUpDate);
+        const now = new Date();
+        lastDate.setHours(0, 0, 0, 0);
+        now.setHours(0, 0, 0, 0);
+        const diffTime = now - lastDate;
+        dynamicDaysSinceFollowUp = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
       }
-
-      // Check if this client still has active Closed Won deals
-      const activeDeal = await Deal.findOne({
-        _id: client.companyId,
-        stage: "Closed Won"
-      }).lean();
       
-      if (!activeDeal) {
-        // Client exists in CLV but no longer has won deals - remove it
-        await ClientLTV.findOneAndDelete({ companyId: client.companyId });
-        return res.status(404).json({ 
-          success: false, 
-          message: "Client no longer has active Closed Won deals" 
-        });
-      }
-
-      const [deals, tickets, renewals, reviews, pricingRisk] = await Promise.all([
-        Deal.find({ companyName: decoded, stage: "Closed Won" })
-          .populate("assignedTo", "firstName lastName")
-          .sort({ wonAt: -1, createdAt: -1 })
-          .lean(),
-
-        client.companyId
-          ? SupportTicket.find({ companyId: client.companyId }).sort({ openedAt: -1 }).lean()
-          : [],
-
-        Renewal.find({ companyName: decoded }).sort({ renewalDate: -1 }).lean(),
-
-        ClientReview.find({ companyId: client.companyId }).sort({ reviewedAt: -1 }).lean(),
-
-        client.companyId
-          ? PricingRisk.findOne({ companyId: client.companyId, status: "Active" }).lean()
-          : null
-      ]);
-
-      // Support analysis
-      const totalTickets = tickets.length;
-      const openTickets = tickets.filter(t => t.status === "Open").length;
-      const lastSupportDate = totalTickets ? tickets[0].openedAt : null;
-
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-      const recentTickets = tickets.filter(t => new Date(t.openedAt) >= sixMonthsAgo);
-      const ticketsPerMonth = recentTickets.length / 6;
-
-      let avgResolutionDays = 0;
-      const closedTickets = tickets.filter(t => t.status === "Closed" && t.resolutionTimeHours);
-      if (closedTickets.length > 0) {
-        const totalHours = closedTickets.reduce((sum, t) => sum + (t.resolutionTimeHours || 0), 0);
-        avgResolutionDays = totalHours / 24 / closedTickets.length;
-      }
-
-      const supportToRevenueRatio = client.totalRevenue > 0
-        ? (totalTickets / client.totalRevenue) * 1000000
-        : 0;
-
-      const supportAnalysis = {
-        totalTickets,
-        openTickets,
-        lastSupportDate,
-        ticketsPerMonth: ticketsPerMonth.toFixed(1),
-        avgResolutionDays: avgResolutionDays.toFixed(1),
-        supportToRevenueRatio: supportToRevenueRatio.toFixed(2),
-        supportPoints: client.supportPoints
+      return {
+        ...client,
+        daysSinceFollowUp: dynamicDaysSinceFollowUp
       };
+    });
+    
+    const classificationCounts = {
+      "Upsell": 0,
+      "Top Value": 0,
+      "Dormant": 0,
+      "At Risk": 0
+    };
 
-      res.json({
-        success: true,
-        data: {
-          client,
-          deals,
-          tickets,
-          renewals,
-          reviews,
-          pricingRisk,
-          supportAnalysis,
-        },
-      });
-    } catch (error) {
-      console.error("Get client error:", error);
-      res.status(500).json({ success: false, message: error.message });
+    const valueCategoryCounts = {
+      "High Value": 0,
+      "Medium Value": 0,
+      "Low Value": 0,
+    };
+
+    clientsWithDynamicDays.forEach(c => {
+      if (c.classification) {
+        classificationCounts[c.classification] = (classificationCounts[c.classification] || 0) + 1;
+      }
+      if (c.valueCategory) {
+        valueCategoryCounts[c.valueCategory] = (valueCategoryCounts[c.valueCategory] || 0) + 1;
+      }
+    });
+
+    const totalCLV = clientsWithDynamicDays.reduce((sum, c) => sum + (c.customerLifetimeValue || 0), 0);
+    const avgCLV = clientsWithDynamicDays.length ? totalCLV / clientsWithDynamicDays.length : 0;
+    
+    const atRiskCount = classificationCounts["At Risk"] || 0;
+    const dormantCount = classificationCounts["Dormant"] || 0;
+    const totalRisky = atRiskCount + dormantCount;
+    const avgRiskScore = clientsWithDynamicDays.length > 0 
+      ? Math.round((totalRisky / clientsWithDynamicDays.length) * 100) 
+      : 0;
+
+    const topClients = clientsWithDynamicDays
+      .filter(c => c.classification === "Top Value")
+      .sort((a, b) => (b.customerLifetimeValue || 0) - (a.customerLifetimeValue || 0))
+      .slice(0, 10)
+      .map(c => ({
+        companyName: c.companyName,
+        clv: c.customerLifetimeValue,
+        classification: c.classification,
+        valueCategory: c.valueCategory,
+        daysSinceFollowUp: c.daysSinceFollowUp,
+        lastActivity: c.lastFollowUpDate,
+        progress: c.latestReview?.progress,
+        supportPoints: c.supportPoints,
+        supportTickets: c.totalSupportTickets,
+        followUpCount: c.followUpCount,
+        delivered: c.delivered,
+        clientHealthScore: c.clientHealthScore
+      }));
+
+    const riskyClients = clientsWithDynamicDays
+      .filter(c => c.classification === "At Risk")
+      .slice(0, 10)
+      .map(c => ({
+        companyName: c.companyName,
+        daysSinceFollowUp: c.daysSinceFollowUp,
+        supportTickets: c.totalSupportTickets,
+        progress: c.progress,
+        supportPoints: c.supportPoints,
+        classificationReason: c.classificationReason,
+        delivered: c.delivered,
+        clientHealthScore: c.clientHealthScore
+      }));
+
+    const dormantClients = clientsWithDynamicDays
+      .filter(c => c.classification === "Dormant")
+      .slice(0, 10)
+      .map(c => ({
+        companyName: c.companyName,
+        daysSinceFollowUp: c.daysSinceFollowUp,
+        lastFollowUp: c.lastFollowUpDate,
+        classificationReason: c.classificationReason,
+        supportTickets: c.totalSupportTickets,
+        delivered: c.delivered,
+        clientHealthScore: c.clientHealthScore
+      }));
+
+    const upsellClients = clientsWithDynamicDays
+      .filter(c => c.classification === "Upsell")
+      .slice(0, 10)
+      .map(c => ({
+        companyName: c.companyName,
+        clv: c.customerLifetimeValue,
+        classification: c.classification,
+        progress: c.latestReview?.progress,
+        supportTickets: c.totalSupportTickets,
+        delivered: c.delivered,
+        clientHealthScore: c.clientHealthScore,
+        daysSinceFollowUp: c.daysSinceFollowUp
+      }));
+
+    // All clients list for modal
+    const allClientsList = clientsWithDynamicDays
+      .slice(0, 20)
+      .map(c => ({
+        companyName: c.companyName,
+        dealValue: c.customerLifetimeValue,
+        progress: c.progress,
+        supportPoints: c.supportPoints,
+        followUpCount: c.followUpCount,
+        classification: c.classification,
+        classificationReason: c.classificationReason,
+        delivered: c.delivered,
+        supportTickets: c.totalSupportTickets,
+        clientHealthScore: c.clientHealthScore,
+        daysSinceFollowUp: c.daysSinceFollowUp
+      }));
+
+    const recentReviews = await ClientReview.find()
+      .sort({ reviewedAt: -1 })
+      .limit(5)
+      .populate("reviewedBy", "firstName lastName")
+      .lean();
+
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    
+    const revenueTrends = await Deal.aggregate([
+      {
+        $match: {
+          stage: "Closed Won",
+          wonAt: { $exists: true, $ne: null, $gte: sixMonthsAgo }
+        }
+      },
+      {
+        $addFields: {
+          numericValue: {
+            $toDouble: {
+              $reduce: {
+                input: { $regexFindAll: { input: "$value", regex: "\\d+" } },
+                initialValue: "",
+                in: { $concat: ["$$value", "$$this.match"] }
+              }
+            }
+          }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$wonAt" },
+            month: { $month: "$wonAt" }
+          },
+          revenue: { $sum: "$numericValue" },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } },
+      { $limit: 12 }
+    ]);
+
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const formattedTrends = revenueTrends.map(item => ({
+      month: `${monthNames[item._id.month - 1]} ${item._id.year}`,
+      revenue: item.revenue || 0,
+      count: item.count || 0
+    }));
+
+    const now = new Date();
+    const allMonths = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthStr = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+      const existing = formattedTrends.find(t => t.month === monthStr);
+      allMonths.push(existing || { month: monthStr, revenue: 0, count: 0 });
     }
-  },
+
+    res.json({
+      success: true,
+      data: {
+        summary: {
+          totalClients: clientsWithDynamicDays.length,
+          totalCLV,
+          avgCLV,
+          avgRiskScore,
+          upsellCount: classificationCounts["Upsell"],
+          topValueCount: classificationCounts["Top Value"],
+          dormantCount: classificationCounts["Dormant"],
+          atRiskCount: classificationCounts["At Risk"],
+        },
+        valueCategories: valueCategoryCounts,
+        classificationDistribution: classificationCounts,
+        topClients,
+        riskyClients,
+        dormantClients,
+        upsellClients,
+        allClientsList,
+        recentReviews,
+        revenueTrends: allMonths,
+        pricingRiskAlerts: []
+      },
+    });
+  } catch (error) {
+    console.error("Dashboard error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+},
+
+  getClientCLV: async (req, res) => {
+  try {
+    const { companyName } = req.params;
+    const decoded = decodeURIComponent(companyName);
+
+    const client = await ClientLTV.findOne({ companyName: decoded }).lean();
+    if (!client) {
+      return res.status(404).json({ success: false, message: "Client not found" });
+    }
+
+    // 🔥 DYNAMIC CALCULATION: Recalculate days since follow-up
+    let dynamicDaysSinceFollowUp = 365;
+    if (client.lastFollowUpDate) {
+      const lastDate = new Date(client.lastFollowUpDate);
+      const now = new Date();
+      lastDate.setHours(0, 0, 0, 0);
+      now.setHours(0, 0, 0, 0);
+      const diffTime = now - lastDate;
+      dynamicDaysSinceFollowUp = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+    }
+
+    // Create a copy of client with dynamic days
+    const clientWithDynamicDays = {
+      ...client,
+      daysSinceFollowUp: dynamicDaysSinceFollowUp
+    };
+
+    const activeDeal = await Deal.findOne({
+      _id: client.companyId,
+      stage: "Closed Won"
+    }).lean();
+    
+    if (!activeDeal) {
+      await ClientLTV.findOneAndDelete({ companyId: client.companyId });
+      return res.status(404).json({ 
+        success: false, 
+        message: "Client no longer has active Closed Won deals" 
+      });
+    }
+
+    const [deals, tickets, renewals, reviews, pricingRisk] = await Promise.all([
+      Deal.find({ companyName: decoded, stage: "Closed Won" })
+        .populate("assignedTo", "firstName lastName")
+        .sort({ wonAt: -1, createdAt: -1 })
+        .lean(),
+
+      client.companyId
+        ? SupportTicket.find({ companyId: client.companyId }).sort({ openedAt: -1 }).lean()
+        : [],
+
+      Renewal.find({ companyName: decoded }).sort({ renewalDate: -1 }).lean(),
+
+      ClientReview.find({ companyId: client.companyId }).sort({ reviewedAt: -1 }).lean(),
+
+      client.companyId
+        ? PricingRisk.findOne({ companyId: client.companyId, status: "Active" }).lean()
+        : null
+    ]);
+
+    const totalTickets = tickets.length;
+    const openTickets = tickets.filter(t => t.status === "Open").length;
+    const lastSupportDate = totalTickets ? tickets[0].openedAt : null;
+
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    const recentTickets = tickets.filter(t => new Date(t.openedAt) >= sixMonthsAgo);
+    const ticketsPerMonth = recentTickets.length / 6;
+
+    let avgResolutionDays = 0;
+    const closedTickets = tickets.filter(t => t.status === "Closed" && t.resolutionTimeHours);
+    if (closedTickets.length > 0) {
+      const totalHours = closedTickets.reduce((sum, t) => sum + (t.resolutionTimeHours || 0), 0);
+      avgResolutionDays = totalHours / 24 / closedTickets.length;
+    }
+
+    const supportToRevenueRatio = client.totalRevenue > 0
+      ? (totalTickets / client.totalRevenue) * 1000000
+      : 0;
+
+    const supportAnalysis = {
+      totalTickets,
+      openTickets,
+      lastSupportDate,
+      ticketsPerMonth: ticketsPerMonth.toFixed(1),
+      avgResolutionDays: avgResolutionDays.toFixed(1),
+      supportToRevenueRatio: supportToRevenueRatio.toFixed(2),
+      supportPoints: client.supportPoints
+    };
+
+    res.json({
+      success: true,
+      data: {
+        client: clientWithDynamicDays, // Use the one with dynamic days
+        deals,
+        tickets,
+        renewals,
+        reviews,
+        pricingRisk,
+        supportAnalysis,
+      },
+    });
+  } catch (error) {
+    console.error("Get client error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+},
 
   calculateAllCLV: async (req, res) => {
     try {
@@ -995,6 +1280,9 @@ export default {
       });
 
       await ticket.save();
+
+      // After creating ticket, refresh client metrics
+      await recalculateMetricsFromDeal(companyId, companyName);
 
       res.status(201).json({ success: true, data: ticket });
     } catch (error) {
@@ -1063,56 +1351,51 @@ export default {
   },
 
   getPricingRecommendation: async (req, res) => {
-    try {
-      const { companyName } = req.params;
-      const decodedName = decodeURIComponent(companyName);
-      
-      console.log("Pricing recommendation requested for:", decodedName);
-      
-      // Find client by company name (not companyId)
-      const client = await ClientLTV.findOne({ companyName: decodedName }).lean();
-      
-      if (!client) {
-        // Return a 200 with a message instead of 404, so frontend can handle gracefully
-        return res.status(200).json({ 
-          success: false, 
-          message: "Client not found in CLV system",
-          data: null
-        });
-      }
-
-      // Get the latest review
-      const latestReview = await ClientReview.findOne({ companyId: client.companyId })
-        .sort({ reviewedAt: -1 })
-        .lean();
-
-      // Prepare metrics for pricing calculation
-      const metrics = {
-        progress: latestReview?.progress || client.progress || "Average",
-        supportTickets: client.totalSupportTickets || 0,
-        clientHealthScore: latestReview?.clientHealthScore || client.clientHealthScore || 50,
-        delivered: latestReview?.delivered || client.delivered || false,
-        totalRevenue: client.customerLifetimeValue || 0
-      };
-
-      const pricing = calculatePricingRecommendation(metrics);
-
-      res.json({
-        success: true,
-        data: {
-          ...pricing,
-          classification: client.classification
-        }
-      });
-
-    } catch (error) {
-      console.error("Error in getPricingRecommendation:", error);
-      // Return a 200 with error message instead of 500
-      res.status(200).json({ 
+  try {
+    const { companyName } = req.params; // Note: this is companyName, not companyId
+    const decodedName = decodeURIComponent(companyName);
+    
+    console.log("Pricing recommendation requested for:", decodedName);
+    
+    const client = await ClientLTV.findOne({ companyName: decodedName }).lean();
+    
+    if (!client) {
+      return res.status(200).json({ 
         success: false, 
-        message: error.message || "Error calculating pricing recommendation",
+        message: "Client not found in CLV system",
         data: null
       });
     }
+
+    const latestReview = await ClientReview.findOne({ companyId: client.companyId })
+      .sort({ reviewedAt: -1 })
+      .lean();
+
+    const metrics = {
+      progress: latestReview?.progress || client.progress || "Average",
+      supportTickets: client.totalSupportTickets || 0,
+      clientHealthScore: latestReview?.clientHealthScore || client.clientHealthScore || 50,
+      delivered: client.delivered || false,
+      totalRevenue: client.customerLifetimeValue || 0
+    };
+
+    const pricing = calculatePricingRecommendation(metrics);
+
+    res.json({
+      success: true,
+      data: {
+        ...pricing,
+        classification: client.classification
+      }
+    });
+
+  } catch (error) {
+    console.error("Error in getPricingRecommendation:", error);
+    res.status(200).json({ 
+      success: false, 
+      message: error.message || "Error calculating pricing recommendation",
+      data: null
+    });
   }
+}
 };
