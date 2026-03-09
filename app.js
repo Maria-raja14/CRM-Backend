@@ -31,7 +31,7 @@ import { initSocket } from "./realtime/socket.js";
 import followupsCronController from './controllers/proposalFollowUpCron.controller.js';
 import dealFollowupController from './controllers/dealFollowup.cron.js';
 import activityReminderController from './controllers/activityReminder.cron.js';
-import "./cron/emailCron.js"; // Just import to start the email cron
+import "./cron/emailCron.js";
 
 dotenv.config();
 

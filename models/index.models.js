@@ -3,9 +3,9 @@
 import User from "./user.model.js";
 
 import Role from "./Role.models.js";
-  // Ensure correct path
- import Streak from "./streak.model.js"; 
- 
+// Ensure correct path
+import Streak from "./streak.model.js";
+
 
 // import LeadGroup from "./leadGroup.models.js";
 // import Organization from "./organization.models.js";
@@ -29,14 +29,16 @@ import Streak from "./streak.model.js";
 
 
 
-export {User,Role,Admin,AllDeals,Activity,deal,Invoice,lastreason,Meeting,CallLog,
+export {
+  User, Role, Admin, AllDeals, Activity, deal, Invoice, lastreason, Meeting, CallLog,
   ClientLTV,
   ContactForm,
   DealFollowup,
   EmailTemplate,
   LostDeal,
   Settings,
-  Streak };
+  Streak
+};
 
 
 
