@@ -11,7 +11,59 @@ const generateToken = (id) =>
   jwt.sign({ id }, process.env.SECRET_KEY, { expiresIn: "1d" });
 
 export default {
-  createUser: async (req, res) => {
+  // createUser: async (req, res) => {
+  //   console.log("BODY:", req.body);
+  //   console.log("FILE:", req.file);
+
+  //   try {
+  //     const {
+  //       firstName,
+  //       lastName,
+  //       email,
+  //       password,
+  //       mobileNumber,
+  //       role,
+  //       status,
+  //       gender,
+  //       address,
+  //       dateOfBirth,
+  //     } = req.body;
+
+  //     const existingUser = await User.findOne({ email });
+
+  //     if (existingUser) {
+  //       if (req.file) fs.unlinkSync(req.file.path);
+  //       return res
+  //         .status(400)
+  //         .json({ message: "User already exists with this email" });
+  //     }
+
+  //     // ✅ filename mattum DB-la save
+  //     const profileImage = req.file ? req.file.filename : null;
+
+  //     const user = await User.create({
+  //       firstName,
+  //       lastName,
+  //       email,
+  //       password,
+  //       mobileNumber,
+  //       role,
+  //       status,
+  //       gender,
+  //       address,
+  //       dateOfBirth,
+  //       profileImage,
+  //     });
+
+  //     res.status(201).json(user);
+  //   } catch (err) {
+  //     if (req.file) fs.unlinkSync(req.file.path);
+  //     res.status(500).json({ message: err.message });
+  //   }
+  // },//old one..
+
+  
+createUser: async (req, res) => {
     console.log("BODY:", req.body);
     console.log("FILE:", req.file);
 
@@ -29,14 +81,8 @@ export default {
         dateOfBirth,
       } = req.body;
 
-      const existingUser = await User.findOne({ email });
-
-      if (existingUser) {
-        if (req.file) fs.unlinkSync(req.file.path);
-        return res
-          .status(400)
-          .json({ message: "User already exists with this email" });
-      }
+      // ✅ REMOVED: existingUser duplicate email check
+      // Duplicate emails are now allowed
 
       // ✅ filename mattum DB-la save
       const profileImage = req.file ? req.file.filename : null;
@@ -61,9 +107,6 @@ export default {
       res.status(500).json({ message: err.message });
     }
   },
-
-  
-
 
   getUsers: async (req, res) => {
     try {
@@ -99,6 +142,79 @@ export default {
     }
   },
 
+  // updateUser: async (req, res) => {
+  //   try {
+  //     const { id } = req.params;
+
+  //     const {
+  //       firstName,
+  //       lastName,
+  //       email,
+  //       mobileNumber,
+  //       role,
+  //       status,
+  //       gender,
+  //       address,
+  //       dateOfBirth,
+  //     } = req.body;
+
+  //     // 1️⃣ Find user
+  //     const user = await User.findById(id);
+  //     if (!user) {
+  //       if (req.file) fs.unlinkSync(req.file.path);
+  //       return res.status(404).json({ message: "User not found" });
+  //     }
+
+  //     // 2️⃣ Email duplicate check
+  //     if (email && email !== user.email) {
+  //       const existingUser = await User.findOne({ email });
+  //       if (existingUser) {
+  //         if (req.file) fs.unlinkSync(req.file.path);
+  //         return res.status(400).json({ message: "Email already taken" });
+  //       }
+  //     }
+
+  //     // 3️⃣ Image replace logic (IMPORTANT)
+  //     let profileImage = user.profileImage;
+
+  //     if (req.file) {
+  //       // delete old image
+  //       if (user.profileImage) {
+  //         const oldPath = `uploads/users/${user.profileImage}`;
+  //         if (fs.existsSync(oldPath)) {
+  //           fs.unlinkSync(oldPath);
+  //         }
+  //       }
+
+  //       // save only filename in DB
+  //       profileImage = req.file.filename;
+  //     }
+
+  //     // 4️⃣ Update user
+  //     const updatedUser = await User.findByIdAndUpdate(
+  //       id,
+  //       {
+  //         firstName,
+  //         lastName,
+  //         email,
+  //         mobileNumber,
+  //         role,
+  //         status,
+  //         gender,
+  //         address,
+  //         dateOfBirth,
+  //         profileImage,
+  //       },
+  //       { new: true, runValidators: true },
+  //     ).populate("role");
+
+  //     res.json(updatedUser);
+  //   } catch (err) {
+  //     if (req.file) fs.unlinkSync(req.file.path);
+  //     res.status(500).json({ message: err.message });
+  //   }
+  // },//old one..
+
   updateUser: async (req, res) => {
     try {
       const { id } = req.params;
@@ -115,39 +231,26 @@ export default {
         dateOfBirth,
       } = req.body;
 
-      // 1️⃣ Find user
       const user = await User.findById(id);
       if (!user) {
         if (req.file) fs.unlinkSync(req.file.path);
         return res.status(404).json({ message: "User not found" });
       }
 
-      // 2️⃣ Email duplicate check
-      if (email && email !== user.email) {
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
-          if (req.file) fs.unlinkSync(req.file.path);
-          return res.status(400).json({ message: "Email already taken" });
-        }
-      }
+      // ✅ REMOVED email duplicate check on update too — duplicate emails allowed
 
-      // 3️⃣ Image replace logic (IMPORTANT)
       let profileImage = user.profileImage;
 
       if (req.file) {
-        // delete old image
         if (user.profileImage) {
           const oldPath = `uploads/users/${user.profileImage}`;
           if (fs.existsSync(oldPath)) {
             fs.unlinkSync(oldPath);
           }
         }
-
-        // save only filename in DB
         profileImage = req.file.filename;
       }
 
-      // 4️⃣ Update user
       const updatedUser = await User.findByIdAndUpdate(
         id,
         {
@@ -171,6 +274,7 @@ export default {
       res.status(500).json({ message: err.message });
     }
   },
+
 
   deleteUser: async (req, res) => {
     try {
