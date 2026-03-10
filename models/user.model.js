@@ -208,7 +208,7 @@ const userSchema = new mongoose.Schema(
 
     email: {
       type: String,
-      required: true,
+      // required: true,
       // ✅ NO unique: true — duplicate emails allowed
       lowercase: true,
       trim: true,
