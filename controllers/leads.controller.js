@@ -50,39 +50,87 @@ export default {
 
 
 
-createLead: async (req, res) => {
-  try {
-    const { leadName, companyName, phoneNumber, email } = req.body;
+// createLead: async (req, res) => {
+//   try {
+//     const { leadName, companyName, phoneNumber, email } = req.body;
 
-    if (!leadName || !companyName || !phoneNumber) {
+//     if (!leadName || !companyName || !phoneNumber) {
+//       return res.status(400).json({
+//         message: "Lead name, company name, and phone number are required",
+//       });
+//     }
+
+//     const data = { ...req.body };
+
+//     // ✅ Handle file uploads — path saved WITHOUT leading slash
+//     // Correct:  "uploads/leads/filename.png"
+//     // Wrong:   "/uploads/leads/filename.png"  ← causes 404 on download/preview
+//     if (req.files?.length > 0) {
+//       data.attachments = req.files.map((file) => ({
+//         name: file.originalname,
+//         path: `uploads/leads/${file.filename}`,  // ✅ no leading slash
+//         type: file.mimetype,
+//         size: file.size,
+//         uploadedAt: new Date(),
+//       }));
+//     }
+
+//     // ✅ AUTO ASSIGN (Round-robin Sales users)
+//     const autoAssignee = await pickNextSalesUser();
+//     data.assignTo = autoAssignee;
+
+//     // ✅ Default status if not provided
+//     if (!data.status) data.status = "Cold";
+
+//     // ✅ followUpDate = create date
+//     data.followUpDate = new Date();
+//     data.lastReminderAt = null;
+
+//     const lead = new Lead(data);
+//     const savedLead = await lead.save();
+
+//     res.status(201).json({
+//       message: "Lead created successfully",
+//       lead: savedLead,
+//     });
+//   } catch (error) {
+//     res.status(400).json({ message: error.message });
+//   }
+// },//old one..
+
+
+  createLead : async (req, res) => {
+  try {
+    const { leadName, designation, phoneNumber } = req.body; // designation replaces companyName
+
+    // Required fields validation
+    if (!leadName || !designation || !phoneNumber) {
       return res.status(400).json({
-        message: "Lead name, company name, and phone number are required",
+        message: "Lead name, designation, and phone number are required",
       });
     }
 
     const data = { ...req.body };
 
-    // ✅ Handle file uploads — path saved WITHOUT leading slash
-    // Correct:  "uploads/leads/filename.png"
-    // Wrong:   "/uploads/leads/filename.png"  ← causes 404 on download/preview
+    // Handle file uploads – store relative path without leading slash
     if (req.files?.length > 0) {
       data.attachments = req.files.map((file) => ({
         name: file.originalname,
-        path: `uploads/leads/${file.filename}`,  // ✅ no leading slash
+        path: `uploads/leads/${file.filename}`,
         type: file.mimetype,
         size: file.size,
         uploadedAt: new Date(),
       }));
     }
 
-    // ✅ AUTO ASSIGN (Round-robin Sales users)
+    // Auto assign (round‑robin) – keep existing
     const autoAssignee = await pickNextSalesUser();
     data.assignTo = autoAssignee;
 
-    // ✅ Default status if not provided
+    // Default status if not provided
     if (!data.status) data.status = "Cold";
 
-    // ✅ followUpDate = create date
+    // Set follow‑up date to creation date
     data.followUpDate = new Date();
     data.lastReminderAt = null;
 
@@ -97,7 +145,6 @@ createLead: async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 },
-
 
   // ➡️ Get All Leads
   getLeads: async (req, res) => {
