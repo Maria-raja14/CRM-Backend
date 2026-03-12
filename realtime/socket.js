@@ -107,95 +107,292 @@
 
 
 
+// import { Server } from "socket.io";
+// import Redis from "ioredis";
+// import Notification from "../models/notification.model.js";
+
+// // Redis setup
+// const redisClient = new Redis();
+// const redisPub = new Redis();
+// const redisSub = new Redis();
+
+// // In-memory connected users
+// export const connectedUsers = {};
+
+// let io;
+
+// export const initSocket = (server) => {
+//   io = new Server(server, { cors: { origin: "*" } });
+
+//   io.on("connection", (socket) => {
+//     const { userId } = socket.handshake.auth;
+//     if (userId) addUserSocket(userId, socket);
+
+//     socket.on("user_connected", (uid) => uid && addUserSocket(uid, socket));
+//     socket.on("user_logout", (uid) => {
+//       if (uid) removeUserSocket(uid, socket.id);
+//       socket.disconnect(true);
+//     });
+
+//     socket.on("disconnect", () => {
+//       for (const uid of Object.keys(connectedUsers)) {
+//         removeUserSocket(uid, socket.id);
+//       }
+//     });
+
+//     console.log("🔌 New socket connected:", socket.id);
+//   });
+
+//   // Redis subscription
+//   redisSub.subscribe("socket_broadcast", (err) => {
+//     if (err) console.error("Redis subscribe error:", err);
+//   });
+
+//   redisSub.on("message", (channel, message) => {
+//     const { userId, event, payload } = JSON.parse(message);
+//     notifyUser(userId, event, payload);
+//   });
+// };
+
+// const addUserSocket = async (userId, socket) => {
+//   if (!connectedUsers[userId]) connectedUsers[userId] = [];
+//   connectedUsers[userId].push(socket);
+//   console.log("✅ User connected:", userId);
+
+//   // Send unread notifications from DB (no offline messages)
+//   const unread = await Notification.find({ userId, read: false }).sort({ createdAt: 1 });
+//   unread.forEach((n) =>
+//     socket.emit("new_notification", {
+//       _id: n._id,
+//       text: n.text,
+//       type: n.type,
+//       meta: n.meta,
+//       profileImage: n.profileImage,
+//       createdAt: n.createdAt,
+//     })
+//   );
+// };
+
+// const removeUserSocket = (userId, socketId) => {
+//   if (!connectedUsers[userId]) return;
+//   connectedUsers[userId] = connectedUsers[userId].filter((s) => s.id !== socketId);
+//   if (!connectedUsers[userId].length) {
+//     delete connectedUsers[userId];
+//     console.log("🗑️ User removed completely:", userId);
+//   }
+// };
+
+// // Notify a single user – if offline, do nothing (DB already has it)
+// export const notifyUser = (userId, event, payload) => {
+//   const sockets = connectedUsers[userId];
+//   if (!sockets?.length) {
+//     // User offline → skip (no queue)
+//     return;
+//   }
+//   sockets.forEach((s) => s.emit(event, payload));
+//   console.log("📩 Event sent:", event, "-> User:", userId);
+// };
+
+// // Notify multiple admins
+// export const notifyAdmins = (adminIds, event, payload) => {
+//   adminIds.forEach((id) => {
+//     redisPub.publish("socket_broadcast", JSON.stringify({ userId: id, event, payload }));
+//   });
+// };//work perfect..
+
+
 import { Server } from "socket.io";
 import Redis from "ioredis";
 import Notification from "../models/notification.model.js";
 
-// Redis setup
-const redisClient = new Redis();
-const redisPub = new Redis();
-const redisSub = new Redis();
+const REDIS_ENABLED = process.env.REDIS_ENABLED === "true";
 
-// In-memory connected users
+let redisPub;
+let redisSub;
+
+if (REDIS_ENABLED) {
+  redisPub = new Redis(process.env.REDIS_URL);
+  redisSub = new Redis(process.env.REDIS_URL);
+}
+
 export const connectedUsers = {};
 
 let io;
 
 export const initSocket = (server) => {
-  io = new Server(server, { cors: { origin: "*" } });
+
+  io = new Server(server, {
+    cors: { origin: "*" },
+  });
 
   io.on("connection", (socket) => {
-    const { userId } = socket.handshake.auth;
-    if (userId) addUserSocket(userId, socket);
 
-    socket.on("user_connected", (uid) => uid && addUserSocket(uid, socket));
+    const { userId } = socket.handshake.auth;
+
+    if (userId) {
+      addUserSocket(userId, socket);
+    }
+
+    socket.on("user_connected", (uid) => {
+      if (uid) addUserSocket(uid, socket);
+    });
+
     socket.on("user_logout", (uid) => {
+
       if (uid) removeUserSocket(uid, socket.id);
+
       socket.disconnect(true);
+
     });
 
     socket.on("disconnect", () => {
+
       for (const uid of Object.keys(connectedUsers)) {
+
         removeUserSocket(uid, socket.id);
+
       }
+
     });
 
-    console.log("🔌 New socket connected:", socket.id);
+    console.log("🔌 Socket connected:", socket.id);
+
   });
 
-  // Redis subscription
-  redisSub.subscribe("socket_broadcast", (err) => {
-    if (err) console.error("Redis subscribe error:", err);
-  });
+  // Redis subscribe
+  if (REDIS_ENABLED) {
 
-  redisSub.on("message", (channel, message) => {
-    const { userId, event, payload } = JSON.parse(message);
-    notifyUser(userId, event, payload);
-  });
+    redisSub.subscribe("socket_broadcast");
+
+    redisSub.on("message", (channel, message) => {
+
+      const { userId, event, payload } = JSON.parse(message);
+
+      sendToLocalSockets(userId, event, payload);
+
+    });
+
+  }
+
 };
 
+/*
+|--------------------------------------------------------------------------
+| Add socket connection
+|--------------------------------------------------------------------------
+*/
+
 const addUserSocket = async (userId, socket) => {
-  if (!connectedUsers[userId]) connectedUsers[userId] = [];
+
+  if (!connectedUsers[userId]) {
+
+    connectedUsers[userId] = [];
+
+  }
+
   connectedUsers[userId].push(socket);
+
   console.log("✅ User connected:", userId);
 
-  // Send unread notifications from DB (no offline messages)
-  const unread = await Notification.find({ userId, read: false }).sort({ createdAt: 1 });
-  unread.forEach((n) =>
+  // Send unread notifications
+
+  const unread = await Notification.find({
+    userId,
+    read: false,
+  }).sort({ createdAt: 1 });
+
+  unread.forEach((n) => {
+
     socket.emit("new_notification", {
+
       _id: n._id,
       text: n.text,
       type: n.type,
       meta: n.meta,
       profileImage: n.profileImage,
       createdAt: n.createdAt,
-    })
-  );
+
+    });
+
+  });
+
 };
+
+/*
+|--------------------------------------------------------------------------
+| Remove socket
+|--------------------------------------------------------------------------
+*/
 
 const removeUserSocket = (userId, socketId) => {
+
   if (!connectedUsers[userId]) return;
-  connectedUsers[userId] = connectedUsers[userId].filter((s) => s.id !== socketId);
+
+  connectedUsers[userId] = connectedUsers[userId].filter(
+    (s) => s.id !== socketId
+  );
+
   if (!connectedUsers[userId].length) {
+
     delete connectedUsers[userId];
-    console.log("🗑️ User removed completely:", userId);
+
+    console.log("🗑️ User removed:", userId);
+
   }
+
 };
 
-// Notify a single user – if offline, do nothing (DB already has it)
-export const notifyUser = (userId, event, payload) => {
+/*
+|--------------------------------------------------------------------------
+| Send event to local sockets
+|--------------------------------------------------------------------------
+*/
+
+const sendToLocalSockets = (userId, event, payload) => {
+
   const sockets = connectedUsers[userId];
-  if (!sockets?.length) {
-    // User offline → skip (no queue)
-    return;
-  }
+
+  if (!sockets?.length) return;
+
   sockets.forEach((s) => s.emit(event, payload));
-  console.log("📩 Event sent:", event, "-> User:", userId);
+
 };
 
-// Notify multiple admins
+/*
+|--------------------------------------------------------------------------
+| Public notify function
+|--------------------------------------------------------------------------
+*/
+
+export const notifyUser = (userId, event, payload) => {
+
+  // Send to local sockets
+  sendToLocalSockets(userId, event, payload);
+
+  // Broadcast to other servers via Redis
+  if (REDIS_ENABLED && redisPub) {
+
+    redisPub.publish(
+      "socket_broadcast",
+      JSON.stringify({ userId, event, payload })
+    );
+
+  }
+
+};
+
+/*
+|--------------------------------------------------------------------------
+| Notify multiple admins
+|--------------------------------------------------------------------------
+*/
+
 export const notifyAdmins = (adminIds, event, payload) => {
+
   adminIds.forEach((id) => {
-    redisPub.publish("socket_broadcast", JSON.stringify({ userId: id, event, payload }));
+
+    notifyUser(id, event, payload);
+
   });
+
 };
