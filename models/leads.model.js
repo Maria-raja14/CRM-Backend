@@ -239,7 +239,8 @@ const leadSchema = new mongoose.Schema(
     phoneNumber: { type: String, required: true },
     email: { type: String },
     source: { type: String },
-    designation: { type: String, required: true },
+    // designation: { type: String, required: true },
+     destination: { type: String, required: true }, // renamed from designation
     duration: { type: String },
     requirement: { type: String },
     assignTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
