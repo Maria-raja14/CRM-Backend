@@ -89,15 +89,31 @@ export default {
   },
 
   // Delete notification
+  // deleteNotification: async (req, res) => {
+  //   try {
+  //     const { id } = req.params;
+  //     const notif = await Notification.findByIdAndDelete(id);
+  //     if (!notif) return res.status(404).json({ message: "Notification not found" });
+  //     res.status(200).json({ message: "Notification deleted" });
+  //   } catch (err) {
+  //     res.status(500).json({ message: err.message });
+  //   }
+  // },//old one..
+
   deleteNotification: async (req, res) => {
-    try {
-      const { id } = req.params;
-      const notif = await Notification.findByIdAndDelete(id);
-      if (!notif) return res.status(404).json({ message: "Notification not found" });
-      res.status(200).json({ message: "Notification deleted" });
-    } catch (err) {
-      res.status(500).json({ message: err.message });
-    }
-  },
+
+  const { id } = req.params;
+
+  const notif = await Notification.findByIdAndDelete(id);
+
+  if (!notif) {
+    return res.status(404).json({ message: "Not found" });
+  }
+
+  res.json({ success: true });
+
+}
 };
 //original
+
+

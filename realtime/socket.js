@@ -52,7 +52,12 @@ const addUserSocket = async (userId, socket) => {
   console.log("✅ User connected:", userId);
 
   // Send unread notifications from DB
-  const unread = await Notification.find({ userId, read: false }).sort({ createdAt: 1 });
+  // const unread = await Notification.find({ userId, read: false }).sort({ createdAt: 1 });
+  const unread = await Notification.find({
+  userId,
+  read: false,
+  expiresAt: { $gte: new Date() }
+}).limit(50);
   unread.forEach((n) =>
     socket.emit("new_notification", {
       _id: n._id,
@@ -98,5 +103,7 @@ export const notifyAdmins = (adminIds, event, payload) => {
   adminIds.forEach((id) => {
     redisPub.publish("socket_broadcast", JSON.stringify({ userId: id, event, payload }));
   });
-};
+};//original
+
+
 

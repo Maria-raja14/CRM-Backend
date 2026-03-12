@@ -14,3 +14,6 @@ router.patch("/read/:id", notificationController.markAsRead);
 router.delete("/:id", notificationController.deleteNotification);
 
 export default router;
+//original
+
+
