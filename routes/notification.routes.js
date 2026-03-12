@@ -13,6 +13,9 @@ router.patch("/read/:id", notificationController.markAsRead);
 // DELETE /notifications/:id
 router.delete("/:id", notificationController.deleteNotification);
 
+// DELETE /notifications/bulk
+router.delete("/bulk", notificationController.bulkDeleteNotifications);
+
 export default router;
 //original
 

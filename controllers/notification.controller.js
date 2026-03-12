@@ -112,7 +112,23 @@ export default {
 
   res.json({ success: true });
 
-}
+},
+
+  // Bulk delete notifications
+bulkDeleteNotifications: async (req, res) => {
+  try {
+    const { ids } = req.body; // array of notification IDs
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "No IDs provided" });
+    }
+    await Notification.deleteMany({ _id: { $in: ids } });
+    res.status(200).json({ success: true, deletedCount: ids.length });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+},
+  
+  
 };
 //original
 

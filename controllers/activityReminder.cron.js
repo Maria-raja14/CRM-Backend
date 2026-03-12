@@ -1,5 +1,130 @@
 
 
+// import cron from "node-cron";
+// import dayjs from "dayjs";
+// import utc from "dayjs/plugin/utc.js";
+// import Activity from "../models/activity.models.js";
+// import Notification from "../models/notification.model.js";
+// import { notifyUser } from "../realtime/socket.js";
+// import User from "../models/user.model.js";
+// import Role from "../models/role.model.js";
+
+// dayjs.extend(utc);
+
+// const SHOULD_REMIND_EVERY_MINUTES = 1440;
+
+// // ✅ Get all admin IDs
+// const getAdminUserIds = async () => {
+//   const adminRole = await Role.findOne({ name: "Admin" });
+//   if (!adminRole) return [];
+//   const admins = await User.find({ role: adminRole._id }, "_id");
+//   return admins.map((a) => a._id.toString());
+// };
+
+// //  Safe notification creator with deduplication
+// const sendNotification = async (
+//   userId,
+//   title,
+//   text,
+//   type = "activity",
+//   meta = {}
+// ) => {
+//   //  Check if a similar notification already exists
+//   const exists = await Notification.findOne({
+//     userId,
+//     type,
+//     "meta.activityId": meta.activityId,
+//     createdAt: { $gte: dayjs().subtract(SHOULD_REMIND_EVERY_MINUTES, "minute").toDate() },
+//   });
+
+//   if (exists) {
+//     return null;
+//   }
+
+//   const notif = await Notification.create({
+//     userId,
+//     type,
+//     title,
+//     text,
+//     meta,
+//     expiresAt: dayjs().add(24, "hour").toDate(),
+//   });
+
+//   notifyUser(
+//     userId,
+//     type === "activity" ? "activity_reminder" : "admin_reminder",
+//     notif
+//   );
+
+//   return notif;
+// };
+
+// export function startActivityReminderCron() {
+//   cron.schedule("* * * * *", async () => {
+//     const now = dayjs().utc();
+//     console.log("🕒 Activity Reminder Cron:", now.format());
+
+//     try {
+//       const dueActivities = await Activity.find({
+//         startDate: { $exists: true },
+//         reminder: { $exists: true },
+//         $or: [
+//           { lastReminderAt: { $exists: false } },
+//           { lastReminderAt: null },
+//           {
+//             lastReminderAt: {
+//               $lt: now.subtract(SHOULD_REMIND_EVERY_MINUTES, "minute").toDate(),
+//             },
+//           },
+//         ],
+//       }).populate("assignedTo", "firstName lastName email _id");
+
+//       for (const act of dueActivities) {
+//         const reminderTime = dayjs(act.reminder).utc();
+
+//         // ✅ Only trigger if reminder time has passed
+//         if (now.isSame(reminderTime) || now.isAfter(reminderTime)) {
+//           const userId = act.assignedTo?._id?.toString();
+
+//           // Assigned user notification
+//           if (userId) {
+//             await sendNotification(
+//               userId,
+//               "⏰ Activity Reminder",
+//               `Reminder for activity: "${act.title}"`,
+//               "activity",
+//               { activityId: act._id.toString(), startAt: act.startDate }
+//             );
+//           }
+
+//           // Admins notification
+//           const admins = await getAdminUserIds();
+//           for (const adminId of admins) {
+//             await sendNotification(
+//               adminId,
+//               "⏰ Activity Reminder (Admin)",
+//               `${act.assignedTo?.firstName || "Unknown"} has activity "${
+//                 act.title
+//               }" at ${dayjs(act.startDate).utc().format("HH:mm")}.`,
+//               "admin",
+//               { activityId: act._id.toString(), startAt: act.startDate }
+//             );
+//           }
+
+//           // ✅ Mark reminder as sent
+//           act.lastReminderAt = new Date();
+//           await act.save();
+//         }
+//       }
+//     } catch (err) {
+//       console.error("❌ Activity reminder cron error:", err.message);
+//     }
+//   });
+// }//original
+
+
+
+
 import cron from "node-cron";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc.js";
@@ -13,7 +138,7 @@ dayjs.extend(utc);
 
 const SHOULD_REMIND_EVERY_MINUTES = 1440;
 
-// ✅ Get all admin IDs
+// Get Admin IDs
 const getAdminUserIds = async () => {
   const adminRole = await Role.findOne({ name: "Admin" });
   if (!adminRole) return [];
@@ -21,7 +146,20 @@ const getAdminUserIds = async () => {
   return admins.map((a) => a._id.toString());
 };
 
-//  Safe notification creator with deduplication
+// Prevent duplicate notifications
+const notificationExists = async (userId, activityId) => {
+  const existing = await Notification.findOne({
+    userId,
+    type: "activity",
+    "meta.activityId": activityId,
+    createdAt: {
+      $gte: dayjs().subtract(SHOULD_REMIND_EVERY_MINUTES, "minute").toDate(),
+    },
+  });
+
+  return !!existing;
+};
+
 const sendNotification = async (
   userId,
   title,
@@ -29,22 +167,13 @@ const sendNotification = async (
   type = "activity",
   meta = {}
 ) => {
-  //  Check if a similar notification already exists
-  const exists = await Notification.findOne({
-    userId,
-    type,
-    "meta.activityId": meta.activityId,
-    createdAt: { $gte: dayjs().subtract(SHOULD_REMIND_EVERY_MINUTES, "minute").toDate() },
-  });
+  const exists = await notificationExists(userId, meta.activityId);
 
-  if (exists) {
-    return null;
-  }
+  if (exists) return null;
 
   const notif = await Notification.create({
     userId,
     type,
-    title,
     text,
     meta,
     expiresAt: dayjs().add(24, "hour").toDate(),
@@ -62,6 +191,7 @@ const sendNotification = async (
 export function startActivityReminderCron() {
   cron.schedule("* * * * *", async () => {
     const now = dayjs().utc();
+
     console.log("🕒 Activity Reminder Cron:", now.format());
 
     try {
@@ -73,7 +203,9 @@ export function startActivityReminderCron() {
           { lastReminderAt: null },
           {
             lastReminderAt: {
-              $lt: now.subtract(SHOULD_REMIND_EVERY_MINUTES, "minute").toDate(),
+              $lt: now
+                .subtract(SHOULD_REMIND_EVERY_MINUTES, "minute")
+                .toDate(),
             },
           },
         ],
@@ -82,11 +214,9 @@ export function startActivityReminderCron() {
       for (const act of dueActivities) {
         const reminderTime = dayjs(act.reminder).utc();
 
-        // ✅ Only trigger if reminder time has passed
         if (now.isSame(reminderTime) || now.isAfter(reminderTime)) {
           const userId = act.assignedTo?._id?.toString();
 
-          // Assigned user notification
           if (userId) {
             await sendNotification(
               userId,
@@ -97,21 +227,20 @@ export function startActivityReminderCron() {
             );
           }
 
-          // Admins notification
           const admins = await getAdminUserIds();
+
           for (const adminId of admins) {
             await sendNotification(
               adminId,
               "⏰ Activity Reminder (Admin)",
               `${act.assignedTo?.firstName || "Unknown"} has activity "${
                 act.title
-              }" at ${dayjs(act.startDate).utc().format("HH:mm")}.`,
+              }"`,
               "admin",
               { activityId: act._id.toString(), startAt: act.startDate }
             );
           }
 
-          // ✅ Mark reminder as sent
           act.lastReminderAt = new Date();
           await act.save();
         }
@@ -120,8 +249,4 @@ export function startActivityReminderCron() {
       console.error("❌ Activity reminder cron error:", err.message);
     }
   });
-}//original
-
-
-
-
+}
