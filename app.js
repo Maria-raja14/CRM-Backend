@@ -32,6 +32,7 @@ import followupsCronController from './controllers/proposalFollowUpCron.controll
 import dealFollowupController from './controllers/dealFollowup.cron.js';
 import activityReminderController from './controllers/activityReminder.cron.js';
 import "./cron/emailCron.js";
+import "./workers/emailWorker.js";
 
 dotenv.config();
 
