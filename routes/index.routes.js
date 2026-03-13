@@ -29,8 +29,8 @@ router.use("/invoice", invoice);
 
 router.use("/proposal", proposalRoutes);
 router.use("/dashboard", adminDashboard);
-router.use("/notification", notificationRoutes);
-
+// router.use("/notification", notificationRoutes);
+router.use("/notifications", notificationRoutes);
 router.use("/gmail", gmailRoutes); // ✅ Mount Gmail API routes
 
 router.use("/google-auth", googleAuthRoutes); // Add this line
