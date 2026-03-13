@@ -319,6 +319,145 @@
 
 
 
+// import cron from "node-cron";
+// import Lead from "../models/leads.model.js";
+// import User from "../models/user.model.js";
+// import Role from "../models/role.model.js";
+// import Notification from "../models/notification.model.js";
+// import moment from "moment";
+// import { sendNotification } from "../services/notificationService.js";
+// import sendEmail from "../services/email.js";
+
+// const SHOULD_REMIND_EVERY_MINUTES = 1440;
+
+// // Get Admin IDs
+// const getAdminUserIds = async () => {
+//   const adminRole = await Role.findOne({ name: "Admin" });
+
+//   if (!adminRole) return [];
+
+//   const admins = await User.find({ role: adminRole._id }, "_id");
+
+//   return admins.map((a) => a._id.toString());
+// };
+
+// //  Prevent duplicate notifications
+// const notificationExists = async (userId, leadId) => {
+//   const existing = await Notification.findOne({
+//     userId,
+//     type: "followup",
+//     "meta.leadId": leadId,
+//     createdAt: {
+//       $gte: moment().subtract(SHOULD_REMIND_EVERY_MINUTES, "minute").toDate(),
+//     },
+//   });
+
+//   return !!existing;
+// };
+
+// export function startFollowUpCron() {
+//   cron.schedule("* * * * *", async () => {
+//     const nowUtc = moment.utc();
+
+//     console.log("🕒 Follow-up Cron:", nowUtc.format());
+
+//     try {
+//       const dueLeads = await Lead.find({
+//         followUpDate: { $lte: nowUtc.toDate() },
+//         status: { $in: ["Hot", "Warm", "Cold"] },
+//         $or: [
+//           { lastReminderAt: { $exists: false } },
+//           { lastReminderAt: null },
+//           {
+//             lastReminderAt: {
+//               $lt: nowUtc
+//                 .clone()
+//                 .subtract(SHOULD_REMIND_EVERY_MINUTES, "minute")
+//                 .toDate(),
+//             },
+//           },
+//         ],
+//       }).populate("assignTo", "firstName lastName email _id");
+
+//       if (!dueLeads.length) return;
+
+//       const admins = await getAdminUserIds();
+
+//       for (const lead of dueLeads) {
+//         const assignUserId = lead.assignTo?._id?.toString();
+
+//         // -------------------------
+//         // Salesman notification
+//         // -------------------------
+//         if (assignUserId) {
+//           const exists = await notificationExists(
+//             assignUserId,
+//             lead._id.toString()
+//           );
+
+//           if (!exists) {
+//             await sendNotification(
+//               assignUserId,
+//               `⚠️ You missed a follow-up for Lead: ${
+//                 lead.leadName || "Unnamed Lead"
+//               }`,
+//               "followup",
+//               { leadId: lead._id.toString() }
+//             );
+//           }
+//         }
+
+//         // -------------------------
+//         // Admin notifications
+//         // -------------------------
+//         for (const adminId of admins) {
+//           const exists = await notificationExists(
+//             adminId,
+//             lead._id.toString()
+//           );
+
+//           if (!exists) {
+//             await sendNotification(
+//               adminId,
+//               `Salesman ${
+//                 lead.assignTo?.firstName || "Unknown"
+//               } missed follow-up for Lead: ${lead.leadName}`,
+//               "followup",
+//               {
+//                 leadId: lead._id.toString(),
+//                 salesman: lead.assignTo?.firstName || "Unknown",
+//                 salesmanId: lead.assignTo?._id?.toString(),
+//               }
+//             );
+//           }
+//         }
+
+//         // mark reminder sent
+//         lead.lastReminderAt = new Date();
+//         await lead.save();
+//       }
+//     } catch (err) {
+//       console.error("❌ followUp cron error:", err);
+//     }
+//   });
+
+//   // Auto delete expired notifications
+//   cron.schedule("0 * * * *", async () => {
+//     try {
+//       const now = new Date();
+
+//       const deleted = await Notification.deleteMany({
+//         expiresAt: { $lte: now },
+//       });
+
+//       console.log("🗑️ Deleted expired notifications:", deleted.deletedCount);
+//     } catch (err) {
+//       console.error("❌ Notification cleanup error:", err);
+//     }
+//   });
+// }//notification come correctly..
+
+
 import cron from "node-cron";
 import Lead from "../models/leads.model.js";
 import User from "../models/user.model.js";
@@ -333,15 +472,12 @@ const SHOULD_REMIND_EVERY_MINUTES = 1440;
 // Get Admin IDs
 const getAdminUserIds = async () => {
   const adminRole = await Role.findOne({ name: "Admin" });
-
   if (!adminRole) return [];
-
   const admins = await User.find({ role: adminRole._id }, "_id");
-
   return admins.map((a) => a._id.toString());
 };
 
-//  Prevent duplicate notifications
+// Prevent duplicate notifications within the cooldown window
 const notificationExists = async (userId, leadId) => {
   const existing = await Notification.findOne({
     userId,
@@ -351,33 +487,44 @@ const notificationExists = async (userId, leadId) => {
       $gte: moment().subtract(SHOULD_REMIND_EVERY_MINUTES, "minute").toDate(),
     },
   });
-
   return !!existing;
 };
 
 export function startFollowUpCron() {
   cron.schedule("* * * * *", async () => {
-    const nowUtc = moment.utc();
+    // ✅ FIX: Always use new Date() — MongoDB stores dates as UTC internally.
+    // moment.utc() was causing a mismatch on live servers because the
+    // followUpDate saved from local was already UTC in MongoDB.
+    // Using `new Date()` gives the correct UTC "now" in all environments.
+    const now = new Date();
 
-    console.log("🕒 Follow-up Cron:", nowUtc.format());
+    console.log("🕒 Follow-up Cron running at:", now.toISOString());
 
     try {
+      // ✅ FIX: Add a 5-minute future buffer so leads created "just now"
+      // are caught even if the cron fires slightly before the exact time.
+      const bufferTime = new Date(now.getTime() + 5 * 60 * 1000); // now + 5 min
+
       const dueLeads = await Lead.find({
-        followUpDate: { $lte: nowUtc.toDate() },
+        // ✅ FIX: Use bufferTime instead of exact now — catches leads
+        // whose followUpDate was set to "today/now" but may be slightly
+        // in the future due to clock skew between client and server.
+        followUpDate: { $lte: bufferTime },
         status: { $in: ["Hot", "Warm", "Cold"] },
         $or: [
           { lastReminderAt: { $exists: false } },
           { lastReminderAt: null },
           {
             lastReminderAt: {
-              $lt: nowUtc
-                .clone()
-                .subtract(SHOULD_REMIND_EVERY_MINUTES, "minute")
-                .toDate(),
+              $lt: new Date(
+                now.getTime() - SHOULD_REMIND_EVERY_MINUTES * 60 * 1000
+              ),
             },
           },
         ],
       }).populate("assignTo", "firstName lastName email _id");
+
+      console.log(`📋 Found ${dueLeads.length} due leads`);
 
       if (!dueLeads.length) return;
 
@@ -386,9 +533,7 @@ export function startFollowUpCron() {
       for (const lead of dueLeads) {
         const assignUserId = lead.assignTo?._id?.toString();
 
-        // -------------------------
-        // Salesman notification
-        // -------------------------
+        // ── Salesman notification ──────────────────────────────────────
         if (assignUserId) {
           const exists = await notificationExists(
             assignUserId,
@@ -404,12 +549,13 @@ export function startFollowUpCron() {
               "followup",
               { leadId: lead._id.toString() }
             );
+            console.log(
+              `✅ Salesman notif sent → userId: ${assignUserId}, lead: ${lead.leadName}`
+            );
           }
         }
 
-        // -------------------------
-        // Admin notifications
-        // -------------------------
+        // ── Admin notifications ────────────────────────────────────────
         for (const adminId of admins) {
           const exists = await notificationExists(
             adminId,
@@ -429,11 +575,14 @@ export function startFollowUpCron() {
                 salesmanId: lead.assignTo?._id?.toString(),
               }
             );
+            console.log(
+              `✅ Admin notif sent → adminId: ${adminId}, lead: ${lead.leadName}`
+            );
           }
         }
 
-        // mark reminder sent
-        lead.lastReminderAt = new Date();
+        // Mark reminder sent so we don't re-fire within the cooldown
+        lead.lastReminderAt = now;
         await lead.save();
       }
     } catch (err) {
@@ -441,15 +590,12 @@ export function startFollowUpCron() {
     }
   });
 
-  // Auto delete expired notifications
+  // Auto-delete expired notifications every hour
   cron.schedule("0 * * * *", async () => {
     try {
-      const now = new Date();
-
       const deleted = await Notification.deleteMany({
-        expiresAt: { $lte: now },
+        expiresAt: { $lte: new Date() },
       });
-
       console.log("🗑️ Deleted expired notifications:", deleted.deletedCount);
     } catch (err) {
       console.error("❌ Notification cleanup error:", err);

@@ -127,4 +127,4 @@ const activitySchema = new mongoose.Schema(
 
 const Activity = mongoose.model("Activity", activitySchema);
 
-export default Activity;
+export default Activity;//notification come correctly..
