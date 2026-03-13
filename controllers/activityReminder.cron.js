@@ -125,131 +125,131 @@
 
 
 
-import cron from "node-cron";
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc.js";
-import Activity from "../models/activity.models.js";
-import Notification from "../models/notification.model.js";
-import { notifyUser } from "../realtime/socket.js";
-import User from "../models/user.model.js";
-import Role from "../models/role.model.js";
+// import cron from "node-cron";
+// import dayjs from "dayjs";
+// import utc from "dayjs/plugin/utc.js";
+// import Activity from "../models/activity.models.js";
+// import Notification from "../models/notification.model.js";
+// import { notifyUser } from "../realtime/socket.js";
+// import User from "../models/user.model.js";
+// import Role from "../models/role.model.js";
 
-dayjs.extend(utc);
+// dayjs.extend(utc);
 
-const SHOULD_REMIND_EVERY_MINUTES = 1440;
+// const SHOULD_REMIND_EVERY_MINUTES = 1440;
 
-// Get Admin IDs
-const getAdminUserIds = async () => {
-  const adminRole = await Role.findOne({ name: "Admin" });
-  if (!adminRole) return [];
-  const admins = await User.find({ role: adminRole._id }, "_id");
-  return admins.map((a) => a._id.toString());
-};
+// // Get Admin IDs
+// const getAdminUserIds = async () => {
+//   const adminRole = await Role.findOne({ name: "Admin" });
+//   if (!adminRole) return [];
+//   const admins = await User.find({ role: adminRole._id }, "_id");
+//   return admins.map((a) => a._id.toString());
+// };
 
-// Prevent duplicate notifications
-const notificationExists = async (userId, activityId) => {
-  const existing = await Notification.findOne({
-    userId,
-    type: "activity",
-    "meta.activityId": activityId,
-    createdAt: {
-      $gte: dayjs().subtract(SHOULD_REMIND_EVERY_MINUTES, "minute").toDate(),
-    },
-  });
+// // Prevent duplicate notifications
+// const notificationExists = async (userId, activityId) => {
+//   const existing = await Notification.findOne({
+//     userId,
+//     type: "activity",
+//     "meta.activityId": activityId,
+//     createdAt: {
+//       $gte: dayjs().subtract(SHOULD_REMIND_EVERY_MINUTES, "minute").toDate(),
+//     },
+//   });
 
-  return !!existing;
-};
+//   return !!existing;
+// };
 
-const sendNotification = async (
-  userId,
-  title,
-  text,
-  type = "activity",
-  meta = {}
-) => {
-  const exists = await notificationExists(userId, meta.activityId);
+// const sendNotification = async (
+//   userId,
+//   title,
+//   text,
+//   type = "activity",
+//   meta = {}
+// ) => {
+//   const exists = await notificationExists(userId, meta.activityId);
 
-  if (exists) return null;
+//   if (exists) return null;
 
-  const notif = await Notification.create({
-    userId,
-    type,
-    text,
-    meta,
-    expiresAt: dayjs().add(24, "hour").toDate(),
-  });
+//   const notif = await Notification.create({
+//     userId,
+//     type,
+//     text,
+//     meta,
+//     expiresAt: dayjs().add(24, "hour").toDate(),
+//   });
 
-  notifyUser(
-    userId,
-    type === "activity" ? "activity_reminder" : "admin_reminder",
-    notif
-  );
+//   notifyUser(
+//     userId,
+//     type === "activity" ? "activity_reminder" : "admin_reminder",
+//     notif
+//   );
 
-  return notif;
-};
+//   return notif;
+// };
 
-export function startActivityReminderCron() {
-  cron.schedule("* * * * *", async () => {
-    const now = dayjs().utc();
+// export function startActivityReminderCron() {
+//   cron.schedule("* * * * *", async () => {
+//     const now = dayjs().utc();
 
-    console.log("🕒 Activity Reminder Cron:", now.format());
+//     console.log("🕒 Activity Reminder Cron:", now.format());
 
-    try {
-      const dueActivities = await Activity.find({
-        startDate: { $exists: true },
-        reminder: { $exists: true },
-        $or: [
-          { lastReminderAt: { $exists: false } },
-          { lastReminderAt: null },
-          {
-            lastReminderAt: {
-              $lt: now
-                .subtract(SHOULD_REMIND_EVERY_MINUTES, "minute")
-                .toDate(),
-            },
-          },
-        ],
-      }).populate("assignedTo", "firstName lastName email _id");
+//     try {
+//       const dueActivities = await Activity.find({
+//         startDate: { $exists: true },
+//         reminder: { $exists: true },
+//         $or: [
+//           { lastReminderAt: { $exists: false } },
+//           { lastReminderAt: null },
+//           {
+//             lastReminderAt: {
+//               $lt: now
+//                 .subtract(SHOULD_REMIND_EVERY_MINUTES, "minute")
+//                 .toDate(),
+//             },
+//           },
+//         ],
+//       }).populate("assignedTo", "firstName lastName email _id");
 
-      for (const act of dueActivities) {
-        const reminderTime = dayjs(act.reminder).utc();
+//       for (const act of dueActivities) {
+//         const reminderTime = dayjs(act.reminder).utc();
 
-        if (now.isSame(reminderTime) || now.isAfter(reminderTime)) {
-          const userId = act.assignedTo?._id?.toString();
+//         if (now.isSame(reminderTime) || now.isAfter(reminderTime)) {
+//           const userId = act.assignedTo?._id?.toString();
 
-          if (userId) {
-            await sendNotification(
-              userId,
-              "⏰ Activity Reminder",
-              `Reminder for activity: "${act.title}"`,
-              "activity",
-              { activityId: act._id.toString(), startAt: act.startDate }
-            );
-          }
+//           if (userId) {
+//             await sendNotification(
+//               userId,
+//               "⏰ Activity Reminder",
+//               `Reminder for activity: "${act.title}"`,
+//               "activity",
+//               { activityId: act._id.toString(), startAt: act.startDate }
+//             );
+//           }
 
-          const admins = await getAdminUserIds();
+//           const admins = await getAdminUserIds();
 
-          for (const adminId of admins) {
-            await sendNotification(
-              adminId,
-              "⏰ Activity Reminder (Admin)",
-              `${act.assignedTo?.firstName || "Unknown"} has activity "${
-                act.title
-              }"`,
-              "admin",
-              { activityId: act._id.toString(), startAt: act.startDate }
-            );
-          }
+//           for (const adminId of admins) {
+//             await sendNotification(
+//               adminId,
+//               "⏰ Activity Reminder (Admin)",
+//               `${act.assignedTo?.firstName || "Unknown"} has activity "${
+//                 act.title
+//               }"`,
+//               "admin",
+//               { activityId: act._id.toString(), startAt: act.startDate }
+//             );
+//           }
 
-          act.lastReminderAt = new Date();
-          await act.save();
-        }
-      }
-    } catch (err) {
-      console.error("❌ Activity reminder cron error:", err.message);
-    }
-  });
-}//notification come correctly..
+//           act.lastReminderAt = new Date();
+//           await act.save();
+//         }
+//       }
+//     } catch (err) {
+//       console.error("❌ Activity reminder cron error:", err.message);
+//     }
+//   });
+// }//notification come correctly..
 
 
 
@@ -386,3 +386,93 @@ export function startActivityReminderCron() {
 //     }
 //   });
 // }//final code..
+
+
+
+// controllers/activityReminderCron.js
+import cron         from "node-cron";
+import Activity     from "../models/activity.models.js";
+import Notification from "../models/notification.model.js";
+import { notifyUser } from "../realtime/socket.js";
+import User         from "../models/user.model.js";
+import Role         from "../models/role.model.js";
+
+const COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+const getAdminUserIds = async () => {
+  const adminRole = await Role.findOne({ name: "Admin" });
+  if (!adminRole) return [];
+  const admins = await User.find({ role: adminRole._id }, "_id");
+  return admins.map((a) => a._id.toString());
+};
+
+const notificationExists = async (userId, activityId) => {
+  const cutoff = new Date(Date.now() - COOLDOWN_MS);
+  const existing = await Notification.findOne({
+    userId,
+    type:              "activity",
+    "meta.activityId": activityId,
+    createdAt:         { $gte: cutoff },
+  });
+  return !!existing;
+};
+
+const sendActivityNotification = async (userId, text, type, meta) => {
+  const alreadySent = await notificationExists(userId, meta.activityId);
+  if (alreadySent) return null;
+
+  const notif = await Notification.create({
+    userId, type, text, meta,
+    expiresAt: new Date(Date.now() + COOLDOWN_MS),
+  });
+
+  notifyUser(userId, type === "activity" ? "activity_reminder" : "admin_reminder", {
+    _id: notif._id, text: notif.text, type: notif.type,
+    meta: notif.meta, createdAt: notif.createdAt,
+  });
+
+  return notif;
+};
+
+export function startActivityReminderCron() {
+  cron.schedule("* * * * *", async () => {
+    const now = new Date();
+    const cooldownCutoff = new Date(now.getTime() - COOLDOWN_MS);
+
+    console.log("🕒 Activity Reminder Cron:", now.toISOString());
+
+    try {
+      const dueActivities = await Activity.find({
+        reminder: { $exists: true, $ne: null, $lte: now },
+        $or: [
+          { lastReminderAt: { $exists: false } },
+          { lastReminderAt: null },
+          { lastReminderAt: { $lt: cooldownCutoff } },
+        ],
+      }).populate("assignedTo", "firstName lastName email _id");
+
+      for (const act of dueActivities) {
+        const userId     = act.assignedTo?._id?.toString();
+        const activityId = act._id.toString();
+
+        if (userId) {
+          await sendActivityNotification(userId, `⏰ Reminder for activity: "${act.title}"`, "activity", { activityId, startAt: act.startDate });
+        }
+
+        const admins = await getAdminUserIds();
+        for (const adminId of admins) {
+          await sendActivityNotification(adminId, `${act.assignedTo?.firstName || "Someone"} has activity: "${act.title}"`, "admin", { activityId, startAt: act.startDate });
+        }
+
+        // ✅ FIX: updateOne instead of act.save() — avoids any model validation errors
+        await Activity.updateOne(
+          { _id: act._id },
+          { $set: { lastReminderAt: now } }
+        );
+      }
+
+    } catch (err) {
+      console.error("❌ Activity reminder cron error:", err.message);
+    }
+  });
+}
