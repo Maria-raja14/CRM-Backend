@@ -242,7 +242,7 @@ export default {
       const monthlyTrend = aggregateMonthlyTrend(enhancedLostDeals, timeframe);
       const reasonDistribution = aggregateReasonDistribution(enhancedLostDeals);
       const topLostUsers = aggregateTopLostUsers(enhancedLostDeals);
-      const recentLostDeals = enhancedLostDeals.slice(0, 20);
+      const recentLostDeals = enhancedLostDeals;
       const industryAnalysis = aggregateIndustryAnalysis(enhancedLostDeals);
       const dealSizeAnalysis = aggregateDealSizeAnalysis(enhancedLostDeals);
       const highValueDeals = enhancedLostDeals.filter(d => (d.parsedValue || 0) >= 100000).sort((a, b) => (b.parsedValue || 0) - (a.parsedValue || 0)).slice(0, 10);
