@@ -1,6 +1,7 @@
 import MassEmail from "../models/massEmail.model.js";
 import fs from "fs";
 import sendEmail from "../utils/sendEmail.js";
+import { addEmailToQueue } from "../utils/emailQueue.js";
 
 export default{
 sendBulkEmail : async (req, res) => {
@@ -70,7 +71,7 @@ sendBulkEmail : async (req, res) => {
     // 🔥 If NO scheduled date → send immediately
     if (!scheduledFor) {
       for (const email of recipients) {
-        await sendEmail({
+        await addEmailToQueue({
           to: email,
           subject,
           html: finalHTML,
