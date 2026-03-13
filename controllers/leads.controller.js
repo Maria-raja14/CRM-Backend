@@ -525,21 +525,53 @@ export default {
   },
 
   // ➡️ Get All Leads
-  getLeads: async (req, res) => {
-    try {
-      const query =
-        req.user.role.name === "Admin" ? {} : { assignTo: req.user._id };
+  // getLeads: async (req, res) => {
+  //   try {
+  //     const query =
+  //       req.user.role.name === "Admin" ? {} : { assignTo: req.user._id };
 
-      const leads = await Lead.find(query).populate(
-        "assignTo",
-        "firstName lastName email role"
-      );
+  //     const leads = await Lead.find(query).populate(
+  //       "assignTo",
+  //       "firstName lastName email role"
+  //     );
 
-      res.status(200).json(leads);
-    } catch (error) {
-      res.status(500).json({ message: error.message });
-    }
-  },
+  //     res.status(200).json(leads);
+  //   } catch (error) {
+  //     res.status(500).json({ message: error.message });
+  //   }
+  // },//old one
+
+  // ✅ Replace your existing getLeads function with this
+
+getLeads: async (req, res) => {
+  try {
+    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 10);
+    const skip  = (page - 1) * limit;
+
+    // Role-based filter — Admin sees all, others see only their own leads
+    const filter =
+      req.user.role.name === "Admin" ? {} : { assignTo: req.user._id };
+
+    const [leads, totalLeads] = await Promise.all([
+      Lead.find(filter)
+        .populate("assignTo", "firstName lastName email role")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Lead.countDocuments(filter),
+    ]);
+
+    res.status(200).json({
+      leads,
+      totalLeads,
+      totalPages:  Math.ceil(totalLeads / limit),
+      currentPage: page,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+},
 
   // ➡️ Get Lead by ID
   getLeadById: async (req, res) => {
