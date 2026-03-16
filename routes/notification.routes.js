@@ -1,25 +1,3 @@
-// // routes/notification.routes.js
-// import express from "express";
-// import notificationController from "../controllers/notification.controller.js";
-
-// const router = express.Router();
-
-// // GET /notifications/:userId
-// router.get("/:userId", notificationController.getUserNotifications);
-
-// // PATCH /notifications/read/:id
-// router.patch("/read/:id", notificationController.markAsRead);
-
-// // DELETE /notifications/:id
-// router.delete("/:id", notificationController.deleteNotification);
-
-// // DELETE /notifications/bulk
-// router.delete("/bulk", notificationController.bulkDeleteNotifications);
-
-// export default router;
-// //original
-
-
 // routes/notification.routes.js
 import express from "express";
 import notificationController from "../controllers/notification.controller.js";
@@ -42,4 +20,4 @@ router.delete("/bulk", notificationController.bulkDeleteNotifications);
 // DELETE /notifications/:id — delete a single notification
 router.delete("/:id", notificationController.deleteNotification);
 
-export default router;
+export default router;//all finally working correct code..
