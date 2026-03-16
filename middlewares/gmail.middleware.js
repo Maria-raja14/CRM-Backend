@@ -41,15 +41,16 @@ import GmailToken from "../models/GmailToken.js";
  */
 const sessions = new Map();
 
-const SESSION_COOKIE  = "gms_sid";          // cookie name
-const SESSION_TTL_MS  = 7 * 24 * 60 * 60 * 1000; // 7 days
-const HMAC_SECRET     = process.env.SESSION_HMAC_SECRET || crypto.randomBytes(32).toString("hex");
+const SESSION_COOKIE = "gms_sid"; // cookie name
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const HMAC_SECRET =
+  process.env.SESSION_HMAC_SECRET || crypto.randomBytes(32).toString("hex");
 
 // Warn loudly if no persistent secret is set
 if (!process.env.SESSION_HMAC_SECRET) {
   console.warn(
     "⚠️  SESSION_HMAC_SECRET not set in .env — sessions will be invalidated on every restart. " +
-    "Set a stable 64-char hex secret in production."
+      "Set a stable 64-char hex secret in production.",
   );
 }
 
@@ -66,18 +67,23 @@ function parseSignedCookie(raw) {
   if (!raw || typeof raw !== "string") return null;
   const dot = raw.lastIndexOf(".");
   if (dot === -1) return null;
-  const id  = raw.slice(0, dot);
+  const id = raw.slice(0, dot);
   const sig = raw.slice(dot + 1);
   const expected = signSessionId(id);
   // Constant-time comparison to prevent timing attacks
-  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected)))
+    return null;
   return id;
 }
 
 // ─── Session CRUD ──────────────────────────────────────────────────────────────
 function createSession(gmailEmail) {
-  const id   = crypto.randomBytes(32).toString("hex");
-  const data = { gmailEmail: gmailEmail.toLowerCase().trim(), createdAt: Date.now(), lastSeen: Date.now() };
+  const id = crypto.randomBytes(32).toString("hex");
+  const data = {
+    gmailEmail: gmailEmail.toLowerCase().trim(),
+    createdAt: Date.now(),
+    lastSeen: Date.now(),
+  };
   sessions.set(id, data);
   return id;
 }
@@ -99,12 +105,15 @@ function destroySession(id) {
 }
 
 // Periodic cleanup of expired sessions (runs every hour)
-setInterval(() => {
-  const now = Date.now();
-  for (const [id, s] of sessions) {
-    if (now - s.createdAt > SESSION_TTL_MS) sessions.delete(id);
-  }
-}, 60 * 60 * 1000);
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [id, s] of sessions) {
+      if (now - s.createdAt > SESSION_TTL_MS) sessions.delete(id);
+    }
+  },
+  60 * 60 * 1000,
+);
 
 // ─── Cookie parser (we avoid a full cookie-parser dep if not already present) ─
 function parseCookies(req) {
@@ -122,7 +131,7 @@ function parseCookies(req) {
  *   setGmailSession(res, email)
  */
 export function setGmailSession(res, email) {
-  const id     = createSession(email.toLowerCase().trim());
+  const id = createSession(email.toLowerCase().trim());
   const signed = makeSignedCookie(id);
   const isProd = process.env.NODE_ENV === "production";
 
@@ -137,22 +146,24 @@ export function setGmailSession(res, email) {
       `Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`,
     ]
       .filter(Boolean)
-      .join("; ")
+      .join("; "),
   );
 
-  console.log(`🔐 Gmail session created for ${email} [session: ${id.slice(0, 8)}…]`);
+  console.log(
+    `🔐 Gmail session created for ${email} [session: ${id.slice(0, 8)}…]`,
+  );
   return id;
 }
 
 // ─── PUBLIC: clear session cookie on disconnect ────────────────────────────────
 export function clearGmailSession(req, res) {
   const cookies = parseCookies(req);
-  const raw     = cookies[SESSION_COOKIE];
-  const id      = parseSignedCookie(raw);
+  const raw = cookies[SESSION_COOKIE];
+  const id = parseSignedCookie(raw);
   if (id) destroySession(id);
   res.setHeader(
     "Set-Cookie",
-    `${SESSION_COOKIE}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`
+    `${SESSION_COOKIE}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
   );
 }
 
@@ -165,12 +176,12 @@ export function clearGmailSession(req, res) {
  */
 export function attachGmailSession(req, res, next) {
   const cookies = parseCookies(req);
-  const raw     = cookies[SESSION_COOKIE];
-  const id      = parseSignedCookie(raw);
+  const raw = cookies[SESSION_COOKIE];
+  const id = parseSignedCookie(raw);
   const session = id ? getSession(id) : null;
 
   req.gmailSessionId = id || null;
-  req.gmailSession   = session || null;
+  req.gmailSession = session || null;
 
   // Convenience: the authoritative email for this request
   // NEVER falls back to req.body.email or req.query.email for security.
@@ -207,7 +218,7 @@ export async function requireGmailAuth(req, res, next) {
   if (!req.gmailEmail) {
     return res.status(401).json({
       success: false,
-      code:    "NO_SESSION",
+      code: "NO_SESSION",
       message: "Not authenticated. Please connect your Gmail account.",
     });
   }
@@ -215,7 +226,7 @@ export async function requireGmailAuth(req, res, next) {
   // ── Verify token still exists and is active in DB ──
   try {
     const tokenDoc = await GmailToken.findOne({
-      email:     req.gmailEmail,
+      email: req.gmailEmail,
       is_active: true,
     }).lean();
 
@@ -224,7 +235,7 @@ export async function requireGmailAuth(req, res, next) {
       if (req.gmailSessionId) destroySession(req.gmailSessionId);
       return res.status(401).json({
         success: false,
-        code:    "TOKEN_REVOKED",
+        code: "TOKEN_REVOKED",
         message: "Gmail account disconnected. Please reconnect.",
       });
     }
@@ -279,11 +290,11 @@ export async function requireAccountAccess(req, res, next) {
   // A session can only own one email — reject cross-user switches
   if (session.gmailEmail !== requestedEmail) {
     console.warn(
-      `⛔ Account switch attempt blocked: session=${session.gmailEmail} → requested=${requestedEmail}`
+      `⛔ Account switch attempt blocked: session=${session.gmailEmail} → requested=${requestedEmail}`,
     );
     return res.status(403).json({
       success: false,
-      code:    "ACCOUNT_SWITCH_DENIED",
+      code: "ACCOUNT_SWITCH_DENIED",
       message: "You do not have access to that Gmail account.",
     });
   }

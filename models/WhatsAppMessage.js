@@ -1,22 +1,3 @@
-// import mongoose from 'mongoose';
-
-// const whatsappMessageSchema = new mongoose.Schema({
-//   to: { type: String, required: true },
-//   from: { type: String, required: true },
-//   body: { type: String },
-//   contentSid: { type: String },
-//   contentVariables: { type: Object },
-//   status: { type: String, default: 'queued' },
-//   messageSid: { type: String, unique: true },
-//   direction: { type: String, enum: ['outbound', 'inbound'] },
-//   leadId: { type: mongoose.Schema.Types.ObjectId, ref: 'Lead' },
-//   dealId: { type: mongoose.Schema.Types.ObjectId, ref: 'Deal' },
-//   createdAt: { type: Date, default: Date.now }
-// });
-
-// export default mongoose.model('WhatsAppMessage', whatsappMessageSchema);
-
-
 import mongoose from "mongoose";
 
 const WhatsappMessageSchema = new mongoose.Schema(
@@ -95,4 +76,4 @@ WhatsappMessageSchema.index({ contactNumber: 1, createdAt: 1 });
 WhatsappMessageSchema.index({ read: 1, direction: 1 });
 
 const WhatsappMessage = mongoose.model("WhatsappMessage", WhatsappMessageSchema);
-export default WhatsappMessage;
+export default WhatsappMessage;//original
