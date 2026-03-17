@@ -483,19 +483,61 @@ const pickNextSalesUser = async () => {
 export default {
 
   // ➡️ Create Lead
+  // createLead: async (req, res) => {
+  //   try {
+  //     const { leadName, destination, phoneNumber } = req.body; // destination (was designation)
+
+  //     if (!leadName || !destination || !phoneNumber) {
+  //       return res.status(400).json({
+  //         message: "Lead name, destination, and phone number are required",
+  //       });
+  //     }
+
+  //     const data = { ...req.body };
+
+  //     // Handle file uploads – store relative path without leading slash
+  //     if (req.files?.length > 0) {
+  //       data.attachments = req.files.map((file) => ({
+  //         name:       file.originalname,
+  //         path:       `uploads/leads/${file.filename}`,
+  //         type:       file.mimetype,
+  //         size:       file.size,
+  //         uploadedAt: new Date(),
+  //       }));
+  //     }
+
+  //     // Auto assign (round-robin)
+  //     const autoAssignee = await pickNextSalesUser();
+  //     data.assignTo = autoAssignee;
+
+  //     if (!data.status) data.status = "Cold";
+
+  //     data.followUpDate  = new Date();
+  //     data.lastReminderAt = null;
+
+  //     const lead      = new Lead(data);
+  //     const savedLead = await lead.save();
+
+  //     res.status(201).json({ message: "Lead created successfully", lead: savedLead });
+  //   } catch (error) {
+  //     res.status(400).json({ message: error.message });
+  //   }
+  // },//old one..
+
+   // ➡️ Create Lead
   createLead: async (req, res) => {
     try {
-      const { leadName, destination, phoneNumber } = req.body; // destination (was designation)
-
+      const { leadName, destination, phoneNumber } = req.body;
+ 
       if (!leadName || !destination || !phoneNumber) {
         return res.status(400).json({
           message: "Lead name, destination, and phone number are required",
         });
       }
-
+ 
       const data = { ...req.body };
-
-      // Handle file uploads – store relative path without leading slash
+ 
+      // Handle file uploads
       if (req.files?.length > 0) {
         data.attachments = req.files.map((file) => ({
           name:       file.originalname,
@@ -505,19 +547,36 @@ export default {
           uploadedAt: new Date(),
         }));
       }
-
+ 
       // Auto assign (round-robin)
       const autoAssignee = await pickNextSalesUser();
       data.assignTo = autoAssignee;
-
+ 
       if (!data.status) data.status = "Cold";
-
-      data.followUpDate  = new Date();
+ 
+      // ✅ FIX: Use the date the user picked from the form.
+      // OLD code had:  data.followUpDate = new Date();
+      // That line always overwrote the user's chosen date with TODAY.
+      //
+      // FormData sends everything as strings. Handle these cases:
+      //   "2026-03-19"  → valid date picked by user  ✅ use it
+      //   ""            → user left it blank          ✅ store null
+      //   "null"        → frontend sent explicit null ✅ store null
+      if (
+        data.followUpDate &&
+        data.followUpDate !== "null" &&
+        data.followUpDate.trim() !== ""
+      ) {
+        data.followUpDate = new Date(data.followUpDate); // e.g. 2026-03-19 → Date obj
+      } else {
+        data.followUpDate = null; // no default to today
+      }
+ 
       data.lastReminderAt = null;
-
+ 
       const lead      = new Lead(data);
       const savedLead = await lead.save();
-
+ 
       res.status(201).json({ message: "Lead created successfully", lead: savedLead });
     } catch (error) {
       res.status(400).json({ message: error.message });
@@ -589,15 +648,88 @@ getLeads: async (req, res) => {
   },
 
   // ➡️ Update Lead
+  // updateLead: async (req, res) => {
+  //   try {
+  //     const before = await Lead.findById(req.params.id).select(
+  //       "status assignTo leadName followUpDate attachments"
+  //     );
+  //     if (!before) return res.status(404).json({ message: "Lead not found" });
+
+  //     const patch = { ...req.body };
+
+  //     // Handle existing + new attachments
+  //     let existingAttachments = [];
+  //     if (req.body.existingAttachments) {
+  //       try {
+  //         existingAttachments = JSON.parse(req.body.existingAttachments);
+  //       } catch {
+  //         existingAttachments = [];
+  //       }
+  //     }
+
+  //     let newFiles = [];
+  //     if (req.files && req.files.length > 0) {
+  //       newFiles = req.files.map((file) => ({
+  //         name:       file.originalname,
+  //         path:       `/uploads/leads/${file.filename}`,
+  //         type:       file.mimetype,
+  //         size:       file.size,
+  //         uploadedAt: new Date(),
+  //       }));
+  //     }
+
+  //     patch.attachments = [...existingAttachments, ...newFiles];
+
+  //     if (patch.status && patch.status !== before.status) {
+  //       patch.lastReminderAt = null;
+  //     }
+
+  //     if (patch.followUpDate) {
+  //       patch.lastReminderAt = null;
+  //     }
+
+  //     const updated = await Lead.findByIdAndUpdate(req.params.id, patch, {
+  //       new: true,
+  //     }).populate("assignTo", "firstName lastName email");
+
+  //     // Notify if converted
+  //     if (before.status !== "Converted" && updated.status === "Converted") {
+  //       const userId   = updated.assignTo?._id?.toString();
+  //       const fullName = `${updated.assignTo?.firstName || ""} ${updated.assignTo?.lastName || ""}`.trim();
+
+  //       if (userId) {
+  //         notifyUser(userId, "deal:converted", {
+  //           leadId:   updated._id,
+  //           leadName: updated.leadName,
+  //           when:     new Date(),
+  //         });
+  //       }
+
+  //       if (updated.assignTo?.email) {
+  //         await sendEmail({
+  //           to:      updated.assignTo.email,
+  //           subject: `🎉 Deal Converted: ${updated.leadName}`,
+  //           text:    `Deal converted for lead ${updated.leadName}. Congrats, ${fullName}!`,
+  //         });
+  //       }
+  //     }
+
+  //     res.status(200).json({ message: "Lead updated successfully", lead: updated });
+  //   } catch (error) {
+  //     res.status(400).json({ message: error.message });
+  //   }
+  // },//old one..
+
+    // ➡️ Update Lead
   updateLead: async (req, res) => {
     try {
       const before = await Lead.findById(req.params.id).select(
         "status assignTo leadName followUpDate attachments"
       );
       if (!before) return res.status(404).json({ message: "Lead not found" });
-
+ 
       const patch = { ...req.body };
-
+ 
       // Handle existing + new attachments
       let existingAttachments = [];
       if (req.body.existingAttachments) {
@@ -607,7 +739,7 @@ getLeads: async (req, res) => {
           existingAttachments = [];
         }
       }
-
+ 
       let newFiles = [];
       if (req.files && req.files.length > 0) {
         newFiles = req.files.map((file) => ({
@@ -618,26 +750,40 @@ getLeads: async (req, res) => {
           uploadedAt: new Date(),
         }));
       }
-
+ 
       patch.attachments = [...existingAttachments, ...newFiles];
-
+ 
+      // ✅ FIX: Same fix as createLead.
+      // FormData sends followUpDate as a string. Convert correctly:
+      //   "2026-03-19"  → Date object (user's chosen date) ✅
+      //   "" or "null"  → null (no date, don't fallback to today) ✅
+      if (
+        patch.followUpDate &&
+        patch.followUpDate !== "null" &&
+        patch.followUpDate.trim() !== ""
+      ) {
+        patch.followUpDate  = new Date(patch.followUpDate);
+        patch.lastReminderAt = null; // reset so cron re-triggers on new date
+      } else if (
+        patch.followUpDate === "" ||
+        patch.followUpDate === "null"
+      ) {
+        patch.followUpDate = null;
+      }
+ 
       if (patch.status && patch.status !== before.status) {
         patch.lastReminderAt = null;
       }
-
-      if (patch.followUpDate) {
-        patch.lastReminderAt = null;
-      }
-
+ 
       const updated = await Lead.findByIdAndUpdate(req.params.id, patch, {
         new: true,
       }).populate("assignTo", "firstName lastName email");
-
+ 
       // Notify if converted
       if (before.status !== "Converted" && updated.status === "Converted") {
         const userId   = updated.assignTo?._id?.toString();
         const fullName = `${updated.assignTo?.firstName || ""} ${updated.assignTo?.lastName || ""}`.trim();
-
+ 
         if (userId) {
           notifyUser(userId, "deal:converted", {
             leadId:   updated._id,
@@ -645,7 +791,7 @@ getLeads: async (req, res) => {
             when:     new Date(),
           });
         }
-
+ 
         if (updated.assignTo?.email) {
           await sendEmail({
             to:      updated.assignTo.email,
@@ -654,7 +800,7 @@ getLeads: async (req, res) => {
           });
         }
       }
-
+ 
       res.status(200).json({ message: "Lead updated successfully", lead: updated });
     } catch (error) {
       res.status(400).json({ message: error.message });
@@ -674,20 +820,41 @@ getLeads: async (req, res) => {
   },
 
   // ➡️ Update Follow-Up Date
+  // updateFollowUpDate: async (req, res) => {
+  //   try {
+  //     const { followUpDate } = req.body;
+  //     if (!followUpDate)
+  //       return res.status(400).json({ message: "followUpDate required" });
+
+  //     const lead = await Lead.findByIdAndUpdate(
+  //       req.params.id,
+  //       { followUpDate, lastReminderAt: null },
+  //       { new: true }
+  //     ).populate("assignTo", "firstName lastName email");
+
+  //     if (!lead) return res.status(404).json({ message: "Lead not found" });
+
+  //     return res.status(200).json({ message: "Follow-up date updated", lead });
+  //   } catch (error) {
+  //     return res.status(400).json({ message: error.message });
+  //   }
+  // },//old one..
+
+  // ➡️ Update Follow-Up Date
   updateFollowUpDate: async (req, res) => {
     try {
       const { followUpDate } = req.body;
       if (!followUpDate)
         return res.status(400).json({ message: "followUpDate required" });
-
+ 
       const lead = await Lead.findByIdAndUpdate(
         req.params.id,
         { followUpDate, lastReminderAt: null },
         { new: true }
       ).populate("assignTo", "firstName lastName email");
-
+ 
       if (!lead) return res.status(404).json({ message: "Lead not found" });
-
+ 
       return res.status(200).json({ message: "Follow-up date updated", lead });
     } catch (error) {
       return res.status(400).json({ message: error.message });

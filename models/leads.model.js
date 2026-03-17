@@ -20,7 +20,8 @@ const leadSchema = new mongoose.Schema(
       default: "Cold",
     },
     // ✅ FIX: Use arrow function so default is evaluated at insert time, not schema-load time
-    followUpDate:     { type: Date, default: () => new Date() },
+    // followUpDate:     { type: Date, default: () => new Date() },
+      followUpDate:     { type: Date, default: null },
     emailSentAt:      { type: Date, default: null },
     lastReminderAt:   { type: Date, default: null },
     followUpNotified: { type: Boolean, default: false },
