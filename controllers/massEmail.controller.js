@@ -333,5 +333,163 @@ deleteEmail : async (req, res) => {
       message: "Failed to delete email",
     });
   }
-}
+},
+// In your massEmail.controller.js - Update the delete function name
+
+deleteEmailHistory: async (req, res) => {
+  try {
+    const email = await MassEmail.findById(req.params.id);
+
+    if (!email) {
+      return res.status(404).json({
+        success: false,
+        message: "Email not found",
+      });
+    }
+
+    // Check if user has permission to delete
+    if (req.user.role.name !== "Admin" && email.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to delete this email",
+      });
+    }
+
+    // Delete associated attachment files from filesystem
+    if (email.attachments && email.attachments.length > 0) {
+      for (const attachment of email.attachments) {
+        try {
+          if (attachment.path && fs.existsSync(attachment.path)) {
+            fs.unlinkSync(attachment.path);
+            console.log(`Deleted attachment: ${attachment.path}`);
+          }
+        } catch (err) {
+          console.error("Error deleting attachment file:", err);
+          // Continue even if file deletion fails
+        }
+      }
+    }
+
+    await email.deleteOne();
+
+    res.json({
+      success: true,
+      message: "Email deleted successfully",
+    });
+
+  } catch (error) {
+    console.error("Delete email error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete email",
+    });
+  }
+},
+
+// Add bulk delete function for the hsitory page
+
+bulkDeleteEmailHistory: async (req, res) => {
+  try {
+    const { emailIds, selectAll, filters } = req.body;
+    
+    // Build the base filter based on user role
+    let baseFilter = {};
+    
+    // If not Admin, only allow deletion of their own emails
+    if (req.user.role.name !== "Admin") {
+      baseFilter.createdBy = req.user._id;
+    }
+
+    let filter = {};
+    let deleteMessage = "";
+
+    // CASE 1: Select All across all pages
+    if (selectAll) {
+      filter = { ...baseFilter, status: "sent" }; // Only allow deleting sent emails
+      deleteMessage = "All emails";
+      
+      // Apply any additional filters if provided (for future use)
+      if (filters) {
+        filter = { ...filter, ...filters };
+      }
+    } 
+    // CASE 2: Delete specific emails by IDs
+    else {
+      if (!emailIds || !Array.isArray(emailIds) || emailIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Email IDs are required when not using select all",
+        });
+      }
+      
+      filter = { 
+        ...baseFilter, 
+        _id: { $in: emailIds },
+        status: "sent" // Only allow deleting sent emails
+      };
+      deleteMessage = `${emailIds.length} emails`;
+    }
+
+    // Get emails to delete their attachments (with pagination to handle large datasets)
+    const batchSize = 100;
+    let totalDeleted = 0;
+    let processedEmails = [];
+
+    // Process in batches to avoid memory issues with large datasets
+    while (true) {
+      const emailsBatch = await MassEmail.find(filter)
+        .limit(batchSize)
+        .skip(totalDeleted)
+        .lean();
+
+      if (emailsBatch.length === 0) break;
+
+      // Delete attachments for this batch
+      for (const email of emailsBatch) {
+        if (email.attachments && email.attachments.length > 0) {
+          for (const attachment of email.attachments) {
+            try {
+              if (attachment.path && fs.existsSync(attachment.path)) {
+                fs.unlinkSync(attachment.path);
+              }
+            } catch (err) {
+              console.error("Error deleting attachment file:", err);
+            }
+          }
+        }
+      }
+
+      processedEmails = [...processedEmails, ...emailsBatch];
+      totalDeleted += emailsBatch.length;
+    }
+
+    // Delete the emails in one go using the IDs we collected
+    const emailIdsToDelete = processedEmails.map(email => email._id);
+    
+    if (emailIdsToDelete.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No emails found to delete",
+      });
+    }
+
+    const result = await MassEmail.deleteMany({
+      _id: { $in: emailIdsToDelete }
+    });
+
+    res.json({
+      success: true,
+      message: `Successfully deleted ${result.deletedCount} emails`,
+      deletedCount: result.deletedCount,
+      selectAllUsed: selectAll || false
+    });
+
+  } catch (error) {
+    console.error("Bulk delete error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete emails",
+    });
+  }
+},
 };
