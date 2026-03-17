@@ -35,6 +35,9 @@ router.put(
 // DELETE /api/email/delete/:id
 router.delete("/delete/:id", protect, indexControllers.massEmailController.deleteEmail);
 
+// NEW: POST /api/email/bulk-delete - Bulk email delete
+router.post("/bulk-delete", protect, indexControllers.massEmailController.bulkDeleteEmailHistory);
+
 // GET /api/email/:id
 router.get("/:id", protect, indexControllers.massEmailController.getSingleEmail);
 
