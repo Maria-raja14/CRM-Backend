@@ -2,11 +2,6 @@
 // import { Server } from "socket.io";
 // import Notification from "../models/notification.model.js";
 
-// // ✅ FIX: Removed Redis entirely.
-// // Redis pub/sub was crashing silently on live when Redis wasn't
-// // configured with auth or the right port — killing all socket delivery.
-// // Since this is a single-server deployment, in-memory map is sufficient.
-
 // export const connectedUsers = {};
 // let io;
 
@@ -25,7 +20,6 @@
 //   io.on("connection", (socket) => {
 //     console.log("🔌 Socket connected:", socket.id, "| transport:", socket.conn.transport.name);
 
-//     // Accept userId from auth (preferred) OR from event (fallback)
 //     const authUserId = socket.handshake.auth?.userId;
 //     if (authUserId) addUserSocket(String(authUserId), socket);
 
@@ -55,21 +49,36 @@
 // const addUserSocket = async (userId, socket) => {
 //   if (!connectedUsers[userId]) connectedUsers[userId] = [];
 
-//   // Don't add duplicate socket entries
 //   if (!connectedUsers[userId].some((s) => s.id === socket.id)) {
 //     connectedUsers[userId].push(socket);
 //   }
 
 //   console.log(`✅ User ${userId} connected (${connectedUsers[userId].length} socket(s))`);
 
-//   // Flush unread notifications from DB on connect/reconnect
+//   // ✅ FIX: Only flush TODAY's unread notifications on reconnect.
+//   // Old notifications (yesterday / earlier) must NOT be sent.
+//   // We use startOfToday as the cutoff — anything created before
+//   // today's midnight is ignored entirely.
 //   try {
-//     const unread = await Notification.find({ userId, read: false })
+//     const startOfToday = new Date();
+//     startOfToday.setHours(0, 0, 0, 0); // midnight of current day
+
+//     const now = new Date();
+
+//     const unread = await Notification.find({
+//       userId,
+//       read: false,
+//       createdAt: { $gte: startOfToday }, // ✅ today only
+//       $or: [
+//         { expiresAt: { $exists: false } },
+//         { expiresAt: { $gte: now } },     // ✅ not yet expired
+//       ],
+//     })
 //       .sort({ createdAt: 1 })
 //       .lean();
 
 //     if (unread.length > 0) {
-//       console.log(`📬 Flushing ${unread.length} unread to ${userId}`);
+//       console.log(`📬 Flushing ${unread.length} unread (today only) to ${userId}`);
 //       unread.forEach((n) =>
 //         socket.emit("new_notification", {
 //           _id:          n._id,
@@ -113,9 +122,7 @@
 
 // export const notifyAdmins = (adminIds, event, payload) => {
 //   adminIds.forEach((id) => notifyUser(id, event, payload));
-// };//all finally working correct code..
-
-
+// };// all work correct notification come correctly ...
 
 
 // realtime/socket.js
@@ -175,30 +182,32 @@ const addUserSocket = async (userId, socket) => {
 
   console.log(`✅ User ${userId} connected (${connectedUsers[userId].length} socket(s))`);
 
-  // ✅ FIX: Only flush TODAY's unread notifications on reconnect.
-  // Old notifications (yesterday / earlier) must NOT be sent.
-  // We use startOfToday as the cutoff — anything created before
-  // today's midnight is ignored entirely.
+  // ✅ FIX: Flush only TODAY's unread notifications that are NOT expired.
+  //
+  //    Rules (must ALL be true to flush a notification):
+  //      1. createdAt >= today midnight  → blocks any yesterday / older docs
+  //      2. expiresAt exists             → legacy docs without expiresAt are skipped
+  //      3. expiresAt >= now             → already-expired docs are skipped
+  //      4. read === false               → only unread ones
+  //
+  //    This makes the socket flush 100% consistent with getUserNotifications.
   try {
+    const now = new Date();
+
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0); // midnight of current day
 
-    const now = new Date();
-
     const unread = await Notification.find({
       userId,
-      read: false,
-      createdAt: { $gte: startOfToday }, // ✅ today only
-      $or: [
-        { expiresAt: { $exists: false } },
-        { expiresAt: { $gte: now } },     // ✅ not yet expired
-      ],
+      read:      false,
+      createdAt: { $gte: startOfToday },      // ✅ today only — no past dates
+      expiresAt: { $exists: true, $gte: now }, // ✅ must exist and not be expired
     })
       .sort({ createdAt: 1 })
       .lean();
 
     if (unread.length > 0) {
-      console.log(`📬 Flushing ${unread.length} unread (today only) to ${userId}`);
+      console.log(`📬 Flushing ${unread.length} unread (today, not expired) to ${userId}`);
       unread.forEach((n) =>
         socket.emit("new_notification", {
           _id:          n._id,
@@ -242,4 +251,4 @@ export const notifyUser = (userId, event, payload) => {
 
 export const notifyAdmins = (adminIds, event, payload) => {
   adminIds.forEach((id) => notifyUser(id, event, payload));
-};// all work correct come ...
+};
