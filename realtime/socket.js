@@ -182,32 +182,34 @@ const addUserSocket = async (userId, socket) => {
 
   console.log(`✅ User ${userId} connected (${connectedUsers[userId].length} socket(s))`);
 
-  // ✅ FIX: Flush only TODAY's unread notifications that are NOT expired.
-  //
-  //    Rules (must ALL be true to flush a notification):
-  //      1. createdAt >= today midnight  → blocks any yesterday / older docs
-  //      2. expiresAt exists             → legacy docs without expiresAt are skipped
-  //      3. expiresAt >= now             → already-expired docs are skipped
-  //      4. read === false               → only unread ones
-  //
-  //    This makes the socket flush 100% consistent with getUserNotifications.
+  // ── Flush unread notifications on reconnect ────────────────────────
+  // STRICT RULES (same as REST API):
+  //   1. createdAt >= today midnight  — no past-day notifications
+  //   2. expiresAt > now              — not yet expired
+  // This prevents yesterday's notifications from re-appearing on page refresh.
   try {
     const now = new Date();
 
     const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0); // midnight of current day
+    startOfToday.setHours(0, 0, 0, 0); // midnight of current calendar day
 
     const unread = await Notification.find({
       userId,
-      read:      false,
-      createdAt: { $gte: startOfToday },      // ✅ today only — no past dates
-      expiresAt: { $exists: true, $gte: now }, // ✅ must exist and not be expired
+      read: false,
+      // ✅ RULE 1 — created today only
+      createdAt: { $gte: startOfToday },
+      // ✅ RULE 2 — not expired
+      $or: [
+        { expiresAt: { $exists: false } },
+        { expiresAt: null },
+        { expiresAt: { $gt: now } },
+      ],
     })
       .sort({ createdAt: 1 })
       .lean();
 
     if (unread.length > 0) {
-      console.log(`📬 Flushing ${unread.length} unread (today, not expired) to ${userId}`);
+      console.log(`📬 Flushing ${unread.length} unread (today only, not expired) to ${userId}`);
       unread.forEach((n) =>
         socket.emit("new_notification", {
           _id:          n._id,
@@ -217,6 +219,7 @@ const addUserSocket = async (userId, socket) => {
           profileImage: n.profileImage,
           createdAt:    n.createdAt,
           read:         n.read,
+          expiresAt:    n.expiresAt,
         })
       );
     }

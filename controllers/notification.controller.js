@@ -154,6 +154,8 @@
 // //original code notification come correctly..
 
 
+
+
 // controllers/notification.controller.js
 import Notification from "../models/notification.model.js";
 import User from "../models/user.model.js";
@@ -162,40 +164,44 @@ import Lead from "../models/leads.model.js";
 export default {
 
   // ── Get notifications for a user ──────────────────────────────────────────
-  // ✅ RULES:
-  //   1. Only return notifications created TODAY (after midnight) — no past dates
-  //   2. Only return notifications that are NOT yet expired (expiresAt >= now)
-  //   3. If expiresAt is missing, treat as expired — do NOT show it
-  //      (every notification must have expiresAt set at creation time)
+  // RULE: Only return notifications where:
+  //   1. createdAt >= today midnight  (no past-day notifications ever)
+  //   2. expiresAt > now              (not yet expired)
+  // A notification created yesterday at 11 PM with expiresAt today at 11 PM
+  // will be EXCLUDED because createdAt < today midnight, even though it
+  // hasn't technically expired yet. Past date = gone, period.
+
   getUserNotifications: async (req, res) => {
     try {
       const { userId } = req.params;
       const now = new Date();
 
-      // Midnight of the current day (server local timezone)
+      // Midnight of the current calendar day (server local time)
       const startOfToday = new Date();
       startOfToday.setHours(0, 0, 0, 0);
 
-      // ✅ FIX: Require expiresAt to exist AND be in the future.
-      //    Notifications without expiresAt are NOT shown (old/legacy docs).
-      //    createdAt must be >= today midnight — no yesterday or older.
       const notifications = await Notification.find({
         userId,
-        createdAt:  { $gte: startOfToday }, // today only — blocks all past dates
-        expiresAt:  { $exists: true, $gte: now }, // must exist and not be expired
+        // ✅ RULE 1 — created today only
+        createdAt: { $gte: startOfToday },
+        // ✅ RULE 2 — not expired
+        $or: [
+          { expiresAt: { $exists: false } },
+          { expiresAt: null },
+          { expiresAt: { $gt: now } },
+        ],
       })
         .sort({ createdAt: -1 })
         .limit(50)
         .lean();
 
-      // Enrich follow-up notifications with salesman profile image
-      for (let notif of notifications) {
+      // Enrich follow-up notifications with the salesman's profile image
+      for (const notif of notifications) {
         if (notif.type === "followup" && notif.meta?.leadId) {
           const lead = await Lead.findById(notif.meta.leadId).populate(
             "assignTo",
             "profileImage firstName lastName"
           );
-
           if (lead?.assignTo) {
             notif.profileImage =
               lead.assignTo.profileImage?.replace(/\\/g, "/") || null;
@@ -206,12 +212,12 @@ export default {
 
       res.status(200).json(notifications);
     } catch (err) {
-      console.error(err);
+      console.error("getUserNotifications error:", err);
       res.status(500).json({ message: err.message });
     }
   },
 
-  // ── Mark notification as read ─────────────────────────────────────────────
+  // ── Mark a single notification as read ───────────────────────────────────
   markAsRead: async (req, res) => {
     try {
       const { id } = req.params;
@@ -220,21 +226,21 @@ export default {
         { read: true },
         { new: true }
       );
-      if (!notif) return res.status(404).json({ message: "Notification not found" });
+      if (!notif)
+        return res.status(404).json({ message: "Notification not found" });
       res.status(200).json({ message: "Notification marked as read", notif });
     } catch (err) {
       res.status(500).json({ message: err.message });
     }
   },
 
-  // ── Delete a single notification ──────────────────────────────────────────
+  // ── Delete a single notification ─────────────────────────────────────────
   deleteNotification: async (req, res) => {
     try {
       const { id } = req.params;
       const notif = await Notification.findByIdAndDelete(id);
-      if (!notif) {
+      if (!notif)
         return res.status(404).json({ message: "Not found" });
-      }
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: err.message });
