@@ -352,7 +352,7 @@ import routes from "./routes/index.routes.js";
 import fileRoutes from "./routes/files.routes.js";
 import { initSocket } from "./realtime/socket.js";
 import { startFollowUpCron } from "./controllers/followups.cron.js";
-import { startActivityReminderCron } from "./controllers/activityReminder.cron.js";
+// import { startActivityReminderCron } from "./controllers/activityReminder.cron.js";
 import { startProposalFollowUpCron } from "./controllers/proposalFollowUpCron.controller.js";
 import gmailRoutes from  "./routes/gmailRoutes.js";
 import googleAuthRoutes from "./routes/googleAuthRoutes.js";
@@ -465,7 +465,7 @@ app.use((err, _req, res, _next) => {
 const server = http.createServer(app);
 initSocket(server);
 startFollowUpCron();
-startActivityReminderCron();
+// startActivityReminderCron();
 startProposalFollowUpCron();
 
 const PORT = process.env.PORT || 5000;

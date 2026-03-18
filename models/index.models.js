@@ -16,13 +16,13 @@ import Invoice from "./invoiceModel.js";
 import lastreason from "./LastreasonsModels.js"
 import Admin from "./olduser.model.js";
 import AllDeals from "./alldeals.models.js";
-import Activity from "./activity.models.js";
+// import Activity from "./activity.models.js";
 import Meeting from './meeting.models.js'
 import GmailToken from "./GmailToken.js";
 import WhatsAppMessage from "./WhatsAppMessage.js";
 import Whatsappconversation from "./Whatsappconversation.model.js"
 
-export {User,Role,Admin,AllDeals,Activity,deal,Invoice,lastreason,Meeting,GmailToken,WhatsAppMessage,Whatsappconversation};
+export {User,Role,Admin,AllDeals,deal,Invoice,lastreason,Meeting,GmailToken,WhatsAppMessage,Whatsappconversation};
 
 
 
