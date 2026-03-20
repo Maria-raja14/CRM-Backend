@@ -2,7 +2,6 @@
 
 
 
-
 // import multer from "multer";
 // import path from "path";
 // import fs from "fs";
@@ -13,7 +12,6 @@
 // });
 
 // const storage = multer.diskStorage({
-//   // ✅ FIXED: Route to correct folder based on which endpoint is called
 //   destination: (req, file, cb) => {
 //     const url = req.originalUrl || req.baseUrl || "";
 
@@ -80,7 +78,34 @@
 //   fileFilter,
 // });
 
-// export default upload;//original
+// // ✅ KEY FIX: Middleware to normalize file paths after multer saves them.
+// // Multer on some OS/configs saves file.path as "\uploads\leads\file.ext" or
+// // "/uploads/leads/file.ext" (with leading slash). We strip the leading slash
+// // so the DB always stores "uploads/leads/file.ext" (no leading slash, forward slashes).
+// // This ensures: SERVER_URL + "/" + file.path = correct URL with no double-slash.
+// const normalizePaths = (req, res, next) => {
+//   if (req.files && req.files.length > 0) {
+//     req.files = req.files.map((file) => ({
+//       ...file,
+//       // Normalize: replace backslashes, strip leading slash
+//       path: file.path
+//         .replace(/\\/g, "/")           // Windows backslash → forward slash
+//         .replace(/^\/+/, ""),          // Remove any leading slashes
+//     }));
+//   }
+//   if (req.file) {
+//     req.file = {
+//       ...req.file,
+//       path: req.file.path
+//         .replace(/\\/g, "/")
+//         .replace(/^\/+/, ""),
+//     };
+//   }
+//   next();
+// };
+
+// export { normalizePaths };
+// export default upload;//all work correctly..
 
 
 
@@ -88,8 +113,13 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 
-// ✅ Ensure all upload directories exist on startup
-["uploads/deals", "uploads/leads", "uploads/users"].forEach((dir) => {
+// ── Ensure all upload directories exist on startup ─────────────────────
+[
+  "uploads/deals",
+  "uploads/leads",
+  "uploads/users",
+  "uploads/proposals",   // ← added for proposal attachments
+].forEach((dir) => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
@@ -99,7 +129,9 @@ const storage = multer.diskStorage({
 
     let uploadPath = "uploads/leads"; // default
 
-    if (url.includes("/deals")) {
+    if (url.includes("/proposal") || url.includes("/mailsend")) {
+      uploadPath = "uploads/proposals";
+    } else if (url.includes("/deals")) {
       uploadPath = "uploads/deals";
     } else if (url.includes("/users")) {
       uploadPath = "uploads/users";
@@ -107,7 +139,7 @@ const storage = multer.diskStorage({
       uploadPath = "uploads/leads";
     }
 
-    // Ensure folder exists (safety net)
+    // Safety net – create folder if it somehow doesn't exist yet
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }
@@ -125,7 +157,7 @@ const storage = multer.diskStorage({
   },
 });
 
-// ✅ Allow images + all common document types
+// ── Allow images + all common document types ──────────────────────────
 const fileFilter = (req, file, cb) => {
   const allowedMimes = [
     "image/jpeg",
@@ -156,32 +188,25 @@ const fileFilter = (req, file, cb) => {
 
 const upload = multer({
   storage,
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
+  limits:     { fileSize: 20 * 1024 * 1024 }, // 20 MB
   fileFilter,
 });
 
-// ✅ KEY FIX: Middleware to normalize file paths after multer saves them.
-// Multer on some OS/configs saves file.path as "\uploads\leads\file.ext" or
-// "/uploads/leads/file.ext" (with leading slash). We strip the leading slash
-// so the DB always stores "uploads/leads/file.ext" (no leading slash, forward slashes).
-// This ensures: SERVER_URL + "/" + file.path = correct URL with no double-slash.
+// ── Normalize file paths after multer saves them ──────────────────────
+// Strips leading slashes and converts Windows backslashes → forward slashes.
+// This ensures DB stores "uploads/proposals/file.pdf" (no leading slash).
 const normalizePaths = (req, res, next) => {
+  const normalize = (p) =>
+    p.replace(/\\/g, "/").replace(/^\/+/, "");
+
   if (req.files && req.files.length > 0) {
     req.files = req.files.map((file) => ({
       ...file,
-      // Normalize: replace backslashes, strip leading slash
-      path: file.path
-        .replace(/\\/g, "/")           // Windows backslash → forward slash
-        .replace(/^\/+/, ""),          // Remove any leading slashes
+      path: normalize(file.path),
     }));
   }
   if (req.file) {
-    req.file = {
-      ...req.file,
-      path: req.file.path
-        .replace(/\\/g, "/")
-        .replace(/^\/+/, ""),
-    };
+    req.file = { ...req.file, path: normalize(req.file.path) };
   }
   next();
 };
