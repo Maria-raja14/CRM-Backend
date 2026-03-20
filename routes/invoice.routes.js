@@ -29,6 +29,10 @@ router.put(
   indexController.invoiceController.updateInvoice
 );
 router.delete("/delete/:id", indexController.invoiceController.deleteInvoice);
+
+// IMPORTANT: /deletemany must be registered BEFORE /delete/:id to avoid route conflict
+router.delete("/deletemany", indexController.invoiceController.deleteManyInvoices);
+
 router.get(
   "/download/:id",
   indexController.invoiceController.generateInvoicePDF

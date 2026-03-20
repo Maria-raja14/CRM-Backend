@@ -39,7 +39,7 @@ const invoiceSchema = new mongoose.Schema({
     type: String,
     required: true,
     unique: true,
-    default: () => `TZI-${Math.floor(Math.random() * 1000000)}`,
+    default: () => `Uenjoy-${Math.floor(Math.random() * 1000000)}`,
   },
   assignTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   issueDate: { type: Date, required: true },
