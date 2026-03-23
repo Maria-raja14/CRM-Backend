@@ -267,80 +267,136 @@ export default {
     }
   },
 
+  // generateInvoicePDF: async (req, res) => {
+  //   try {
+  //     const invoiceId = req.params.id;
+
+  //     if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
+  //       return res.status(400).json({ error: "Invalid invoice ID" });
+  //     }
+
+  //     const invoice = await Invoice.findById(invoiceId)
+  //       .populate("assignTo", "firstName lastName email")
+  //       .populate(
+  //         "items.deal",
+  //         "dealName value stage email companyName address country phoneNumber"
+  //       );
+
+  //     if (!invoice) {
+  //       return res.status(404).json({ error: "Invoice not found" });
+  //     }
+
+  //     const templatePath = path.join(
+  //       process.cwd(),
+  //       "views",
+  //       "invoiceTemplate.ejs"
+  //     );
+
+  //     if (!fs.existsSync(templatePath)) {
+  //       console.error("Invoice template missing at:", templatePath);
+  //       return res.status(500).json({ error: "Template file not found" });
+  //     }
+
+  //     const templateData = await ejs.renderFile(
+  //       templatePath,
+  //       { invoice },
+  //       { async: true }
+  //     );
+
+  //     const browser = await puppeteer.launch({
+  //       headless: true,
+  //       args: [
+  //         "--no-sandbox",
+  //         "--disable-setuid-sandbox",
+  //         "--disable-gpu",
+  //         "--disable-dev-shm-usage",
+  //       ],
+  //     });
+
+  //     const page = await browser.newPage();
+  //     await page.setContent(templateData, { waitUntil: "networkidle0" });
+
+  //     const pdfBuffer = await page.pdf({
+  //       format: "A4",
+  //       margin: { top: "20mm", right: "10mm", bottom: "20mm", left: "10mm" },
+  //       printBackground: true,
+  //     });
+
+  //     await browser.close();
+
+  //     res.setHeader("Content-Type", "application/pdf");
+  //     res.setHeader(
+  //       "Content-Disposition",
+  //       `attachment; filename=Invoice_${
+  //         invoice.invoicenumber || invoice._id
+  //       }.pdf`
+  //     );
+  //     res.setHeader("Content-Length", pdfBuffer.length);
+
+  //     return res.end(pdfBuffer);
+  //   } catch (error) {
+  //     console.error("Error generating PDF:", error);
+  //     res
+  //       .status(500)
+  //       .json({ error: "Failed to generate PDF", details: error.message });
+  //   }
+  // },//old one
+
+
   generateInvoicePDF: async (req, res) => {
-    try {
-      const invoiceId = req.params.id;
+  try {
+    const invoiceId = req.params.id;
 
-      if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
-        return res.status(400).json({ error: "Invalid invoice ID" });
-      }
-
-      const invoice = await Invoice.findById(invoiceId)
-        .populate("assignTo", "firstName lastName email")
-        .populate(
-          "items.deal",
-          "dealName value stage email companyName address country phoneNumber"
-        );
-
-      if (!invoice) {
-        return res.status(404).json({ error: "Invoice not found" });
-      }
-
-      const templatePath = path.join(
-        process.cwd(),
-        "views",
-        "invoiceTemplate.ejs"
-      );
-
-      if (!fs.existsSync(templatePath)) {
-        console.error("Invoice template missing at:", templatePath);
-        return res.status(500).json({ error: "Template file not found" });
-      }
-
-      const templateData = await ejs.renderFile(
-        templatePath,
-        { invoice },
-        { async: true }
-      );
-
-      const browser = await puppeteer.launch({
-        headless: true,
-        args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--disable-gpu",
-          "--disable-dev-shm-usage",
-        ],
-      });
-
-      const page = await browser.newPage();
-      await page.setContent(templateData, { waitUntil: "networkidle0" });
-
-      const pdfBuffer = await page.pdf({
-        format: "A4",
-        margin: { top: "20mm", right: "10mm", bottom: "20mm", left: "10mm" },
-        printBackground: true,
-      });
-
-      await browser.close();
-
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename=Invoice_${
-          invoice.invoicenumber || invoice._id
-        }.pdf`
-      );
-      res.setHeader("Content-Length", pdfBuffer.length);
-
-      return res.end(pdfBuffer);
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      res
-        .status(500)
-        .json({ error: "Failed to generate PDF", details: error.message });
+    if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
+      return res.status(400).json({ error: "Invalid invoice ID" });
     }
-  },
+
+    const invoice = await Invoice.findById(invoiceId)
+      .populate("assignTo", "firstName lastName email")
+      .populate(
+        "items.deal",
+        "dealName value stage email companyName address country phoneNumber"
+      );
+
+    if (!invoice) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+
+    const templatePath = path.join(process.cwd(), "views", "invoiceTemplate.ejs");
+
+    if (!fs.existsSync(templatePath)) {
+      return res.status(500).json({ error: "Template file not found" });
+    }
+
+    // ✅ Reuse the global browser instance (same one used by sendInvoiceEmail)
+    const browser = await getBrowser();
+    const page = await browser.newPage();
+
+    const templateData = await ejs.renderFile(templatePath, { invoice }, { async: true });
+
+    await page.setContent(templateData, { waitUntil: "domcontentloaded" }); // ✅ faster than networkidle0
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      margin: { top: "20mm", right: "10mm", bottom: "20mm", left: "10mm" },
+      printBackground: true,
+    });
+
+    await page.close(); // ✅ Close page, not browser
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=Invoice_${invoice.invoicenumber || invoice._id}.pdf`
+    );
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    return res.end(pdfBuffer);
+  } catch (error) {
+    console.error("Error generating PDF:", error);
+    res.status(500).json({ error: "Failed to generate PDF", details: error.message });
+  }
+},
 
   sendInvoiceEmail: async (req, res) => {
     try {
