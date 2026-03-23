@@ -4,12 +4,12 @@
     <meta charset="utf-8" />
     <title>Invoice</title>
     <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
       body {
         font-family: Arial, sans-serif;
         font-size: 12px;
-        margin: 0;
-        padding: 0;
         color: #333;
+        background: #fff;
       }
       .invoice-box {
         width: 95%;
@@ -17,60 +17,47 @@
         padding: 30px;
         background: #fff;
       }
-
-      /* Logo */
-      .logo {
-        display: block;
-        margin: 0 auto 20px auto;
-        width: 280px; /* bigger logo */
+      .logo-wrapper {
+        text-align: center;
+        margin-bottom: 24px;
+        min-height: 80px;
       }
-
-      /* Info section */
+      .logo {
+        width: 260px;
+        height: auto;
+        display: inline-block;
+      }
       .info-section {
         display: flex;
         justify-content: space-between;
         margin-top: 10px;
+        gap: 20px;
       }
       .info-box {
         width: 48%;
         font-size: 12px;
-        line-height: 1.6;
+        line-height: 1.8;
       }
       .info-box strong {
         display: block;
+        font-size: 13px;
         margin-bottom: 4px;
+        color: #111;
       }
-
-      /* Invoice details */
       .invoice-details {
         margin-top: 20px;
         font-size: 12px;
+        line-height: 2;
       }
-
-      /* Table */
       table {
         width: 100%;
         border-collapse: collapse;
         margin-top: 20px;
       }
-      table,
-      th,
-      td {
-        border: 1px solid #ccc;
-      }
-      th,
-      td {
-        padding: 8px;
-        text-align: left;
-      }
-      th {
-        font-weight: bold;
-      }
-      .right {
-        text-align: right;
-      }
-
-      /* Totals */
+      table, th, td { border: 1px solid #ccc; }
+      th, td { padding: 8px 10px; text-align: left; }
+      th { background-color: #f5f5f5; font-weight: bold; }
+      .right { text-align: right; }
       .totals {
         margin-top: 20px;
         width: 100%;
@@ -82,69 +69,99 @@
         border-collapse: collapse;
         font-size: 12px;
       }
-      .totals-table td {
-        padding: 6px;
-        border: none;
-      }
-      .totals-table tr td:first-child {
-        text-align: left;
-      }
-      .totals-table tr td:last-child {
-        text-align: right;
-      }
+      .totals-table td { padding: 6px 8px; border: none; }
+      .totals-table tr td:first-child { text-align: left; color: #555; }
+      .totals-table tr td:last-child  { text-align: right; font-weight: 500; }
       .totals-table tr.total-row td {
         font-weight: bold;
-        border-top: 1px solid #000;
-        padding-top: 8px;
+        font-size: 13px;
+        border-top: 2px solid #333;
+        padding-top: 10px;
+        color: #111;
       }
-
       .footer {
         font-size: 10px;
         text-align: center;
-        margin-top: 30px;
-        color: gray;
+        margin-top: 40px;
+        color: #888;
+        border-top: 1px solid #eee;
+        padding-top: 14px;
       }
     </style>
   </head>
   <body>
     <div class="invoice-box">
-      <!-- Logo -->
-      <img
-      
-         src="https://uenjoytours.com/wp-content/uploads/2025/06/logo.png"
-        alt="TZI Logo"
-        class="logo"
-      />
+
+      <!-- ✅ Logo — src is base64 passed from controller, works in ALL environments -->
+      <div class="logo-wrapper">
+        <% if (logoBase64) { %>
+          <img src="<%= logoBase64 %>" alt="U Enjoy Tours Logo" class="logo" />
+        <% } else { %>
+          <p style="font-size:18px;font-weight:bold;color:#1e40af;">U Enjoy Tours</p>
+        <% } %>
+      </div>
 
       <!-- Info -->
       <div class="info-section">
-        <!-- Company Info (left) -->
+        <!-- Company Info -->
         <div class="info-box">
           <strong>U Enjoy Tours</strong>
-         2nd Floor,No.1721/1B,A.H.R.S Towers<br />
-         Ramamurthy Nagar Main Road,Ramamurthy Nagar,Bengaluru Karnataka,560016<br />
+          2nd Floor, No.1721/1B, A.H.R.S Towers<br />
+          Ramamurthy Nagar Main Road, Ramamurthy Nagar,<br />
+          Bengaluru, Karnataka - 560016<br />
           Email: uenjoytours@gmail.com<br />
           Phone: +91 9535542288<br />
-          GSTIN:29ALYPC4718L1ZE <br />
-          <!-- PAN: AAJCT2568Q -->
+          GSTIN: 29ALYPC4718L1ZE
         </div>
 
-        <!-- Client Info (right) -->
-        <div class="info-box" style="text-align: right">
+        <!-- Client Info -->
+        <div class="info-box" style="text-align:right;">
           <strong>Bill To:</strong>
           <%= invoice.items[0]?.deal?.companyName || invoice.items[0]?.deal?.dealName || "Client" %><br />
-          <%= invoice.items[0]?.deal?.address || "" %><br />
-          <%= invoice.items[0]?.deal?.country || "" %><br />
-          Email: <%= invoice.items[0]?.deal?.email || "" %><br />
-          Phone: <%= invoice.items[0]?.deal?.phoneNumber || "" %>
+          <% if (invoice.items[0]?.deal?.address) { %>
+            <%= invoice.items[0].deal.address %><br />
+          <% } %>
+          <% if (invoice.items[0]?.deal?.country) { %>
+            <%= invoice.items[0].deal.country %><br />
+          <% } %>
+          <% if (invoice.items[0]?.deal?.email) { %>
+            Email: <%= invoice.items[0].deal.email %><br />
+          <% } %>
+          <%
+            const clientPhone =
+              invoice.items[0]?.deal?.phoneNumber   ||
+              invoice.items[0]?.deal?.phone         ||
+              invoice.items[0]?.deal?.contactNumber ||
+              invoice.items[0]?.deal?.mobile        ||
+              "";
+          %>
+          <% if (clientPhone) { %>
+            Phone: <%= clientPhone %>
+          <% } %>
         </div>
       </div>
 
       <!-- Invoice Details -->
       <div class="invoice-details">
-        <!-- <strong>Invoice Date:</strong>
-        <%= new Date(invoice.createdAt).toLocaleDateString() %><br /> -->
-        <strong>Invoice Number:</strong> <%= invoice.invoicenumber %>
+        <strong>Invoice Date:</strong>
+        <%= new Date(invoice.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) %><br />
+        <strong>Invoice Number:</strong> <%= invoice.invoicenumber %><br />
+        <% if (invoice.dueDate) { %>
+          <strong>Due Date:</strong>
+          <%= new Date(invoice.dueDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) %><br />
+        <% } %>
+        <strong>Status:</strong>
+        <span style="
+          display:inline-block;
+          padding:2px 10px;
+          border-radius:12px;
+          font-size:11px;
+          font-weight:bold;
+          background-color:<%= invoice.status === 'paid' ? '#dcfce7' : '#fee2e2' %>;
+          color:<%= invoice.status === 'paid' ? '#16a34a' : '#dc2626' %>;
+        ">
+          <%= (invoice.status || 'unpaid').toUpperCase() %>
+        </span>
       </div>
 
       <!-- Table -->
@@ -158,14 +175,14 @@
           </tr>
         </thead>
         <tbody>
-          <% invoice.items.forEach(item => { %>
+          <% invoice.items.forEach(function(item) { %>
           <tr>
             <td><%= item.deal?.dealName || "" %></td>
             <td>998314</td>
             <td>30</td>
-            <td class="right"><%= Number(item.amount).toFixed(2) %></td>
+            <td class="right"><%= Number(item.amount || item.price || 0).toFixed(2) %></td>
           </tr>
-          <% }) %>
+          <% }); %>
         </tbody>
       </table>
 
@@ -174,57 +191,41 @@
         <table class="totals-table">
           <tr>
             <td>Subtotal</td>
-            <td><%= invoice.currency %> <%= Number(invoice.subtotal).toFixed(2) %></td>
+            <td><%= invoice.currency %> <%= Number(invoice.subtotal || 0).toFixed(2) %></td>
           </tr>
 
-          <% 
-            let taxAmount = 0; 
-            let discountAmount = 0; 
-            let finalTotal = Number(invoice.subtotal); 
+          <% const savedTaxAmount      = Number(invoice.taxAmount || 0); %>
+          <% const savedDiscountAmount = Number(invoice.discount  || invoice.discountAmount || 0); %>
+          <% const savedTotal          = Number(invoice.total     || 0); %>
 
-            // Apply Tax only if currency = INR
-            if(invoice.currency === "INR" && invoice.taxValue > 0) {
-              if(invoice.taxType === "percentage") {
-                taxAmount = (invoice.subtotal * invoice.taxValue) / 100;
-              } else {
-                taxAmount = invoice.taxValue;
-              }
-              finalTotal += taxAmount;
-          %>
+          <% if (invoice.currency === "INR" && savedTaxAmount > 0) { %>
           <tr>
-            <td>Tax (<%= invoice.taxType === "percentage" ? invoice.taxValue + "%" : invoice.taxValue %>)</td>
-            <td><%= invoice.currency %> <%= taxAmount.toFixed(2) %></td>
+            <td>Tax<% if (invoice.taxType === "percentage" && invoice.tax > 0) { %> (<%= invoice.tax %>%)<% } %></td>
+            <td><%= invoice.currency %> <%= savedTaxAmount.toFixed(2) %></td>
           </tr>
           <% } %>
 
-          <% 
-            // Apply Discount always
-            if(invoice.discountValue > 0) {
-              if(invoice.discountType === "percentage") {
-                discountAmount = (finalTotal * invoice.discountValue) / 100;
-              } else {
-                discountAmount = invoice.discountValue;
-              }
-              finalTotal -= discountAmount;
-          %>
+          <% if (savedDiscountAmount > 0) { %>
           <tr>
-            <td>Discount (<%= invoice.discountType === "percentage" ? invoice.discountValue + "%" : invoice.discountValue %>)</td>
-            <td>- <%= invoice.currency %> <%= discountAmount.toFixed(2) %></td>
+            <td>Discount<% if (invoice.discountType === "percentage" && invoice.discountValue > 0) { %> (<%= invoice.discountValue %>%)<% } %></td>
+            <td>- <%= invoice.currency %> <%= savedDiscountAmount.toFixed(2) %></td>
           </tr>
           <% } %>
 
           <tr class="total-row">
             <td>Total</td>
-            <td><%= invoice.currency %> <%= finalTotal.toFixed(2) %></td>
+            <td><%= invoice.currency %> <%= savedTotal.toFixed(2) %></td>
           </tr>
         </table>
       </div>
 
       <!-- Footer -->
       <div class="footer">
-        Terms & Conditions: Payment due within 30 days.<br />
-        © TechZarInfo Software Solutions Pvt Ltd
+        Terms &amp; Conditions: Payment due within 30 days.<br />
+        Thank you for your business with U Enjoy Tours!<br />
+        &copy; U Enjoy Tours | uenjoytours@gmail.com | +91 9535542288
       </div>
+
     </div>
   </body>
 </html>
