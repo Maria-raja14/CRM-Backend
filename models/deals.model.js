@@ -1,3 +1,6 @@
+
+
+
 // import mongoose from "mongoose";
 
 // const dealSchema = new mongoose.Schema({
@@ -6,8 +9,8 @@
 //   dealName:   { type: String, required: true },
 //   assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 
-//   // Stored as "1,00,000 INR"  (no duplicate field)
-//   value:    { type: String, default: "0" },
+//   // Stored as "1,00,000 INR"
+//   value: { type: String, default: "0" },
 //   currency: { type: String, default: "INR" },
 
 //   stage: {
@@ -27,21 +30,27 @@
 //   phoneNumber: { type: String },
 //   email:       { type: String },
 //   source:      { type: String },
-//   companyName: { type: String },
-//   industry:    { type: String },
+
+//   // ✅ CHANGED: companyName → destination
+//   // companyName kept as alias for backward compat with old documents
+//   destination: { type: String },
+ 
+
+//   // ✅ CHANGED: industry → duration
+//   // industry kept as alias for backward compat with old documents
+//   duration:    { type: String },
+ 
+
 //   requirement: { type: String },
 //   address:     { type: String },
 //   country:     { type: String },
 
-//   // ✅ FIXED: Attachments stored as proper objects NOT flat strings.
-//   // Old: attachments: [{ type: String }]  → caused .name/.path to be undefined
-//   // New: each attachment has name, path, type, size, uploadedAt
 //   attachments: [
 //     {
-//       name:       { type: String, required: true }, // original filename e.g. "report.pdf"
-//       path:       { type: String, required: true }, // "uploads/deals/1234-xyz.pdf" — NO leading slash
-//       type:       { type: String },                  // MIME type e.g. "application/pdf"
-//       size:       { type: Number },                  // file size in bytes
+//       name:       { type: String, required: true },
+//       path:       { type: String, required: true },
+//       type:       { type: String },
+//       size:       { type: Number },
 //       uploadedAt: { type: Date, default: Date.now },
 //     },
 //   ],
@@ -77,12 +86,8 @@ const dealSchema = new mongoose.Schema({
   stage: {
     type: String,
     enum: [
-      "Qualification",
-      "Negotiation",
-      "Proposal",
-      "Proposal Sent",
-      "Closed Won",
-      "Closed Lost",
+      "Qualification", "Negotiation", "Proposal",
+      "Proposal Sent", "Closed Won", "Closed Lost",
     ],
     default: "Qualification",
   },
@@ -92,19 +97,25 @@ const dealSchema = new mongoose.Schema({
   email:       { type: String },
   source:      { type: String },
 
-  // ✅ CHANGED: companyName → destination
-  // companyName kept as alias for backward compat with old documents
+  // ── Destination / Duration (renamed from companyName / industry) ──
   destination: { type: String },
- 
-
-  // ✅ CHANGED: industry → duration
-  // industry kept as alias for backward compat with old documents
   duration:    { type: String },
- 
 
   requirement: { type: String },
   address:     { type: String },
   country:     { type: String },
+
+  // ══════════════════════════════════════════════════
+  // COST FIELDS
+  // ══════════════════════════════════════════════════
+  purchasingLandCost:   { type: Number, default: 0 },
+  purchasingTicketCost: { type: Number, default: 0 },
+  sellingLandCost:      { type: Number, default: 0 },
+  sellingTicketCost:    { type: Number, default: 0 },
+  // Computed / cached at save time for easy querying
+  totalPurchasingCost:  { type: Number, default: 0 },
+  totalSellingCost:     { type: Number, default: 0 },
+  profit:               { type: Number, default: 0 },
 
   attachments: [
     {
@@ -123,8 +134,19 @@ const dealSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now },
 });
 
+/* ── Auto-compute totals on save ── */
 dealSchema.pre("save", function (next) {
   this.updatedAt = new Date();
+
+  const purchLand   = Number(this.purchasingLandCost   || 0);
+  const purchTicket = Number(this.purchasingTicketCost || 0);
+  const sellLand    = Number(this.sellingLandCost      || 0);
+  const sellTicket  = Number(this.sellingTicketCost    || 0);
+
+  this.totalPurchasingCost = purchLand + purchTicket;
+  this.totalSellingCost    = sellLand  + sellTicket;
+  this.profit              = this.totalSellingCost - this.totalPurchasingCost;
+
   next();
 });
 

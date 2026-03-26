@@ -12,6 +12,7 @@ const router = express.Router();
 // All routes are protected
 router.use(protect);
 
+
 // Convert lead → deal
 router.post(
   "/fromLead/:leadId",
@@ -67,6 +68,6 @@ router.delete(
   indexControllers.dealsController.bulkDeleteDeals
 );
 
-export default router;
+export default router;//original code..
 
 
