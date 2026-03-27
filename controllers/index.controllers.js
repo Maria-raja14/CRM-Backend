@@ -12,6 +12,7 @@ import salesReportsController from "./salesReports.controller.js"
 import googleAuthController from './googleAuth.controller.js';
 // import whatsappController from './whatsapp.controller.js';  // Add this line
 import * as whatsappController from './whatsapp.controller.js';
+
 export default {
   usersController,
   roleController,
@@ -23,6 +24,7 @@ export default {
   adminDashboardController,
   salesReportsController,
   googleAuthController,
- whatsappController
+  whatsappController,
+
   
 };
