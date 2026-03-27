@@ -321,7 +321,7 @@ import googleAuthRoutes from "./routes/googleAuthRoutes.js";
 import whatsappRoutes from "./routes/whatsapp.routes.js";
 import salesRoutes from "./routes/salesReports.routes.js";
 import callRoutes from "./routes/call.routes.js";
-import facebookLeadRoutes from "./routes/facebooklead.routes.js";
+// import facebookLeadRoutes from "./routes/facebooklead.routes.js";
 
 dotenv.config();
 
@@ -384,7 +384,7 @@ app.use("/api/gmail",           gmailRoutes);
 app.use("/api/google-auth",     googleAuthRoutes);
 app.use("/api/whatsapp",        whatsappRoutes);
 app.use("/api/call",            callRoutes);
-app.use("/api/facebook-leads",  facebookLeadRoutes); // ← NEW
+// app.use("/api/facebook-leads",  facebookLeadRoutes); // ← NEW
 
 // Legacy Google callback
 app.get("/api/auth/google/callback", (req, res) => {
@@ -405,7 +405,7 @@ app.get("/api/health", (_req, res) => {
       call_inbound:        "/api/call/webhook",
       call_status:         "/api/call/status",
       call_recording:      "/api/call/recording-callback",
-      facebook_leads:      "/api/facebook-leads/webhook", // ← NEW
+      // facebook_leads:      "/api/facebook-leads/webhook", // ← NEW
     },
   });
 });
@@ -449,7 +449,7 @@ const startServer = async () => {
     console.log(`📞 Call webhook:         POST https://yourdomain.com/api/call/webhook`);
     console.log(`📞 Call status:          POST https://yourdomain.com/api/call/status`);
     console.log(`📞 Call recording:       POST https://yourdomain.com/api/call/recording-callback`);
-    console.log(`📘 Facebook leads:       GET/POST https://yourdomain.com/api/facebook-leads/webhook`);
+    // console.log(`📘 Facebook leads:       GET/POST https://yourdomain.com/api/facebook-leads/webhook`);
     console.log(`🔗 Allowed origins: ${allowedOrigins.join(", ")}`);
   });
 };
