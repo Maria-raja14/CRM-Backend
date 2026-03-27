@@ -321,7 +321,7 @@ import googleAuthRoutes from "./routes/googleAuthRoutes.js";
 import whatsappRoutes from "./routes/whatsapp.routes.js";
 import salesRoutes from "./routes/salesReports.routes.js";
 import callRoutes from "./routes/call.routes.js";
-import facebookLeadRoutes from "./routes/facebooklead.routes.js"; // ← NEW
+import facebookLeadRoutes from "./routes/facebooklead.routes.js";
 
 dotenv.config();
 
