@@ -321,7 +321,7 @@ import googleAuthRoutes from "./routes/googleAuthRoutes.js";
 import whatsappRoutes from "./routes/whatsapp.routes.js";
 import salesRoutes from "./routes/salesReports.routes.js";
 import callRoutes from "./routes/call.routes.js";
-import facebookLeadRoutes from "./routes/facebooklead.routes.js";
+import facebookleadRoutes from "./routes/facebooklead.routes.js";
 
 dotenv.config();
 
@@ -384,7 +384,7 @@ app.use("/api/gmail",           gmailRoutes);
 app.use("/api/google-auth",     googleAuthRoutes);
 app.use("/api/whatsapp",        whatsappRoutes);
 app.use("/api/call",            callRoutes);
-app.use("/api/facebook-leads",  facebookLeadRoutes); // ← NEW
+app.use("/api/facebook-leads",  facebookleadRoutes); // ← NEW
 
 // Legacy Google callback
 app.get("/api/auth/google/callback", (req, res) => {
