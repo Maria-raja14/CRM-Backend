@@ -56,36 +56,154 @@ export const verifyWebhook = (req, res) => {
    POST /api/facebook-leads/webhook
    Facebook sends lead data here when a user fills out a Lead Ad form.
 ───────────────────────────────────────────────────────────────────────────── */
+// export const receiveWebhook = async (req, res) => {
+//   // Always respond 200 first so Facebook doesn't retry aggressively
+//   res.status(200).json({ status: "EVENT_RECEIVED" });
+
+//   try {
+//     const body = req.body;
+
+//     if (body.object !== "page") {
+//       console.log("📘 Facebook webhook – not a page event, ignoring");
+//       return;
+//     }
+
+//     for (const entry of body.entry || []) {
+//       for (const change of entry.changes || []) {
+//         if (change.field !== "leadgen") continue;
+
+//         const value      = change.value || {};
+//         const leadgenId  = value.leadgen_id;
+//         const pageId     = value.page_id  || entry.id;
+//         const formId     = value.form_id;
+//         const adId       = value.ad_id;
+//         const adgroupId  = value.adgroup_id;
+
+//         console.log("📘 New Facebook lead event:", { leadgenId, pageId, formId });
+
+//         if (!leadgenId) continue;
+
+//         // ── Fetch full lead data from Facebook Graph API ──────────────
+//         let fieldData  = [];
+//         let parsedData = { fullName: "", email: "", phoneNumber: "", state: "" };
+
+//         try {
+//           const graphRes = await axios.get(
+//             `https://graph.facebook.com/v19.0/${leadgenId}`,
+//             {
+//               params: {
+//                 access_token: process.env.FB_PAGE_ACCESS_TOKEN,
+//                 // fields: "field_data,created_time,ad_id,adgroup_id,form_id",
+//                  fields: "field_data",
+//               },
+//             }
+//           );
+//           fieldData  = graphRes.data.field_data || [];
+//           parsedData = parseFieldData(fieldData);
+//           console.log("📘 Fetched lead field data:", parsedData);
+//         } catch (graphErr) {
+//           console.error("⚠️  Failed to fetch lead from Graph API:", graphErr.response?.data || graphErr.message);
+//         }
+
+//         // ── Save to FacebookLead collection ───────────────────────────
+//         let fbLead;
+//         try {
+//           fbLead = await FacebookLead.findOneAndUpdate(
+//             { leadId: leadgenId },
+//             {
+//               leadId:      leadgenId,
+//               pageId,
+//               formId,
+//               adId,
+//               adgroupId,
+//               fullName:    parsedData.fullName,
+//               email:       parsedData.email,
+//               phoneNumber: parsedData.phoneNumber,
+//               state:       parsedData.state,
+//               rawFieldData: fieldData,
+//             },
+//             { upsert: true, new: true }
+//           );
+//         } catch (dbErr) {
+//           console.error("❌ Failed to save FacebookLead:", dbErr.message);
+//           continue;
+//         }
+
+//         // ── Sync to main Lead collection ──────────────────────────────
+//         try {
+//           const existingLead = await Lead.findOne({ facebookLeadId: leadgenId });
+
+//           if (!existingLead) {
+//             const newLead = await Lead.create({
+//               leadName:      parsedData.fullName  || "Facebook Lead",
+//               email:         parsedData.email,
+//               phoneNumber:   parsedData.phoneNumber,
+//               state:         parsedData.state,
+//               source:        "Facebook",
+//               status:        "Cold",
+//               facebookLeadId: leadgenId,
+//             });
+
+//             await FacebookLead.findByIdAndUpdate(fbLead._id, {
+//               crmLeadId: newLead._id,
+//               synced:    true,
+//             });
+
+//             console.log("✅ Lead synced to CRM:", newLead._id);
+//           } else {
+//             console.log("📘 Lead already exists in CRM:", existingLead._id);
+//           }
+//         } catch (syncErr) {
+//           console.error("❌ Lead sync failed:", syncErr.message);
+//           await FacebookLead.findByIdAndUpdate(fbLead._id, {
+//             syncError: syncErr.message,
+//           });
+//         }
+//       }
+//     }
+//   } catch (err) {
+//     console.error("❌ Facebook webhook processing error:", err.message);
+//   }
+// };//old one..
+
+
 export const receiveWebhook = async (req, res) => {
-  // Always respond 200 first so Facebook doesn't retry aggressively
+  // ✅ ALWAYS respond first
   res.status(200).json({ status: "EVENT_RECEIVED" });
+
+  // 🔥 DEBUG LOGS (ADD HERE)
+  console.log("🔥 WEBHOOK HIT");
+  console.log("📩 BODY:", JSON.stringify(req.body, null, 2));
+  console.log("🔑 TOKEN:", process.env.FB_PAGE_ACCESS_TOKEN);
 
   try {
     const body = req.body;
 
     if (body.object !== "page") {
-      console.log("📘 Facebook webhook – not a page event, ignoring");
+      console.log("❌ Not a page event");
       return;
     }
 
     for (const entry of body.entry || []) {
       for (const change of entry.changes || []) {
-        if (change.field !== "leadgen") continue;
 
-        const value      = change.value || {};
-        const leadgenId  = value.leadgen_id;
-        const pageId     = value.page_id  || entry.id;
-        const formId     = value.form_id;
-        const adId       = value.ad_id;
-        const adgroupId  = value.adgroup_id;
+        console.log("➡️ CHANGE RECEIVED:", change);
 
-        console.log("📘 New Facebook lead event:", { leadgenId, pageId, formId });
+        if (change.field !== "leadgen") {
+          console.log("❌ Not leadgen event");
+          continue;
+        }
+
+        const value = change.value || {};
+        const leadgenId = value.leadgen_id;
+
+        console.log("✅ LEAD ID:", leadgenId);
 
         if (!leadgenId) continue;
 
-        // ── Fetch full lead data from Facebook Graph API ──────────────
-        let fieldData  = [];
-        let parsedData = { fullName: "", email: "", phoneNumber: "", state: "" };
+        // 🔥 GRAPH API CALL
+        let fieldData = [];
+        let parsedData = {};
 
         try {
           const graphRes = await axios.get(
@@ -93,76 +211,73 @@ export const receiveWebhook = async (req, res) => {
             {
               params: {
                 access_token: process.env.FB_PAGE_ACCESS_TOKEN,
-                // fields: "field_data,created_time,ad_id,adgroup_id,form_id",
-                 fields: "field_data",
+                fields: "field_data",
               },
             }
           );
-          fieldData  = graphRes.data.field_data || [];
+
+          console.log("📦 GRAPH API RESPONSE:", graphRes.data);
+
+          fieldData = graphRes.data.field_data || [];
           parsedData = parseFieldData(fieldData);
-          console.log("📘 Fetched lead field data:", parsedData);
-        } catch (graphErr) {
-          console.error("⚠️  Failed to fetch lead from Graph API:", graphErr.response?.data || graphErr.message);
+
+          console.log("🧾 PARSED DATA:", parsedData);
+
+        } catch (err) {
+          console.error("❌ GRAPH API ERROR:", err.response?.data || err.message);
         }
 
-        // ── Save to FacebookLead collection ───────────────────────────
+        // 🔥 SAVE FACEBOOK LEAD
         let fbLead;
         try {
           fbLead = await FacebookLead.findOneAndUpdate(
             { leadId: leadgenId },
             {
-              leadId:      leadgenId,
-              pageId,
-              formId,
-              adId,
-              adgroupId,
-              fullName:    parsedData.fullName,
-              email:       parsedData.email,
+              leadId: leadgenId,
+              fullName: parsedData.fullName,
+              email: parsedData.email,
               phoneNumber: parsedData.phoneNumber,
-              state:       parsedData.state,
+              state: parsedData.state,
               rawFieldData: fieldData,
             },
             { upsert: true, new: true }
           );
-        } catch (dbErr) {
-          console.error("❌ Failed to save FacebookLead:", dbErr.message);
+
+          console.log("💾 FacebookLead saved:", fbLead._id);
+
+        } catch (err) {
+          console.error("❌ DB SAVE ERROR:", err.message);
           continue;
         }
 
-        // ── Sync to main Lead collection ──────────────────────────────
+        // 🔥 SYNC TO MAIN LEAD
         try {
           const existingLead = await Lead.findOne({ facebookLeadId: leadgenId });
 
           if (!existingLead) {
             const newLead = await Lead.create({
-              leadName:      parsedData.fullName  || "Facebook Lead",
-              email:         parsedData.email,
-              phoneNumber:   parsedData.phoneNumber,
-              state:         parsedData.state,
-              source:        "Facebook",
-              status:        "Cold",
+              leadName: parsedData.fullName || "Facebook Lead",
+              email: parsedData.email,
+              phoneNumber: parsedData.phoneNumber,
+              state: parsedData.state,
+              source: "Facebook",
+              status: "Cold",
               facebookLeadId: leadgenId,
             });
 
-            await FacebookLead.findByIdAndUpdate(fbLead._id, {
-              crmLeadId: newLead._id,
-              synced:    true,
-            });
-
-            console.log("✅ Lead synced to CRM:", newLead._id);
+            console.log("✅ Lead saved in CRM:", newLead._id);
           } else {
-            console.log("📘 Lead already exists in CRM:", existingLead._id);
+            console.log("⚠️ Lead already exists");
           }
-        } catch (syncErr) {
-          console.error("❌ Lead sync failed:", syncErr.message);
-          await FacebookLead.findByIdAndUpdate(fbLead._id, {
-            syncError: syncErr.message,
-          });
+
+        } catch (err) {
+          console.error("❌ SYNC ERROR:", err.message);
         }
       }
     }
+
   } catch (err) {
-    console.error("❌ Facebook webhook processing error:", err.message);
+    console.error("❌ WEBHOOK ERROR:", err.message);
   }
 };
 
