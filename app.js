@@ -449,7 +449,7 @@ const startServer = async () => {
     console.log(`📞 Call webhook:         POST https://yourdomain.com/api/call/webhook`);
     console.log(`📞 Call status:          POST https://yourdomain.com/api/call/status`);
     console.log(`📞 Call recording:       POST https://yourdomain.com/api/call/recording-callback`);
-    // console.log(`📘 Facebook leads:       GET/POST https://yourdomain.com/api/facebook-leads/webhook`);
+    console.log(`📘 Facebook leads:       GET/POST https://yourdomain.com/api/facebook-leads/webhook`);
     console.log(`🔗 Allowed origins: ${allowedOrigins.join(", ")}`);
   });
 };

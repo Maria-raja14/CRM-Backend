@@ -93,7 +93,8 @@ export const receiveWebhook = async (req, res) => {
             {
               params: {
                 access_token: process.env.FB_PAGE_ACCESS_TOKEN,
-                fields: "field_data,created_time,ad_id,adgroup_id,form_id",
+                // fields: "field_data,created_time,ad_id,adgroup_id,form_id",
+                 fields: "field_data",
               },
             }
           );
@@ -184,4 +185,4 @@ export const getAllFacebookLeads = async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch Facebook leads", error: err.message });
   }
-};
+};//original code..
