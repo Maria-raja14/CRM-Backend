@@ -322,7 +322,7 @@ import whatsappRoutes from "./routes/whatsapp.routes.js";
 import salesRoutes from "./routes/salesReports.routes.js";
 import callRoutes from "./routes/call.routes.js";
 import facebookLeadRoutes from "./routes/facebookLead.routes.js";
-
+import facebookFormRoutes from "./routes/facebookForm.routes.js";
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -385,7 +385,7 @@ app.use("/api/google-auth",     googleAuthRoutes);
 app.use("/api/whatsapp",        whatsappRoutes);
 app.use("/api/call",            callRoutes);
 app.use("/api/facebook-leads",  facebookLeadRoutes); // ← NEW
-
+app.use("/api/facebook-form",   facebookFormRoutes);
 // Legacy Google callback
 app.get("/api/auth/google/callback", (req, res) => {
   const redirectUrl = `/api/google-auth/auth/google/callback?${new URLSearchParams(req.query)}`;
