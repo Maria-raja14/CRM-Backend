@@ -7,7 +7,7 @@ import {
   verifyWebhook,
   receiveWebhook,
   getAllFacebookLeads,
-} from "../controllers/facebooklead.controller.js";
+} from "../controllers/facebookLead.controller.js";
 
 const router = express.Router();
 
