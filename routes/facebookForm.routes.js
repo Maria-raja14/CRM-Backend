@@ -1,3 +1,6 @@
+
+
+
 // import express from 'express';
 // import {
 //   createFacebookLead,
@@ -6,12 +9,14 @@
 //   updateFacebookLead,
 //   deleteFacebookLead,
 // } from '../controllers/facebookForm.controller.js';
-// import { protect } from '../middlewares/auth.middleware.js'; // if you have auth middleware
+// import { protect } from '../middlewares/auth.middleware.js';
 
 // const router = express.Router();
 
-// // All routes are protected (adjust as needed)
-// router.post('/create', protect, createFacebookLead);
+// // Public route – no authentication required
+// router.post('/create', createFacebookLead);
+
+// // Protected routes (require login)
 // router.get('/', protect, getAllFacebookLeads);
 // router.get('/:id', protect, getFacebookLeadById);
 // router.put('/:id', protect, updateFacebookLead);
@@ -19,6 +24,8 @@
 
 // export default router;
 
+
+// routes/facebookForm.routes.js
 
 import express from 'express';
 import {
@@ -28,17 +35,24 @@ import {
   updateFacebookLead,
   deleteFacebookLead,
 } from '../controllers/facebookForm.controller.js';
-import { protect } from '../middlewares/auth.middleware.js';
 
 const router = express.Router();
 
-// Public route – no authentication required
+// ─── Public route (no auth) ────────────────────────────────────────────────────
+// POST /api/facebook-form/create
 router.post('/create', createFacebookLead);
 
-// Protected routes (require login)
-router.get('/', protect, getAllFacebookLeads);
-router.get('/:id', protect, getFacebookLeadById);
-router.put('/:id', protect, updateFacebookLead);
-router.delete('/:id', protect, deleteFacebookLead);
+// ─── Protected routes (add your auth middleware here if needed) ────────────────
+// GET    /api/facebook-form/
+router.get('/', getAllFacebookLeads);
+
+// GET    /api/facebook-form/:id
+router.get('/:id', getFacebookLeadById);
+
+// PUT    /api/facebook-form/:id
+router.put('/:id', updateFacebookLead);
+
+// DELETE /api/facebook-form/:id
+router.delete('/:id', deleteFacebookLead);
 
 export default router;
