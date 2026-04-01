@@ -1,10 +1,9 @@
-
 // import Deal from "../models/deals.model.js";
 // import Lead from "../models/leads.model.js";
 // import sendEmail from "../services/email.js";
 // import { notifyUser } from "../realtime/socket.js";
 
-// /* ── Helpers ──────────────────────────────────────────── */
+// /* ── Helpers ── */
 // const mapFileToAttachment = (file) => ({
 //   name:       file.originalname,
 //   path:       file.path.replace(/\\/g, "/").replace(/^\/+/, ""),
@@ -35,13 +34,11 @@
 //   return `${new Intl.NumberFormat("en-IN").format(numeric)} ${currency}`;
 // };
 
-// /* Parse a cost string/number safely to a Number */
 // const parseCostField = (v) => {
 //   const n = parseFloat(String(v || "0").replace(/,/g, ""));
 //   return isNaN(n) ? 0 : n;
 // };
 
-// /* Build cost update fields from request body */
 // const extractCostFields = (body) => ({
 //   purchasingLandCost:   parseCostField(body.purchasingLandCost),
 //   purchasingTicketCost: parseCostField(body.purchasingTicketCost),
@@ -49,9 +46,6 @@
 //   sellingTicketCost:    parseCostField(body.sellingTicketCost),
 // });
 
-// /* ══════════════════════════════════════════════════════════
-//    CONTROLLER
-//    ══════════════════════════════════════════════════════════ */
 // export default {
 
 //   /* ── 1. Convert Lead → Deal ── */
@@ -68,13 +62,15 @@
 //       await lead.save();
 
 //       const deal = new Deal({
-//         leadId:      lead._id,
-//         dealName:    lead.leadName,
-//         assignedTo:  lead.assignTo?._id,
-//         stage:       "Qualification",
-//         value:       "0",
-//         destination: lead.destination || "",
-//         duration:    lead.duration    || "",
+//         leadId:         lead._id,
+//         dealName:       lead.leadName,
+//         assignedTo:     lead.assignTo?._id,
+//         stage:          "Qualification",
+//         value:          "0",
+//         destination:    lead.destination || "",
+//         duration:       lead.duration    || "",
+//         noOfTravellers: lead.noOfTravellers || null,
+//         travelDate:     lead.travelDate     || null,
 //       });
 //       await deal.save();
 
@@ -91,17 +87,16 @@
 //         dealName, assignTo, dealValue, currency, stage,
 //         notes, phoneNumber, email, source,
 //         destination, duration,
-//         // legacy compat
 //         companyName, industry,
 //         requirement, address, country,
+//         noOfTravellers, travelDate,
 //       } = req.body;
 
 //       const finalDestination = destination || companyName || "";
 //       const finalDuration    = duration    || industry    || "";
 
-//       if (!dealName || !phoneNumber || !finalDestination) {
+//       if (!dealName || !phoneNumber || !finalDestination)
 //         return res.status(400).json({ message: "dealName, phoneNumber & destination are required" });
-//       }
 
 //       const allowedStages = ["Qualification","Negotiation","Proposal","Proposal Sent","Closed Won","Closed Lost"];
 //       const dealStage     = stage && allowedStages.includes(stage) ? stage : "Qualification";
@@ -114,19 +109,21 @@
 
 //       const deal = new Deal({
 //         dealName,
-//         assignedTo:  assignTo || null,
-//         value:       formattedValue,
-//         currency:    currency || "INR",
-//         stage:       dealStage,
-//         notes:       notes       || "",
+//         assignedTo:     assignTo        || null,
+//         value:          formattedValue,
+//         currency:       currency        || "INR",
+//         stage:          dealStage,
+//         notes:          notes           || "",
 //         phoneNumber,
-//         email:       email       || "",
-//         source:      source      || "",
-//         destination: finalDestination,
-//         duration:    finalDuration,
-//         requirement: requirement || "",
-//         address:     address     || "",
-//         country:     country     || "",
+//         email:          email           || "",
+//         source:         source          || "",
+//         destination:    finalDestination,
+//         duration:       finalDuration,
+//         requirement:    requirement     || "",
+//         address:        address         || "",
+//         country:        country         || "",
+//         noOfTravellers: noOfTravellers ? parseInt(noOfTravellers, 10) || null : null,
+//         travelDate:     travelDate ? new Date(travelDate) : null,
 //         attachments,
 //         ...costFields,
 //       });
@@ -137,7 +134,7 @@
 //       console.error("Error creating manual deal:", err);
 //       res.status(500).json({ message: err.message });
 //     }
-//   },//old one..
+//   },
 
 //   /* ── 3. Get All Deals ── */
 //   getAllDeals: async (req, res) => {
@@ -146,9 +143,8 @@
 //       if (req.user.role.name !== "Admin") query.assignedTo = req.user._id;
 
 //       const { start, end } = req.query;
-//       if (start && end) {
+//       if (start && end)
 //         query.createdAt = { $gte: new Date(start), $lte: new Date(end + "T23:59:59.999Z") };
-//       }
 
 //       const deals = await Deal.find(query)
 //         .populate("assignedTo", "firstName lastName email")
@@ -192,9 +188,9 @@
 //         email:          deal.email,
 //         source:         deal.source,
 //         destination:    deal.destination || "",
-//         companyName:    deal.destination || "",   // alias for legacy UI
+//         companyName:    deal.destination || "",
 //         duration:       deal.duration    || "",
-//         industry:       deal.duration    || "",   // alias for legacy UI
+//         industry:       deal.duration    || "",
 //         requirement:    deal.requirement,
 //         address:        deal.address,
 //         country:        deal.country,
@@ -203,7 +199,8 @@
 //         attachments:    [...leadAttachments, ...dealAttachments],
 //         createdAt:      deal.createdAt,
 //         updatedAt:      deal.updatedAt,
-//         // ── Cost fields ───────────────────────────────────────────
+//         noOfTravellers: deal.noOfTravellers || null,
+//         travelDate:     deal.travelDate     || null,
 //         purchasingLandCost:   deal.purchasingLandCost   || 0,
 //         purchasingTicketCost: deal.purchasingTicketCost || 0,
 //         sellingLandCost:      deal.sellingLandCost      || 0,
@@ -264,8 +261,9 @@
 //         dealName, dealValue, currency, stage, assignTo,
 //         notes, phoneNumber, email, source,
 //         destination, duration,
-//         companyName, industry,  // legacy keys
+//         companyName, industry,
 //         requirement, address, country, existingAttachments,
+//         noOfTravellers, travelDate,
 //       } = body;
 
 //       const deal = await Deal.findById(req.params.id);
@@ -291,7 +289,14 @@
 //         ...(requirement  !== undefined && { requirement }),
 //         ...(address      !== undefined && { address }),
 //         ...(country      !== undefined && { country }),
-//         // ── Cost fields ────────────────────────────────────────────────
+//         ...(noOfTravellers !== undefined && {
+//           noOfTravellers: noOfTravellers !== "" && noOfTravellers !== null
+//             ? parseInt(noOfTravellers, 10) || null : null,
+//         }),
+//         ...(travelDate !== undefined && {
+//           travelDate: travelDate && travelDate !== "null" && travelDate !== ""
+//             ? new Date(travelDate) : null,
+//         }),
 //         ...extractCostFields(body),
 //         updatedAt: new Date(),
 //       };
@@ -302,14 +307,12 @@
 //         updateFields.currency   = finalCurrency;
 //       }
 
-//       // Handle attachments
 //       let keptAttachments = [];
 //       if (existingAttachments !== undefined) {
 //         try {
 //           const parsed    = typeof existingAttachments === "string" ? JSON.parse(existingAttachments) : existingAttachments;
 //           keptAttachments = (Array.isArray(parsed) ? parsed : []).map(normalizeAttachment).filter(Boolean);
 //         } catch (err) {
-//           console.error("Error parsing existingAttachments:", err);
 //           keptAttachments = (deal.attachments || []).map(normalizeAttachment).filter(Boolean);
 //         }
 //       } else {
@@ -319,7 +322,6 @@
 //       const newAttachments     = (req.files || []).map(mapFileToAttachment);
 //       updateFields.attachments = [...keptAttachments, ...newAttachments];
 
-//       // Recompute totals after cost update
 //       const pL = parseCostField(updateFields.purchasingLandCost   ?? deal.purchasingLandCost);
 //       const pT = parseCostField(updateFields.purchasingTicketCost ?? deal.purchasingTicketCost);
 //       const sL = parseCostField(updateFields.sellingLandCost      ?? deal.sellingLandCost);
@@ -351,7 +353,6 @@
 //       await Deal.findByIdAndDelete(req.params.id);
 //       res.status(200).json({ message: "Deal deleted successfully" });
 //     } catch (error) {
-//       console.error("Delete deal error:", error);
 //       res.status(500).json({ message: "Server error", error: error.message });
 //     }
 //   },
@@ -370,7 +371,6 @@
 //       const result = await Deal.deleteMany(query);
 //       res.status(200).json({ message: `${result.deletedCount} deal(s) deleted successfully`, deletedCount: result.deletedCount });
 //     } catch (error) {
-//       console.error("Bulk delete error:", error);
 //       res.status(500).json({ message: "Server error", error: error.message });
 //     }
 //   },
@@ -385,11 +385,11 @@
 //         .sort({ createdAt: -1 }).limit(10);
 //       res.status(200).json(deals);
 //     } catch (error) {
-//       console.error("Pending deals error:", error);
 //       res.status(500).json({ message: "Server error" });
 //     }
 //   },
-// };//original all work correctly..
+// };//all working correctly..
+
 
 
 import Deal from "../models/deals.model.js";
@@ -433,6 +433,12 @@ const parseCostField = (v) => {
   return isNaN(n) ? 0 : n;
 };
 
+const parseTravellerField = (v) => {
+  if (v === undefined || v === "" || v === null) return null;
+  const n = parseInt(v, 10);
+  return isNaN(n) ? null : n;
+};
+
 const extractCostFields = (body) => ({
   purchasingLandCost:   parseCostField(body.purchasingLandCost),
   purchasingTicketCost: parseCostField(body.purchasingTicketCost),
@@ -456,15 +462,16 @@ export default {
       await lead.save();
 
       const deal = new Deal({
-        leadId:         lead._id,
-        dealName:       lead.leadName,
-        assignedTo:     lead.assignTo?._id,
-        stage:          "Qualification",
-        value:          "0",
-        destination:    lead.destination || "",
-        duration:       lead.duration    || "",
-        noOfTravellers: lead.noOfTravellers || null,
-        travelDate:     lead.travelDate     || null,
+        leadId:       lead._id,
+        dealName:     lead.leadName,
+        assignedTo:   lead.assignTo?._id,
+        stage:        "Qualification",
+        value:        "0",
+        destination:  lead.destination || "",
+        duration:     lead.duration    || "",
+        noOfAdults:   lead.noOfAdults   || null,
+        noOfChildren: lead.noOfChildren || null,
+        travelDate:   lead.travelDate   || null,
       });
       await deal.save();
 
@@ -483,7 +490,7 @@ export default {
         destination, duration,
         companyName, industry,
         requirement, address, country,
-        noOfTravellers, travelDate,
+        noOfAdults, noOfChildren, travelDate,
       } = req.body;
 
       const finalDestination = destination || companyName || "";
@@ -503,21 +510,22 @@ export default {
 
       const deal = new Deal({
         dealName,
-        assignedTo:     assignTo        || null,
-        value:          formattedValue,
-        currency:       currency        || "INR",
-        stage:          dealStage,
-        notes:          notes           || "",
+        assignedTo:   assignTo        || null,
+        value:        formattedValue,
+        currency:     currency        || "INR",
+        stage:        dealStage,
+        notes:        notes           || "",
         phoneNumber,
-        email:          email           || "",
-        source:         source          || "",
-        destination:    finalDestination,
-        duration:       finalDuration,
-        requirement:    requirement     || "",
-        address:        address         || "",
-        country:        country         || "",
-        noOfTravellers: noOfTravellers ? parseInt(noOfTravellers, 10) || null : null,
-        travelDate:     travelDate ? new Date(travelDate) : null,
+        email:        email           || "",
+        source:       source          || "",
+        destination:  finalDestination,
+        duration:     finalDuration,
+        requirement:  requirement     || "",
+        address:      address         || "",
+        country:      country         || "",
+        noOfAdults:   parseTravellerField(noOfAdults),
+        noOfChildren: parseTravellerField(noOfChildren),
+        travelDate:   travelDate ? new Date(travelDate) : null,
         attachments,
         ...costFields,
       });
@@ -593,8 +601,9 @@ export default {
         attachments:    [...leadAttachments, ...dealAttachments],
         createdAt:      deal.createdAt,
         updatedAt:      deal.updatedAt,
-        noOfTravellers: deal.noOfTravellers || null,
-        travelDate:     deal.travelDate     || null,
+        noOfAdults:     deal.noOfAdults   || null,
+        noOfChildren:   deal.noOfChildren || null,
+        travelDate:     deal.travelDate   || null,
         purchasingLandCost:   deal.purchasingLandCost   || 0,
         purchasingTicketCost: deal.purchasingTicketCost || 0,
         sellingLandCost:      deal.sellingLandCost      || 0,
@@ -657,7 +666,7 @@ export default {
         destination, duration,
         companyName, industry,
         requirement, address, country, existingAttachments,
-        noOfTravellers, travelDate,
+        noOfAdults, noOfChildren, travelDate,
       } = body;
 
       const deal = await Deal.findById(req.params.id);
@@ -683,9 +692,12 @@ export default {
         ...(requirement  !== undefined && { requirement }),
         ...(address      !== undefined && { address }),
         ...(country      !== undefined && { country }),
-        ...(noOfTravellers !== undefined && {
-          noOfTravellers: noOfTravellers !== "" && noOfTravellers !== null
-            ? parseInt(noOfTravellers, 10) || null : null,
+        // ── UPDATED: noOfAdults + noOfChildren ──
+        ...(noOfAdults !== undefined && {
+          noOfAdults: parseTravellerField(noOfAdults),
+        }),
+        ...(noOfChildren !== undefined && {
+          noOfChildren: parseTravellerField(noOfChildren),
         }),
         ...(travelDate !== undefined && {
           travelDate: travelDate && travelDate !== "null" && travelDate !== ""

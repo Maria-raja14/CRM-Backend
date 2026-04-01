@@ -106,8 +106,12 @@
 
 //       const lead      = new Lead(data);
 //       const savedLead = await lead.save();
+
+//       console.log(`✅ [createLead] New lead created: ${savedLead._id} — "${savedLead.leadName}" | source: ${savedLead.source || "Manual"}`);
+
 //       res.status(201).json({ message: "Lead created successfully", lead: savedLead });
 //     } catch (error) {
+//       console.error("❌ [createLead] Error:", error.message);
 //       res.status(400).json({ message: error.message });
 //     }
 //   },
@@ -121,6 +125,14 @@
 
 //       const roleName = req.user.role.name?.toLowerCase();
 
+//       console.log(`📋 [getLeads] Request by role="${roleName}" | page=${page} | limit=${limit} | filters:`, {
+//         search:   req.query.search   || null,
+//         status:   req.query.status   || null,
+//         source:   req.query.source   || null,
+//         assignee: req.query.assignee || null,
+//       });
+
+//       /* ── Operations role: combined leads + deals ── */
 //       if (roleName === "operations") {
 //         const assignedTo = req.user._id;
 
@@ -154,6 +166,8 @@
 //         const total     = combined.length;
 //         const paginated = combined.slice(skip, skip + limit);
 
+//         console.log(`📋 [getLeads] Operations view — leads: ${leads.length}, deals: ${deals.length}, total: ${total}`);
+
 //         return res.status(200).json({
 //           leads: paginated,
 //           totalLeads: total,
@@ -162,6 +176,7 @@
 //         });
 //       }
 
+//       /* ── Admin / Sales role ── */
 //       // Build filter with search support
 //       const filter = roleName === "admin" ? {} : { assignTo: req.user._id };
 
@@ -172,20 +187,52 @@
 //           { email:       { $regex: s, $options: "i" } },
 //           { phoneNumber: { $regex: s, $options: "i" } },
 //           { destination: { $regex: s, $options: "i" } },
+//           // ✅ Also search by phone without spaces/formatting
+//           { phoneNumber: { $regex: s.replace(/\s+/g, ""), $options: "i" } },
 //         ];
 //       }
+
 //       if (req.query.status)   filter.status = req.query.status;
 //       if (req.query.source)   filter.source = req.query.source;
-//       if (req.query.assignee) filter["assignTo.firstName"] = { $regex: req.query.assignee, $options: "i" };
+
+//       // Assignee filter: match by first name in populated field — use lookup approach
+//       let assigneeId = null;
+//       if (req.query.assignee) {
+//         const matchedUser = await userModel.findOne({
+//           $or: [
+//             { firstName: { $regex: req.query.assignee, $options: "i" } },
+//             { lastName:  { $regex: req.query.assignee, $options: "i" } },
+//           ]
+//         }).select("_id").lean();
+//         if (matchedUser) {
+//           filter.assignTo = matchedUser._id;
+//         } else {
+//           // no user matched — return empty
+//           console.log(`📋 [getLeads] No user found for assignee filter: "${req.query.assignee}"`);
+//           return res.status(200).json({ leads: [], totalLeads: 0, totalPages: 0, currentPage: page });
+//         }
+//       }
 
 //       const [leads, totalLeads] = await Promise.all([
 //         Lead.find(filter)
 //           .populate("assignTo", "firstName lastName email role")
 //           .sort({ createdAt: -1 })
 //           .skip(skip)
-//           .limit(limit),
+//           .limit(limit)
+//           .lean(),
 //         Lead.countDocuments(filter),
 //       ]);
+
+//       // ✅ Console: breakdown by source
+//       const facebookLeads = leads.filter(l => l.source === "Facebook");
+//       const manualLeads   = leads.filter(l => l.source !== "Facebook");
+//       console.log(`📋 [getLeads] Fetched ${leads.length} leads (page ${page}/${Math.ceil(totalLeads / limit)}) | Manual: ${manualLeads.length}, Facebook: ${facebookLeads.length}, Total DB: ${totalLeads}`);
+
+//       if (facebookLeads.length > 0) {
+//         console.log("📘 [getLeads] Facebook leads in this page:", facebookLeads.map(l => ({
+//           id: l._id, name: l.leadName, phone: l.phoneNumber, status: l.status, facebookLeadId: l.facebookLeadId
+//         })));
+//       }
 
 //       res.status(200).json({
 //         leads,
@@ -194,6 +241,7 @@
 //         currentPage: page,
 //       });
 //     } catch (error) {
+//       console.error("❌ [getLeads] Error:", error.message);
 //       res.status(500).json({ message: error.message });
 //     }
 //   },
@@ -203,8 +251,12 @@
 //     try {
 //       const lead = await Lead.findById(req.params.id).populate("assignTo", "firstName lastName email role");
 //       if (!lead) return res.status(404).json({ message: "Lead not found" });
+
+//       console.log(`🔍 [getLeadById] Lead fetched: ${lead._id} — "${lead.leadName}" | source: ${lead.source}`);
+
 //       res.status(200).json(lead);
 //     } catch (error) {
+//       console.error("❌ [getLeadById] Error:", error.message);
 //       res.status(500).json({ message: error.message });
 //     }
 //   },
@@ -264,6 +316,8 @@
 
 //       if (followUpDateChanged) await deleteStaleFollowUpNotifications(req.params.id);
 
+//       console.log(`✏️  [updateLead] Lead updated: ${updated._id} — "${updated.leadName}" | status: ${before.status} → ${updated.status}`);
+
 //       if (before.status !== "Converted" && updated.status === "Converted") {
 //         const userId   = updated.assignTo?._id?.toString();
 //         const fullName = `${updated.assignTo?.firstName || ""} ${updated.assignTo?.lastName || ""}`.trim();
@@ -275,6 +329,7 @@
 
 //       res.status(200).json({ message: "Lead updated successfully", lead: updated });
 //     } catch (error) {
+//       console.error("❌ [updateLead] Error:", error.message);
 //       res.status(400).json({ message: error.message });
 //     }
 //   },
@@ -284,8 +339,12 @@
 //     try {
 //       const lead = await Lead.findByIdAndDelete(req.params.id);
 //       if (!lead) return res.status(404).json({ message: "Lead not found" });
+
+//       console.log(`🗑️  [deleteLead] Lead deleted: ${req.params.id} — "${lead.leadName}"`);
+
 //       res.status(200).json({ message: "Lead deleted successfully" });
 //     } catch (error) {
+//       console.error("❌ [deleteLead] Error:", error.message);
 //       res.status(500).json({ message: error.message });
 //     }
 //   },
@@ -310,8 +369,11 @@
 //       if (!lead) return res.status(404).json({ message: "Lead not found" });
 //       if (dateChanged) await deleteStaleFollowUpNotifications(req.params.id);
 
+//       console.log(`📅 [updateFollowUpDate] Lead: ${req.params.id} | followUp: ${followUpDate}`);
+
 //       return res.status(200).json({ message: "Follow-up date updated", lead });
 //     } catch (error) {
+//       console.error("❌ [updateFollowUpDate] Error:", error.message);
 //       return res.status(400).json({ message: error.message });
 //     }
 //   },
@@ -367,7 +429,6 @@
 //         totalPurchasingCost:  pLand   + pTicket,
 //         totalSellingCost:     sLand   + sTicket,
 //         profit:               (sLand  + sTicket) - (pLand + pTicket),
-//         // ── NEW FIELDS ──
 //         noOfTravellers: noOfTravellers ? parseInt(noOfTravellers, 10) || null : (lead.noOfTravellers || null),
 //         travelDate:     travelDate ? new Date(travelDate) : (lead.travelDate || null),
 //       });
@@ -375,12 +436,14 @@
 //       await deal.save();
 //       await Lead.findByIdAndDelete(req.params.id);
 
+//       console.log(`🤝 [convertLeadToDeal] Lead "${lead.leadName}" (${lead._id}) → Deal "${deal._id}" | source: ${lead.source}`);
+
 //       const userId = lead.assignTo?._id?.toString();
 //       if (userId) notifyUser(userId, "deal:created", { dealId: deal._id, dealName: deal.dealName });
 
 //       res.status(200).json({ message: "Lead converted to deal", deal });
 //     } catch (error) {
-//       console.error("Error converting lead to deal:", error);
+//       console.error("❌ [convertLeadToDeal] Error:", error.message, error.stack);
 //       res.status(500).json({ message: error.message });
 //     }
 //   },
@@ -393,6 +456,7 @@
 //         .populate("assignTo", "firstName lastName email");
 //       res.status(200).json(leads);
 //     } catch (error) {
+//       console.error("❌ [getRecentLeads] Error:", error.message);
 //       res.status(500).json({ message: error.message });
 //     }
 //   },
@@ -407,6 +471,7 @@
 //         .populate("assignTo", "firstName lastName email");
 //       res.status(200).json(leads);
 //     } catch (error) {
+//       console.error("❌ [getPendingLeads] Error:", error.message);
 //       res.status(500).json({ message: error.message });
 //     }
 //   },
@@ -425,6 +490,8 @@
 //       if (status !== oldStatus) lead.lastReminderAt = null;
 //       await lead.save();
 
+//       console.log(`🔄 [updateLeadStatus] Lead: ${req.params.id} | "${lead.leadName}" | ${oldStatus} → ${status}`);
+
 //       if (oldStatus !== "Converted" && status === "Converted") {
 //         const userId   = lead.assignTo?._id?.toString();
 //         const fullName = `${lead.assignTo?.firstName || ""} ${lead.assignTo?.lastName || ""}`.trim();
@@ -436,11 +503,11 @@
 
 //       res.status(200).json({ message: "Lead status updated successfully", lead });
 //     } catch (error) {
+//       console.error("❌ [updateLeadStatus] Error:", error.message);
 //       res.status(500).json({ message: error.message });
 //     }
 //   },
-// };//original code correctly..
-
+// };//all work correctly....
 
 
 import dayjs from "dayjs";
@@ -500,6 +567,13 @@ const parseCostField = (v) => {
   return isNaN(n) ? 0 : n;
 };
 
+/* ── Parse integer traveller field ── */
+const parseTravellerField = (v) => {
+  if (v === undefined || v === "" || v === null) return null;
+  const n = parseInt(v, 10);
+  return isNaN(n) ? null : n;
+};
+
 export default {
 
   /* ── Create Lead ── */
@@ -540,12 +614,11 @@ export default {
         data.travelDate = null;
       }
 
-      // Handle noOfTravellers
-      if (data.noOfTravellers !== undefined && data.noOfTravellers !== "" && data.noOfTravellers !== null) {
-        data.noOfTravellers = parseInt(data.noOfTravellers, 10) || null;
-      } else {
-        data.noOfTravellers = null;
-      }
+      // Handle noOfAdults
+      data.noOfAdults = parseTravellerField(data.noOfAdults);
+
+      // Handle noOfChildren
+      data.noOfChildren = parseTravellerField(data.noOfChildren);
 
       data.lastReminderAt = null;
 
@@ -601,7 +674,8 @@ export default {
           createdAt: deal.createdAt,
           followUpDate: deal.followUpDate,
           email: deal.email,
-          noOfTravellers: deal.noOfTravellers,
+          noOfAdults:   deal.noOfAdults,
+          noOfChildren: deal.noOfChildren,
           travelDate: deal.travelDate,
           _type: "deal",
           ...deal,
@@ -622,7 +696,6 @@ export default {
       }
 
       /* ── Admin / Sales role ── */
-      // Build filter with search support
       const filter = roleName === "admin" ? {} : { assignTo: req.user._id };
 
       if (req.query.search) {
@@ -632,16 +705,13 @@ export default {
           { email:       { $regex: s, $options: "i" } },
           { phoneNumber: { $regex: s, $options: "i" } },
           { destination: { $regex: s, $options: "i" } },
-          // ✅ Also search by phone without spaces/formatting
           { phoneNumber: { $regex: s.replace(/\s+/g, ""), $options: "i" } },
         ];
       }
 
-      if (req.query.status)   filter.status = req.query.status;
-      if (req.query.source)   filter.source = req.query.source;
+      if (req.query.status) filter.status = req.query.status;
+      if (req.query.source) filter.source = req.query.source;
 
-      // Assignee filter: match by first name in populated field — use lookup approach
-      let assigneeId = null;
       if (req.query.assignee) {
         const matchedUser = await userModel.findOne({
           $or: [
@@ -652,7 +722,6 @@ export default {
         if (matchedUser) {
           filter.assignTo = matchedUser._id;
         } else {
-          // no user matched — return empty
           console.log(`📋 [getLeads] No user found for assignee filter: "${req.query.assignee}"`);
           return res.status(200).json({ leads: [], totalLeads: 0, totalPages: 0, currentPage: page });
         }
@@ -668,16 +737,9 @@ export default {
         Lead.countDocuments(filter),
       ]);
 
-      // ✅ Console: breakdown by source
       const facebookLeads = leads.filter(l => l.source === "Facebook");
       const manualLeads   = leads.filter(l => l.source !== "Facebook");
       console.log(`📋 [getLeads] Fetched ${leads.length} leads (page ${page}/${Math.ceil(totalLeads / limit)}) | Manual: ${manualLeads.length}, Facebook: ${facebookLeads.length}, Total DB: ${totalLeads}`);
-
-      if (facebookLeads.length > 0) {
-        console.log("📘 [getLeads] Facebook leads in this page:", facebookLeads.map(l => ({
-          id: l._id, name: l.leadName, phone: l.phoneNumber, status: l.status, facebookLeadId: l.facebookLeadId
-        })));
-      }
 
       res.status(200).json({
         leads,
@@ -737,9 +799,14 @@ export default {
         patch.travelDate = null;
       }
 
-      // Handle noOfTravellers
-      if (patch.noOfTravellers !== undefined && patch.noOfTravellers !== "" && patch.noOfTravellers !== null) {
-        patch.noOfTravellers = parseInt(patch.noOfTravellers, 10) || null;
+      // Handle noOfAdults
+      if (patch.noOfAdults !== undefined) {
+        patch.noOfAdults = parseTravellerField(patch.noOfAdults);
+      }
+
+      // Handle noOfChildren
+      if (patch.noOfChildren !== undefined) {
+        patch.noOfChildren = parseTravellerField(patch.noOfChildren);
       }
 
       let followUpDateChanged = false;
@@ -835,7 +902,8 @@ export default {
         value, notes, currency,
         purchasingLandCost, purchasingTicketCost,
         sellingLandCost,    sellingTicketCost,
-        noOfTravellers,     travelDate,
+        noOfAdults,   noOfChildren,
+        travelDate,
       } = req.body;
 
       const numericValue    = Number(value || 0);
@@ -874,8 +942,10 @@ export default {
         totalPurchasingCost:  pLand   + pTicket,
         totalSellingCost:     sLand   + sTicket,
         profit:               (sLand  + sTicket) - (pLand + pTicket),
-        noOfTravellers: noOfTravellers ? parseInt(noOfTravellers, 10) || null : (lead.noOfTravellers || null),
-        travelDate:     travelDate ? new Date(travelDate) : (lead.travelDate || null),
+        // ── UPDATED: use noOfAdults/noOfChildren from body, fallback to lead fields ──
+        noOfAdults:   noOfAdults   != null ? parseTravellerField(noOfAdults)   : (lead.noOfAdults   || null),
+        noOfChildren: noOfChildren != null ? parseTravellerField(noOfChildren) : (lead.noOfChildren || null),
+        travelDate:   travelDate   ? new Date(travelDate) : (lead.travelDate || null),
       });
 
       await deal.save();
