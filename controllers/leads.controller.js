@@ -635,123 +635,261 @@ export default {
   },
 
   /* ── Get All Leads (paginated) ── */
-  getLeads: async (req, res) => {
-    try {
-      const page  = Math.max(1, parseInt(req.query.page)  || 1);
-      const limit = Math.max(1, parseInt(req.query.limit) || 10);
-      const skip  = (page - 1) * limit;
+  // getLeads: async (req, res) => {
+  //   try {
+  //     const page  = Math.max(1, parseInt(req.query.page)  || 1);
+  //     const limit = Math.max(1, parseInt(req.query.limit) || 10);
+  //     const skip  = (page - 1) * limit;
 
-      const roleName = req.user.role.name?.toLowerCase();
+  //     const roleName = req.user.role.name?.toLowerCase();
 
-      console.log(`📋 [getLeads] Request by role="${roleName}" | page=${page} | limit=${limit} | filters:`, {
-        search:   req.query.search   || null,
-        status:   req.query.status   || null,
-        source:   req.query.source   || null,
-        assignee: req.query.assignee || null,
+  //     console.log(`📋 [getLeads] Request by role="${roleName}" | page=${page} | limit=${limit} | filters:`, {
+  //       search:   req.query.search   || null,
+  //       status:   req.query.status   || null,
+  //       source:   req.query.source   || null,
+  //       assignee: req.query.assignee || null,
+  //     });
+
+  //     /* ── Operations role: combined leads + deals ── */
+  //     if (roleName === "operations") {
+  //       const assignedTo = req.user._id;
+
+  //       const leads = await Lead.find({ assignTo: assignedTo })
+  //         .populate("assignTo", "firstName lastName email role")
+  //         .sort({ createdAt: -1 }).lean();
+
+  //       const deals = await Deal.find({ assignedTo: assignedTo })
+  //         .populate("assignedTo", "firstName lastName email role")
+  //         .sort({ createdAt: -1 }).lean();
+
+  //       const transformedDeals = deals.map((deal) => ({
+  //         _id: deal._id,
+  //         leadName: deal.dealName,
+  //         phoneNumber: deal.phoneNumber,
+  //         destination: deal.destination,
+  //         country: deal.country,
+  //         source: deal.source,
+  //         status: "Deal",
+  //         assignTo: deal.assignedTo,
+  //         createdAt: deal.createdAt,
+  //         followUpDate: deal.followUpDate,
+  //         email: deal.email,
+  //         noOfAdults:   deal.noOfAdults,
+  //         noOfChildren: deal.noOfChildren,
+  //         travelDate: deal.travelDate,
+  //         _type: "deal",
+  //         ...deal,
+  //       }));
+
+  //       const combined  = [...leads, ...transformedDeals].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  //       const total     = combined.length;
+  //       const paginated = combined.slice(skip, skip + limit);
+
+  //       console.log(`📋 [getLeads] Operations view — leads: ${leads.length}, deals: ${deals.length}, total: ${total}`);
+
+  //       return res.status(200).json({
+  //         leads: paginated,
+  //         totalLeads: total,
+  //         totalPages: Math.ceil(total / limit),
+  //         currentPage: page,
+  //       });
+  //     }
+
+  //     /* ── Admin / Sales role ── */
+  //     const filter = roleName === "admin" ? {} : { assignTo: req.user._id };
+
+  //     if (req.query.search) {
+  //       const s = req.query.search;
+  //       filter.$or = [
+  //         { leadName:    { $regex: s, $options: "i" } },
+  //         { email:       { $regex: s, $options: "i" } },
+  //         { phoneNumber: { $regex: s, $options: "i" } },
+  //         { destination: { $regex: s, $options: "i" } },
+  //         { phoneNumber: { $regex: s.replace(/\s+/g, ""), $options: "i" } },
+  //       ];
+  //     }
+
+  //     if (req.query.status) filter.status = req.query.status;
+  //     if (req.query.source) filter.source = req.query.source;
+
+  //     if (req.query.assignee) {
+  //       const matchedUser = await userModel.findOne({
+  //         $or: [
+  //           { firstName: { $regex: req.query.assignee, $options: "i" } },
+  //           { lastName:  { $regex: req.query.assignee, $options: "i" } },
+  //         ]
+  //       }).select("_id").lean();
+  //       if (matchedUser) {
+  //         filter.assignTo = matchedUser._id;
+  //       } else {
+  //         console.log(`📋 [getLeads] No user found for assignee filter: "${req.query.assignee}"`);
+  //         return res.status(200).json({ leads: [], totalLeads: 0, totalPages: 0, currentPage: page });
+  //       }
+  //     }
+
+  //     const [leads, totalLeads] = await Promise.all([
+  //       Lead.find(filter)
+  //         .populate("assignTo", "firstName lastName email role")
+  //         .sort({ createdAt: -1 })
+  //         .skip(skip)
+  //         .limit(limit)
+  //         .lean(),
+  //       Lead.countDocuments(filter),
+  //     ]);
+
+  //     const facebookLeads = leads.filter(l => l.source === "Facebook");
+  //     const manualLeads   = leads.filter(l => l.source !== "Facebook");
+  //     console.log(`📋 [getLeads] Fetched ${leads.length} leads (page ${page}/${Math.ceil(totalLeads / limit)}) | Manual: ${manualLeads.length}, Facebook: ${facebookLeads.length}, Total DB: ${totalLeads}`);
+
+  //     res.status(200).json({
+  //       leads,
+  //       totalLeads,
+  //       totalPages: Math.ceil(totalLeads / limit),
+  //       currentPage: page,
+  //     });
+  //   } catch (error) {
+  //     console.error("❌ [getLeads] Error:", error.message);
+  //     res.status(500).json({ message: error.message });
+  //   }
+  // },//original all work correctly..
+
+
+getLeads: async (req, res) => {
+  try {
+    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 10);
+    const skip  = (page - 1) * limit;
+
+    const roleName = req.user.role.name?.toLowerCase();
+
+    console.log(`📋 [getLeads] Request by role="${roleName}" | page=${page} | limit=${limit} | filters:`, {
+      search:   req.query.search   || null,
+      status:   req.query.status   || null,
+      source:   req.query.source   || null,
+      assignee: req.query.assignee || null,
+    });
+
+    /* ── Operations role: combined leads + deals ── */
+    if (roleName === "operations") {
+      const assignedTo = req.user._id;
+
+      const leads = await Lead.find({ assignTo: assignedTo })
+        .populate("assignTo", "firstName lastName email role")
+        .sort({ createdAt: -1 }).lean();
+
+      const deals = await Deal.find({ assignedTo: assignedTo })
+        .populate("assignedTo", "firstName lastName email role")
+        .sort({ createdAt: -1 }).lean();
+
+      const transformedDeals = deals.map((deal) => ({
+        _id: deal._id,
+        leadName: deal.dealName,
+        phoneNumber: deal.phoneNumber,
+        destination: deal.destination,
+        country: deal.country,
+        source: deal.source,
+        status: "Deal",
+        assignTo: deal.assignedTo,
+        createdAt: deal.createdAt,
+        followUpDate: deal.followUpDate,
+        email: deal.email,
+        noOfAdults:   deal.noOfAdults,
+        noOfChildren: deal.noOfChildren,
+        travelDate: deal.travelDate,
+        _type: "deal",
+        ...deal,
+      }));
+
+      const combined  = [...leads, ...transformedDeals].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      const total     = combined.length;
+      const paginated = combined.slice(skip, skip + limit);
+
+      console.log(`📋 [getLeads] Operations view — leads: ${leads.length}, deals: ${deals.length}, total: ${total}`);
+
+      return res.status(200).json({
+        leads: paginated,
+        totalLeads: total,
+        totalPages: Math.ceil(total / limit),
+        currentPage: page,
       });
+    }
 
-      /* ── Operations role: combined leads + deals ── */
-      if (roleName === "operations") {
-        const assignedTo = req.user._id;
+    /* ── Admin / Sales role ── */
+    const filter = roleName === "admin" ? {} : { assignTo: req.user._id };
 
-        const leads = await Lead.find({ assignTo: assignedTo })
-          .populate("assignTo", "firstName lastName email role")
-          .sort({ createdAt: -1 }).lean();
+    if (req.query.search) {
+      const s = req.query.search;
+      filter.$or = [
+        { leadName:    { $regex: s, $options: "i" } },
+        { email:       { $regex: s, $options: "i" } },
+        { phoneNumber: { $regex: s, $options: "i" } },
+        { destination: { $regex: s, $options: "i" } },
+        { phoneNumber: { $regex: s.replace(/\s+/g, ""), $options: "i" } },
+      ];
+    }
 
-        const deals = await Deal.find({ assignedTo: assignedTo })
-          .populate("assignedTo", "firstName lastName email role")
-          .sort({ createdAt: -1 }).lean();
+    if (req.query.status) filter.status = req.query.status;
+    if (req.query.source) filter.source = req.query.source;
 
-        const transformedDeals = deals.map((deal) => ({
-          _id: deal._id,
-          leadName: deal.dealName,
-          phoneNumber: deal.phoneNumber,
-          destination: deal.destination,
-          country: deal.country,
-          source: deal.source,
-          status: "Deal",
-          assignTo: deal.assignedTo,
-          createdAt: deal.createdAt,
-          followUpDate: deal.followUpDate,
-          email: deal.email,
-          noOfAdults:   deal.noOfAdults,
-          noOfChildren: deal.noOfChildren,
-          travelDate: deal.travelDate,
-          _type: "deal",
-          ...deal,
-        }));
-
-        const combined  = [...leads, ...transformedDeals].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        const total     = combined.length;
-        const paginated = combined.slice(skip, skip + limit);
-
-        console.log(`📋 [getLeads] Operations view — leads: ${leads.length}, deals: ${deals.length}, total: ${total}`);
-
-        return res.status(200).json({
-          leads: paginated,
-          totalLeads: total,
-          totalPages: Math.ceil(total / limit),
-          currentPage: page,
-        });
-      }
-
-      /* ── Admin / Sales role ── */
-      const filter = roleName === "admin" ? {} : { assignTo: req.user._id };
-
-      if (req.query.search) {
-        const s = req.query.search;
-        filter.$or = [
-          { leadName:    { $regex: s, $options: "i" } },
-          { email:       { $regex: s, $options: "i" } },
-          { phoneNumber: { $regex: s, $options: "i" } },
-          { destination: { $regex: s, $options: "i" } },
-          { phoneNumber: { $regex: s.replace(/\s+/g, ""), $options: "i" } },
-        ];
-      }
-
-      if (req.query.status) filter.status = req.query.status;
-      if (req.query.source) filter.source = req.query.source;
-
-      if (req.query.assignee) {
+    // FIXED: Handle assignee filter - now expects User ID directly
+    if (req.query.assignee) {
+      // Check if assignee is a valid MongoDB ObjectId
+      const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(req.query.assignee);
+      
+      if (isValidObjectId) {
+        // Direct ID match (from frontend)
+        filter.assignTo = req.query.assignee;
+        console.log(`📋 [getLeads] Filtering by assignee ID: ${req.query.assignee}`);
+      } else {
+        // Fallback for name search (backward compatibility)
         const matchedUser = await userModel.findOne({
           $or: [
             { firstName: { $regex: req.query.assignee, $options: "i" } },
             { lastName:  { $regex: req.query.assignee, $options: "i" } },
           ]
         }).select("_id").lean();
+        
         if (matchedUser) {
           filter.assignTo = matchedUser._id;
+          console.log(`📋 [getLeads] Filtering by assignee name: "${req.query.assignee}" -> ID: ${matchedUser._id}`);
         } else {
           console.log(`📋 [getLeads] No user found for assignee filter: "${req.query.assignee}"`);
-          return res.status(200).json({ leads: [], totalLeads: 0, totalPages: 0, currentPage: page });
+          return res.status(200).json({ 
+            leads: [], 
+            totalLeads: 0, 
+            totalPages: 0, 
+            currentPage: page 
+          });
         }
       }
-
-      const [leads, totalLeads] = await Promise.all([
-        Lead.find(filter)
-          .populate("assignTo", "firstName lastName email role")
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limit)
-          .lean(),
-        Lead.countDocuments(filter),
-      ]);
-
-      const facebookLeads = leads.filter(l => l.source === "Facebook");
-      const manualLeads   = leads.filter(l => l.source !== "Facebook");
-      console.log(`📋 [getLeads] Fetched ${leads.length} leads (page ${page}/${Math.ceil(totalLeads / limit)}) | Manual: ${manualLeads.length}, Facebook: ${facebookLeads.length}, Total DB: ${totalLeads}`);
-
-      res.status(200).json({
-        leads,
-        totalLeads,
-        totalPages: Math.ceil(totalLeads / limit),
-        currentPage: page,
-      });
-    } catch (error) {
-      console.error("❌ [getLeads] Error:", error.message);
-      res.status(500).json({ message: error.message });
     }
-  },
+
+    const [leads, totalLeads] = await Promise.all([
+      Lead.find(filter)
+        .populate("assignTo", "firstName lastName email role")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Lead.countDocuments(filter),
+    ]);
+
+    const facebookLeads = leads.filter(l => l.source === "Facebook");
+    const manualLeads   = leads.filter(l => l.source !== "Facebook");
+    console.log(`📋 [getLeads] Fetched ${leads.length} leads (page ${page}/${Math.ceil(totalLeads / limit)}) | Manual: ${manualLeads.length}, Facebook: ${facebookLeads.length}, Total DB: ${totalLeads}`);
+
+    res.status(200).json({
+      leads,
+      totalLeads,
+      totalPages: Math.ceil(totalLeads / limit),
+      currentPage: page,
+    });
+  } catch (error) {
+    console.error("❌ [getLeads] Error:", error.message);
+    res.status(500).json({ message: error.message });
+  }
+},
+
 
   /* ── Get Lead by ID ── */
   getLeadById: async (req, res) => {
