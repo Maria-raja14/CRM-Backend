@@ -33,4 +33,4 @@ router.patch("/:id/followup", emailLeadController.updateFollowUp);
 // DELETE /api/email-leads/:id
 router.delete("/:id", emailLeadController.deleteEmailLead);
 
-export default router;
+export default router;//old code..
