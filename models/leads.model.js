@@ -18,7 +18,7 @@ const leadSchema = new mongoose.Schema(
     country:     { type: String },
 
     // Add to leadSchema:
-isAutoCreated: { type: Boolean, default: false }, //-->newly add for the email lead trip magics..
+fromEmail: { type: Boolean, default: false },
     // ✅ KEY FIX: default MUST be undefined (not null) for sparse unique index to work.
     // When facebookLeadId is undefined/not set, MongoDB sparse index ignores the document.
     // When facebookLeadId is null, MongoDB treats it as a value and unique constraint fires.

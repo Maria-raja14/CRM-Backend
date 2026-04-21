@@ -191,8 +191,8 @@ async function processGmailMessage(gmail, messageId, emailAccount) {
     destination: leadData.destination || "",
     country:     leadData.country     || "India",
     source:      "Trip Magic",
-    isAutoCreated: true,  // ← ADD THIS FIELD
     status:      "Cold",
+    fromEmail: true,   // ← only the poller does this
     notes:       leadData.notes       || "",
     noOfAdults:  leadData.noOfAdults  ?? null,
     noOfChildren: leadData.noOfChildren ?? null,
