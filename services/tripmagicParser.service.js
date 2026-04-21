@@ -193,7 +193,8 @@ export function parseTripMagicLead(message) {
 
   // ── Final lead object ───────────────────────────────────────────────────────
   return {
-    leadName:    rawName       || "TripMagics Lead",
+    // leadName:    rawName       || "TripMagics Lead",
+     leadName:    rawName       || "",
     phoneNumber: parsePhone(rawPhone),
     email:       rawEmail      || "",
     destination: destination   || rawToCity || "",
