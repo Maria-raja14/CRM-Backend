@@ -158,7 +158,8 @@
 
 
 
-// server.js  (UPDATED — added email lead routes + cron)
+// server.js  (FULL UPDATED FILE)
+// Added: TripMagics poller + tripmagic routes
 
 import express from "express";
 import dotenv from "dotenv";
@@ -173,15 +174,16 @@ import fileRoutes from "./routes/files.routes.js";
 import { initSocket } from "./realtime/socket.js";
 import { startFollowUpCron } from "./controllers/followups.cron.js";
 import { startProposalFollowUpCron } from "./controllers/proposalFollowUpCron.controller.js";
-import { startEmailLeadCron } from "./controllers/emailLeadCron.js";           // ← NEW
-import emailLeadRoutes from "./routes/emailLead.routes.js";                     // ← NEW
 import gmailRoutes from "./routes/gmailRoutes.js";
 import googleAuthRoutes from "./routes/googleAuthRoutes.js";
-import whatsappRoutes from "./routes/whatsapp.routes.js";
 import salesRoutes from "./routes/salesReports.routes.js";
 import callRoutes from "./routes/call.routes.js";
 import facebookLeadRoutes from "./routes/facebookLead.routes.js";
 import facebookFormRoutes from "./routes/facebookForm.routes.js";
+
+// ✅ NEW: TripMagics
+import tripmagicRoutes from "./routes/tripmagic.routes.js";
+import { startTripMagicPoller } from "./services/tripmagicPoller.service.js";
 
 dotenv.config();
 
@@ -190,7 +192,7 @@ const __dirname  = path.dirname(__filename);
 
 const app = express();
 
-// ─── CORS ─────────────────────────────────────────────────────────────────────
+// ─── CORS ──────────────────────────────────────────────────────────────────────
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
@@ -237,17 +239,16 @@ app.use(
 app.use(express.static(path.join(__dirname, "public")));
 
 // ─── API Routes ────────────────────────────────────────────────────────────────
-// IMPORTANT: facebook-form route should be BEFORE generic routes
-app.use("/api/facebook-form", facebookFormRoutes);
+app.use("/api/facebook-form",  facebookFormRoutes);
 app.use("/api/facebook-leads", facebookLeadRoutes);
-app.use("/api/email-leads", emailLeadRoutes);                                   // ← NEW
-app.use("/api", routes);
-app.use("/api/files", fileRoutes);
-app.use("/api/sales", salesRoutes);
-app.use("/api/gmail", gmailRoutes);
-app.use("/api/google-auth", googleAuthRoutes);
-app.use("/api/whatsapp", whatsappRoutes);
-app.use("/api/call", callRoutes);
+app.use("/api",                routes);
+app.use("/api/files",          fileRoutes);
+app.use("/api/sales",          salesRoutes);
+app.use("/api/gmail",          gmailRoutes);
+app.use("/api/google-auth",    googleAuthRoutes);
+
+// ✅ NEW: TripMagics admin routes
+app.use("/api/tripmagic", tripmagicRoutes);
 
 // Legacy Google callback
 app.get("/api/auth/google/callback", (req, res) => {
@@ -263,13 +264,11 @@ app.get("/api/health", (_req, res) => {
     service: "CRM Server",
     allowedOrigins,
     webhooks: {
-      whatsapp_inbound:    "/api/whatsapp/webhook",
-      whatsapp_status:     "/api/whatsapp/status",
-      call_inbound:        "/api/call/webhook",
-      call_status:         "/api/call/status",
-      call_recording:      "/api/call/recording-callback",
-      facebook_leads:      "/api/facebook-leads/webhook",
-      email_leads_poll:    "POST /api/email-leads/poll",                        // ← NEW
+      facebook_leads: "/api/facebook-leads/webhook",
+    },
+    tripmagic: {
+      poller: "active",
+      pollInterval: "every 2 minutes",
     },
   });
 });
@@ -295,7 +294,6 @@ const server = http.createServer(app);
 initSocket(server);
 startFollowUpCron();
 startProposalFollowUpCron();
-startEmailLeadCron();                                                           // ← NEW
 
 const PORT = process.env.PORT || 5000;
 
@@ -303,20 +301,19 @@ const startServer = async () => {
   try {
     await connectDB();
     console.log("✅ MongoDB connected");
+
+    // ✅ NEW: Start TripMagics email poller AFTER DB is ready
+    startTripMagicPoller();
+    console.log("✅ TripMagics email poller started");
+
   } catch (error) {
     console.error("⚠️ MongoDB connection failed:", error.message);
   }
 
   server.listen(PORT, () => {
     console.log(`✅ Server running on port ${PORT}`);
-    console.log(`🟢 WhatsApp webhook:     POST https://yourdomain.com/api/whatsapp/webhook`);
-    console.log(`🟢 WhatsApp status:      POST https://yourdomain.com/api/whatsapp/status`);
-    console.log(`📞 Call webhook:         POST https://yourdomain.com/api/call/webhook`);
-    console.log(`📞 Call status:          POST https://yourdomain.com/api/call/status`);
-    console.log(`📞 Call recording:       POST https://yourdomain.com/api/call/recording-callback`);
-    console.log(`📘 Facebook leads:       GET/POST https://yourdomain.com/api/facebook-leads/webhook`);
-    console.log(`📘 Facebook form:        POST https://yourdomain.com/api/facebook-form/create`);
-    console.log(`📧 Email leads poll:     POST https://yourdomain.com/api/email-leads/poll`);  // ← NEW
+    console.log(`📘 Facebook leads:  GET/POST https://yourdomain.com/api/facebook-leads/webhook`);
+    console.log(`📘 TripMagics poll: POST https://yourdomain.com/api/tripmagic/poll`);
     console.log(`🔗 Allowed origins: ${allowedOrigins.join(", ")}`);
   });
 };
