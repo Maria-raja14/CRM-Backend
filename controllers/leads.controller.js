@@ -1,3 +1,6 @@
+
+
+
 // import dayjs from "dayjs";
 // import Lead from "../models/leads.model.js";
 // import userModel from "../models/user.model.js";
@@ -55,6 +58,13 @@
 //   return isNaN(n) ? 0 : n;
 // };
 
+// /* ── Parse integer traveller field ── */
+// const parseTravellerField = (v) => {
+//   if (v === undefined || v === "" || v === null) return null;
+//   const n = parseInt(v, 10);
+//   return isNaN(n) ? null : n;
+// };
+
 // export default {
 
 //   /* ── Create Lead ── */
@@ -95,12 +105,11 @@
 //         data.travelDate = null;
 //       }
 
-//       // Handle noOfTravellers
-//       if (data.noOfTravellers !== undefined && data.noOfTravellers !== "" && data.noOfTravellers !== null) {
-//         data.noOfTravellers = parseInt(data.noOfTravellers, 10) || null;
-//       } else {
-//         data.noOfTravellers = null;
-//       }
+//       // Handle noOfAdults
+//       data.noOfAdults = parseTravellerField(data.noOfAdults);
+
+//       // Handle noOfChildren
+//       data.noOfChildren = parseTravellerField(data.noOfChildren);
 
 //       data.lastReminderAt = null;
 
@@ -117,134 +126,261 @@
 //   },
 
 //   /* ── Get All Leads (paginated) ── */
-//   getLeads: async (req, res) => {
-//     try {
-//       const page  = Math.max(1, parseInt(req.query.page)  || 1);
-//       const limit = Math.max(1, parseInt(req.query.limit) || 10);
-//       const skip  = (page - 1) * limit;
+//   // getLeads: async (req, res) => {
+//   //   try {
+//   //     const page  = Math.max(1, parseInt(req.query.page)  || 1);
+//   //     const limit = Math.max(1, parseInt(req.query.limit) || 10);
+//   //     const skip  = (page - 1) * limit;
 
-//       const roleName = req.user.role.name?.toLowerCase();
+//   //     const roleName = req.user.role.name?.toLowerCase();
 
-//       console.log(`📋 [getLeads] Request by role="${roleName}" | page=${page} | limit=${limit} | filters:`, {
-//         search:   req.query.search   || null,
-//         status:   req.query.status   || null,
-//         source:   req.query.source   || null,
-//         assignee: req.query.assignee || null,
+//   //     console.log(`📋 [getLeads] Request by role="${roleName}" | page=${page} | limit=${limit} | filters:`, {
+//   //       search:   req.query.search   || null,
+//   //       status:   req.query.status   || null,
+//   //       source:   req.query.source   || null,
+//   //       assignee: req.query.assignee || null,
+//   //     });
+
+//   //     /* ── Operations role: combined leads + deals ── */
+//   //     if (roleName === "operations") {
+//   //       const assignedTo = req.user._id;
+
+//   //       const leads = await Lead.find({ assignTo: assignedTo })
+//   //         .populate("assignTo", "firstName lastName email role")
+//   //         .sort({ createdAt: -1 }).lean();
+
+//   //       const deals = await Deal.find({ assignedTo: assignedTo })
+//   //         .populate("assignedTo", "firstName lastName email role")
+//   //         .sort({ createdAt: -1 }).lean();
+
+//   //       const transformedDeals = deals.map((deal) => ({
+//   //         _id: deal._id,
+//   //         leadName: deal.dealName,
+//   //         phoneNumber: deal.phoneNumber,
+//   //         destination: deal.destination,
+//   //         country: deal.country,
+//   //         source: deal.source,
+//   //         status: "Deal",
+//   //         assignTo: deal.assignedTo,
+//   //         createdAt: deal.createdAt,
+//   //         followUpDate: deal.followUpDate,
+//   //         email: deal.email,
+//   //         noOfAdults:   deal.noOfAdults,
+//   //         noOfChildren: deal.noOfChildren,
+//   //         travelDate: deal.travelDate,
+//   //         _type: "deal",
+//   //         ...deal,
+//   //       }));
+
+//   //       const combined  = [...leads, ...transformedDeals].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+//   //       const total     = combined.length;
+//   //       const paginated = combined.slice(skip, skip + limit);
+
+//   //       console.log(`📋 [getLeads] Operations view — leads: ${leads.length}, deals: ${deals.length}, total: ${total}`);
+
+//   //       return res.status(200).json({
+//   //         leads: paginated,
+//   //         totalLeads: total,
+//   //         totalPages: Math.ceil(total / limit),
+//   //         currentPage: page,
+//   //       });
+//   //     }
+
+//   //     /* ── Admin / Sales role ── */
+//   //     const filter = roleName === "admin" ? {} : { assignTo: req.user._id };
+
+//   //     if (req.query.search) {
+//   //       const s = req.query.search;
+//   //       filter.$or = [
+//   //         { leadName:    { $regex: s, $options: "i" } },
+//   //         { email:       { $regex: s, $options: "i" } },
+//   //         { phoneNumber: { $regex: s, $options: "i" } },
+//   //         { destination: { $regex: s, $options: "i" } },
+//   //         { phoneNumber: { $regex: s.replace(/\s+/g, ""), $options: "i" } },
+//   //       ];
+//   //     }
+
+//   //     if (req.query.status) filter.status = req.query.status;
+//   //     if (req.query.source) filter.source = req.query.source;
+
+//   //     if (req.query.assignee) {
+//   //       const matchedUser = await userModel.findOne({
+//   //         $or: [
+//   //           { firstName: { $regex: req.query.assignee, $options: "i" } },
+//   //           { lastName:  { $regex: req.query.assignee, $options: "i" } },
+//   //         ]
+//   //       }).select("_id").lean();
+//   //       if (matchedUser) {
+//   //         filter.assignTo = matchedUser._id;
+//   //       } else {
+//   //         console.log(`📋 [getLeads] No user found for assignee filter: "${req.query.assignee}"`);
+//   //         return res.status(200).json({ leads: [], totalLeads: 0, totalPages: 0, currentPage: page });
+//   //       }
+//   //     }
+
+//   //     const [leads, totalLeads] = await Promise.all([
+//   //       Lead.find(filter)
+//   //         .populate("assignTo", "firstName lastName email role")
+//   //         .sort({ createdAt: -1 })
+//   //         .skip(skip)
+//   //         .limit(limit)
+//   //         .lean(),
+//   //       Lead.countDocuments(filter),
+//   //     ]);
+
+//   //     const facebookLeads = leads.filter(l => l.source === "Facebook");
+//   //     const manualLeads   = leads.filter(l => l.source !== "Facebook");
+//   //     console.log(`📋 [getLeads] Fetched ${leads.length} leads (page ${page}/${Math.ceil(totalLeads / limit)}) | Manual: ${manualLeads.length}, Facebook: ${facebookLeads.length}, Total DB: ${totalLeads}`);
+
+//   //     res.status(200).json({
+//   //       leads,
+//   //       totalLeads,
+//   //       totalPages: Math.ceil(totalLeads / limit),
+//   //       currentPage: page,
+//   //     });
+//   //   } catch (error) {
+//   //     console.error("❌ [getLeads] Error:", error.message);
+//   //     res.status(500).json({ message: error.message });
+//   //   }
+//   // },//original all work correctly..
+
+
+// getLeads: async (req, res) => {
+//   try {
+//     const page  = Math.max(1, parseInt(req.query.page)  || 1);
+//     const limit = Math.max(1, parseInt(req.query.limit) || 10);
+//     const skip  = (page - 1) * limit;
+
+//     const roleName = req.user.role.name?.toLowerCase();
+
+//     console.log(`📋 [getLeads] Request by role="${roleName}" | page=${page} | limit=${limit} | filters:`, {
+//       search:   req.query.search   || null,
+//       status:   req.query.status   || null,
+//       source:   req.query.source   || null,
+//       assignee: req.query.assignee || null,
+//     });
+
+//     /* ── Operations role: combined leads + deals ── */
+//     if (roleName === "operations") {
+//       const assignedTo = req.user._id;
+
+//       const leads = await Lead.find({ assignTo: assignedTo })
+//         .populate("assignTo", "firstName lastName email role")
+//         .sort({ createdAt: -1 }).lean();
+
+//       const deals = await Deal.find({ assignedTo: assignedTo })
+//         .populate("assignedTo", "firstName lastName email role")
+//         .sort({ createdAt: -1 }).lean();
+
+//       const transformedDeals = deals.map((deal) => ({
+//         _id: deal._id,
+//         leadName: deal.dealName,
+//         phoneNumber: deal.phoneNumber,
+//         destination: deal.destination,
+//         country: deal.country,
+//         source: deal.source,
+//         status: "Deal",
+//         assignTo: deal.assignedTo,
+//         createdAt: deal.createdAt,
+//         followUpDate: deal.followUpDate,
+//         email: deal.email,
+//         noOfAdults:   deal.noOfAdults,
+//         noOfChildren: deal.noOfChildren,
+//         travelDate: deal.travelDate,
+//         _type: "deal",
+//         ...deal,
+//       }));
+
+//       const combined  = [...leads, ...transformedDeals].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+//       const total     = combined.length;
+//       const paginated = combined.slice(skip, skip + limit);
+
+//       console.log(`📋 [getLeads] Operations view — leads: ${leads.length}, deals: ${deals.length}, total: ${total}`);
+
+//       return res.status(200).json({
+//         leads: paginated,
+//         totalLeads: total,
+//         totalPages: Math.ceil(total / limit),
+//         currentPage: page,
 //       });
+//     }
 
-//       /* ── Operations role: combined leads + deals ── */
-//       if (roleName === "operations") {
-//         const assignedTo = req.user._id;
+//     /* ── Admin / Sales role ── */
+//     const filter = roleName === "admin" ? {} : { assignTo: req.user._id };
 
-//         const leads = await Lead.find({ assignTo: assignedTo })
-//           .populate("assignTo", "firstName lastName email role")
-//           .sort({ createdAt: -1 }).lean();
+//     if (req.query.search) {
+//       const s = req.query.search;
+//       filter.$or = [
+//         { leadName:    { $regex: s, $options: "i" } },
+//         { email:       { $regex: s, $options: "i" } },
+//         { phoneNumber: { $regex: s, $options: "i" } },
+//         { destination: { $regex: s, $options: "i" } },
+//         { phoneNumber: { $regex: s.replace(/\s+/g, ""), $options: "i" } },
+//       ];
+//     }
 
-//         const deals = await Deal.find({ assignedTo: assignedTo })
-//           .populate("assignedTo", "firstName lastName email role")
-//           .sort({ createdAt: -1 }).lean();
+//     if (req.query.status) filter.status = req.query.status;
+//     if (req.query.source) filter.source = req.query.source;
 
-//         const transformedDeals = deals.map((deal) => ({
-//           _id: deal._id,
-//           leadName: deal.dealName,
-//           phoneNumber: deal.phoneNumber,
-//           destination: deal.destination,
-//           country: deal.country,
-//           source: deal.source,
-//           status: "Deal",
-//           assignTo: deal.assignedTo,
-//           createdAt: deal.createdAt,
-//           followUpDate: deal.followUpDate,
-//           email: deal.email,
-//           noOfTravellers: deal.noOfTravellers,
-//           travelDate: deal.travelDate,
-//           _type: "deal",
-//           ...deal,
-//         }));
-
-//         const combined  = [...leads, ...transformedDeals].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-//         const total     = combined.length;
-//         const paginated = combined.slice(skip, skip + limit);
-
-//         console.log(`📋 [getLeads] Operations view — leads: ${leads.length}, deals: ${deals.length}, total: ${total}`);
-
-//         return res.status(200).json({
-//           leads: paginated,
-//           totalLeads: total,
-//           totalPages: Math.ceil(total / limit),
-//           currentPage: page,
-//         });
-//       }
-
-//       /* ── Admin / Sales role ── */
-//       // Build filter with search support
-//       const filter = roleName === "admin" ? {} : { assignTo: req.user._id };
-
-//       if (req.query.search) {
-//         const s = req.query.search;
-//         filter.$or = [
-//           { leadName:    { $regex: s, $options: "i" } },
-//           { email:       { $regex: s, $options: "i" } },
-//           { phoneNumber: { $regex: s, $options: "i" } },
-//           { destination: { $regex: s, $options: "i" } },
-//           // ✅ Also search by phone without spaces/formatting
-//           { phoneNumber: { $regex: s.replace(/\s+/g, ""), $options: "i" } },
-//         ];
-//       }
-
-//       if (req.query.status)   filter.status = req.query.status;
-//       if (req.query.source)   filter.source = req.query.source;
-
-//       // Assignee filter: match by first name in populated field — use lookup approach
-//       let assigneeId = null;
-//       if (req.query.assignee) {
+//     // FIXED: Handle assignee filter - now expects User ID directly
+//     if (req.query.assignee) {
+//       // Check if assignee is a valid MongoDB ObjectId
+//       const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(req.query.assignee);
+      
+//       if (isValidObjectId) {
+//         // Direct ID match (from frontend)
+//         filter.assignTo = req.query.assignee;
+//         console.log(`📋 [getLeads] Filtering by assignee ID: ${req.query.assignee}`);
+//       } else {
+//         // Fallback for name search (backward compatibility)
 //         const matchedUser = await userModel.findOne({
 //           $or: [
 //             { firstName: { $regex: req.query.assignee, $options: "i" } },
 //             { lastName:  { $regex: req.query.assignee, $options: "i" } },
 //           ]
 //         }).select("_id").lean();
+        
 //         if (matchedUser) {
 //           filter.assignTo = matchedUser._id;
+//           console.log(`📋 [getLeads] Filtering by assignee name: "${req.query.assignee}" -> ID: ${matchedUser._id}`);
 //         } else {
-//           // no user matched — return empty
 //           console.log(`📋 [getLeads] No user found for assignee filter: "${req.query.assignee}"`);
-//           return res.status(200).json({ leads: [], totalLeads: 0, totalPages: 0, currentPage: page });
+//           return res.status(200).json({ 
+//             leads: [], 
+//             totalLeads: 0, 
+//             totalPages: 0, 
+//             currentPage: page 
+//           });
 //         }
 //       }
-
-//       const [leads, totalLeads] = await Promise.all([
-//         Lead.find(filter)
-//           .populate("assignTo", "firstName lastName email role")
-//           .sort({ createdAt: -1 })
-//           .skip(skip)
-//           .limit(limit)
-//           .lean(),
-//         Lead.countDocuments(filter),
-//       ]);
-
-//       // ✅ Console: breakdown by source
-//       const facebookLeads = leads.filter(l => l.source === "Facebook");
-//       const manualLeads   = leads.filter(l => l.source !== "Facebook");
-//       console.log(`📋 [getLeads] Fetched ${leads.length} leads (page ${page}/${Math.ceil(totalLeads / limit)}) | Manual: ${manualLeads.length}, Facebook: ${facebookLeads.length}, Total DB: ${totalLeads}`);
-
-//       if (facebookLeads.length > 0) {
-//         console.log("📘 [getLeads] Facebook leads in this page:", facebookLeads.map(l => ({
-//           id: l._id, name: l.leadName, phone: l.phoneNumber, status: l.status, facebookLeadId: l.facebookLeadId
-//         })));
-//       }
-
-//       res.status(200).json({
-//         leads,
-//         totalLeads,
-//         totalPages: Math.ceil(totalLeads / limit),
-//         currentPage: page,
-//       });
-//     } catch (error) {
-//       console.error("❌ [getLeads] Error:", error.message);
-//       res.status(500).json({ message: error.message });
 //     }
-//   },
+
+//     const [leads, totalLeads] = await Promise.all([
+//       Lead.find(filter)
+//         .populate("assignTo", "firstName lastName email role")
+//         .sort({ createdAt: -1 })
+//         .skip(skip)
+//         .limit(limit)
+//         .lean(),
+//       Lead.countDocuments(filter),
+//     ]);
+
+//     const facebookLeads = leads.filter(l => l.source === "Facebook");
+//     const manualLeads   = leads.filter(l => l.source !== "Facebook");
+//     console.log(`📋 [getLeads] Fetched ${leads.length} leads (page ${page}/${Math.ceil(totalLeads / limit)}) | Manual: ${manualLeads.length}, Facebook: ${facebookLeads.length}, Total DB: ${totalLeads}`);
+
+//     res.status(200).json({
+//       leads,
+//       totalLeads,
+//       totalPages: Math.ceil(totalLeads / limit),
+//       currentPage: page,
+//     });
+//   } catch (error) {
+//     console.error("❌ [getLeads] Error:", error.message);
+//     res.status(500).json({ message: error.message });
+//   }
+// },
+
 
 //   /* ── Get Lead by ID ── */
 //   getLeadById: async (req, res) => {
@@ -292,9 +428,14 @@
 //         patch.travelDate = null;
 //       }
 
-//       // Handle noOfTravellers
-//       if (patch.noOfTravellers !== undefined && patch.noOfTravellers !== "" && patch.noOfTravellers !== null) {
-//         patch.noOfTravellers = parseInt(patch.noOfTravellers, 10) || null;
+//       // Handle noOfAdults
+//       if (patch.noOfAdults !== undefined) {
+//         patch.noOfAdults = parseTravellerField(patch.noOfAdults);
+//       }
+
+//       // Handle noOfChildren
+//       if (patch.noOfChildren !== undefined) {
+//         patch.noOfChildren = parseTravellerField(patch.noOfChildren);
 //       }
 
 //       let followUpDateChanged = false;
@@ -390,7 +531,8 @@
 //         value, notes, currency,
 //         purchasingLandCost, purchasingTicketCost,
 //         sellingLandCost,    sellingTicketCost,
-//         noOfTravellers,     travelDate,
+//         noOfAdults,   noOfChildren,
+//         travelDate,
 //       } = req.body;
 
 //       const numericValue    = Number(value || 0);
@@ -429,8 +571,10 @@
 //         totalPurchasingCost:  pLand   + pTicket,
 //         totalSellingCost:     sLand   + sTicket,
 //         profit:               (sLand  + sTicket) - (pLand + pTicket),
-//         noOfTravellers: noOfTravellers ? parseInt(noOfTravellers, 10) || null : (lead.noOfTravellers || null),
-//         travelDate:     travelDate ? new Date(travelDate) : (lead.travelDate || null),
+//         // ── UPDATED: use noOfAdults/noOfChildren from body, fallback to lead fields ──
+//         noOfAdults:   noOfAdults   != null ? parseTravellerField(noOfAdults)   : (lead.noOfAdults   || null),
+//         noOfChildren: noOfChildren != null ? parseTravellerField(noOfChildren) : (lead.noOfChildren || null),
+//         travelDate:   travelDate   ? new Date(travelDate) : (lead.travelDate || null),
 //       });
 
 //       await deal.save();
@@ -507,7 +651,7 @@
 //       res.status(500).json({ message: error.message });
 //     }
 //   },
-// };//all work correctly....
+// };//all work correctly fine....
 
 
 import dayjs from "dayjs";
@@ -585,6 +729,9 @@ export default {
 
       const data = { ...req.body };
 
+      // ✅ FIX: Manually created leads NEVER set fromEmail — force it to false
+      data.fromEmail = false;
+
       if (req.files?.length > 0) {
         data.attachments = req.files.map((file) => ({
           name: file.originalname, path: `uploads/leads/${file.filename}`,
@@ -607,25 +754,20 @@ export default {
         data.followUpDate = null;
       }
 
-      // Handle travelDate
       if (data.travelDate && data.travelDate !== "null" && String(data.travelDate).trim() !== "") {
         data.travelDate = new Date(data.travelDate);
       } else {
         data.travelDate = null;
       }
 
-      // Handle noOfAdults
-      data.noOfAdults = parseTravellerField(data.noOfAdults);
-
-      // Handle noOfChildren
+      data.noOfAdults   = parseTravellerField(data.noOfAdults);
       data.noOfChildren = parseTravellerField(data.noOfChildren);
-
       data.lastReminderAt = null;
 
       const lead      = new Lead(data);
       const savedLead = await lead.save();
 
-      console.log(`✅ [createLead] New lead created: ${savedLead._id} — "${savedLead.leadName}" | source: ${savedLead.source || "Manual"}`);
+      console.log(`✅ [createLead] New lead created: ${savedLead._id} — "${savedLead.leadName}" | source: ${savedLead.source || "Manual"} | fromEmail: ${savedLead.fromEmail}`);
 
       res.status(201).json({ message: "Lead created successfully", lead: savedLead });
     } catch (error) {
@@ -635,261 +777,134 @@ export default {
   },
 
   /* ── Get All Leads (paginated) ── */
-  // getLeads: async (req, res) => {
-  //   try {
-  //     const page  = Math.max(1, parseInt(req.query.page)  || 1);
-  //     const limit = Math.max(1, parseInt(req.query.limit) || 10);
-  //     const skip  = (page - 1) * limit;
+  getLeads: async (req, res) => {
+    try {
+      const page  = Math.max(1, parseInt(req.query.page)  || 1);
+      const limit = Math.max(1, parseInt(req.query.limit) || 10);
+      const skip  = (page - 1) * limit;
 
-  //     const roleName = req.user.role.name?.toLowerCase();
+      const roleName = req.user.role.name?.toLowerCase();
 
-  //     console.log(`📋 [getLeads] Request by role="${roleName}" | page=${page} | limit=${limit} | filters:`, {
-  //       search:   req.query.search   || null,
-  //       status:   req.query.status   || null,
-  //       source:   req.query.source   || null,
-  //       assignee: req.query.assignee || null,
-  //     });
-
-  //     /* ── Operations role: combined leads + deals ── */
-  //     if (roleName === "operations") {
-  //       const assignedTo = req.user._id;
-
-  //       const leads = await Lead.find({ assignTo: assignedTo })
-  //         .populate("assignTo", "firstName lastName email role")
-  //         .sort({ createdAt: -1 }).lean();
-
-  //       const deals = await Deal.find({ assignedTo: assignedTo })
-  //         .populate("assignedTo", "firstName lastName email role")
-  //         .sort({ createdAt: -1 }).lean();
-
-  //       const transformedDeals = deals.map((deal) => ({
-  //         _id: deal._id,
-  //         leadName: deal.dealName,
-  //         phoneNumber: deal.phoneNumber,
-  //         destination: deal.destination,
-  //         country: deal.country,
-  //         source: deal.source,
-  //         status: "Deal",
-  //         assignTo: deal.assignedTo,
-  //         createdAt: deal.createdAt,
-  //         followUpDate: deal.followUpDate,
-  //         email: deal.email,
-  //         noOfAdults:   deal.noOfAdults,
-  //         noOfChildren: deal.noOfChildren,
-  //         travelDate: deal.travelDate,
-  //         _type: "deal",
-  //         ...deal,
-  //       }));
-
-  //       const combined  = [...leads, ...transformedDeals].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  //       const total     = combined.length;
-  //       const paginated = combined.slice(skip, skip + limit);
-
-  //       console.log(`📋 [getLeads] Operations view — leads: ${leads.length}, deals: ${deals.length}, total: ${total}`);
-
-  //       return res.status(200).json({
-  //         leads: paginated,
-  //         totalLeads: total,
-  //         totalPages: Math.ceil(total / limit),
-  //         currentPage: page,
-  //       });
-  //     }
-
-  //     /* ── Admin / Sales role ── */
-  //     const filter = roleName === "admin" ? {} : { assignTo: req.user._id };
-
-  //     if (req.query.search) {
-  //       const s = req.query.search;
-  //       filter.$or = [
-  //         { leadName:    { $regex: s, $options: "i" } },
-  //         { email:       { $regex: s, $options: "i" } },
-  //         { phoneNumber: { $regex: s, $options: "i" } },
-  //         { destination: { $regex: s, $options: "i" } },
-  //         { phoneNumber: { $regex: s.replace(/\s+/g, ""), $options: "i" } },
-  //       ];
-  //     }
-
-  //     if (req.query.status) filter.status = req.query.status;
-  //     if (req.query.source) filter.source = req.query.source;
-
-  //     if (req.query.assignee) {
-  //       const matchedUser = await userModel.findOne({
-  //         $or: [
-  //           { firstName: { $regex: req.query.assignee, $options: "i" } },
-  //           { lastName:  { $regex: req.query.assignee, $options: "i" } },
-  //         ]
-  //       }).select("_id").lean();
-  //       if (matchedUser) {
-  //         filter.assignTo = matchedUser._id;
-  //       } else {
-  //         console.log(`📋 [getLeads] No user found for assignee filter: "${req.query.assignee}"`);
-  //         return res.status(200).json({ leads: [], totalLeads: 0, totalPages: 0, currentPage: page });
-  //       }
-  //     }
-
-  //     const [leads, totalLeads] = await Promise.all([
-  //       Lead.find(filter)
-  //         .populate("assignTo", "firstName lastName email role")
-  //         .sort({ createdAt: -1 })
-  //         .skip(skip)
-  //         .limit(limit)
-  //         .lean(),
-  //       Lead.countDocuments(filter),
-  //     ]);
-
-  //     const facebookLeads = leads.filter(l => l.source === "Facebook");
-  //     const manualLeads   = leads.filter(l => l.source !== "Facebook");
-  //     console.log(`📋 [getLeads] Fetched ${leads.length} leads (page ${page}/${Math.ceil(totalLeads / limit)}) | Manual: ${manualLeads.length}, Facebook: ${facebookLeads.length}, Total DB: ${totalLeads}`);
-
-  //     res.status(200).json({
-  //       leads,
-  //       totalLeads,
-  //       totalPages: Math.ceil(totalLeads / limit),
-  //       currentPage: page,
-  //     });
-  //   } catch (error) {
-  //     console.error("❌ [getLeads] Error:", error.message);
-  //     res.status(500).json({ message: error.message });
-  //   }
-  // },//original all work correctly..
-
-
-getLeads: async (req, res) => {
-  try {
-    const page  = Math.max(1, parseInt(req.query.page)  || 1);
-    const limit = Math.max(1, parseInt(req.query.limit) || 10);
-    const skip  = (page - 1) * limit;
-
-    const roleName = req.user.role.name?.toLowerCase();
-
-    console.log(`📋 [getLeads] Request by role="${roleName}" | page=${page} | limit=${limit} | filters:`, {
-      search:   req.query.search   || null,
-      status:   req.query.status   || null,
-      source:   req.query.source   || null,
-      assignee: req.query.assignee || null,
-    });
-
-    /* ── Operations role: combined leads + deals ── */
-    if (roleName === "operations") {
-      const assignedTo = req.user._id;
-
-      const leads = await Lead.find({ assignTo: assignedTo })
-        .populate("assignTo", "firstName lastName email role")
-        .sort({ createdAt: -1 }).lean();
-
-      const deals = await Deal.find({ assignedTo: assignedTo })
-        .populate("assignedTo", "firstName lastName email role")
-        .sort({ createdAt: -1 }).lean();
-
-      const transformedDeals = deals.map((deal) => ({
-        _id: deal._id,
-        leadName: deal.dealName,
-        phoneNumber: deal.phoneNumber,
-        destination: deal.destination,
-        country: deal.country,
-        source: deal.source,
-        status: "Deal",
-        assignTo: deal.assignedTo,
-        createdAt: deal.createdAt,
-        followUpDate: deal.followUpDate,
-        email: deal.email,
-        noOfAdults:   deal.noOfAdults,
-        noOfChildren: deal.noOfChildren,
-        travelDate: deal.travelDate,
-        _type: "deal",
-        ...deal,
-      }));
-
-      const combined  = [...leads, ...transformedDeals].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      const total     = combined.length;
-      const paginated = combined.slice(skip, skip + limit);
-
-      console.log(`📋 [getLeads] Operations view — leads: ${leads.length}, deals: ${deals.length}, total: ${total}`);
-
-      return res.status(200).json({
-        leads: paginated,
-        totalLeads: total,
-        totalPages: Math.ceil(total / limit),
-        currentPage: page,
+      console.log(`📋 [getLeads] Request by role="${roleName}" | page=${page} | limit=${limit} | filters:`, {
+        search:   req.query.search   || null,
+        status:   req.query.status   || null,
+        source:   req.query.source   || null,
+        assignee: req.query.assignee || null,
       });
-    }
 
-    /* ── Admin / Sales role ── */
-    const filter = roleName === "admin" ? {} : { assignTo: req.user._id };
+      /* ── Operations role: combined leads + deals ── */
+      if (roleName === "operations") {
+        const assignedTo = req.user._id;
 
-    if (req.query.search) {
-      const s = req.query.search;
-      filter.$or = [
-        { leadName:    { $regex: s, $options: "i" } },
-        { email:       { $regex: s, $options: "i" } },
-        { phoneNumber: { $regex: s, $options: "i" } },
-        { destination: { $regex: s, $options: "i" } },
-        { phoneNumber: { $regex: s.replace(/\s+/g, ""), $options: "i" } },
-      ];
-    }
+        const leads = await Lead.find({ assignTo: assignedTo })
+          .populate("assignTo", "firstName lastName email role")
+          .sort({ createdAt: -1 }).lean();
 
-    if (req.query.status) filter.status = req.query.status;
-    if (req.query.source) filter.source = req.query.source;
+        const deals = await Deal.find({ assignedTo: assignedTo })
+          .populate("assignedTo", "firstName lastName email role")
+          .sort({ createdAt: -1 }).lean();
 
-    // FIXED: Handle assignee filter - now expects User ID directly
-    if (req.query.assignee) {
-      // Check if assignee is a valid MongoDB ObjectId
-      const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(req.query.assignee);
-      
-      if (isValidObjectId) {
-        // Direct ID match (from frontend)
-        filter.assignTo = req.query.assignee;
-        console.log(`📋 [getLeads] Filtering by assignee ID: ${req.query.assignee}`);
-      } else {
-        // Fallback for name search (backward compatibility)
-        const matchedUser = await userModel.findOne({
-          $or: [
-            { firstName: { $regex: req.query.assignee, $options: "i" } },
-            { lastName:  { $regex: req.query.assignee, $options: "i" } },
-          ]
-        }).select("_id").lean();
-        
-        if (matchedUser) {
-          filter.assignTo = matchedUser._id;
-          console.log(`📋 [getLeads] Filtering by assignee name: "${req.query.assignee}" -> ID: ${matchedUser._id}`);
+        const transformedDeals = deals.map((deal) => ({
+          _id: deal._id,
+          leadName: deal.dealName,
+          phoneNumber: deal.phoneNumber,
+          destination: deal.destination,
+          country: deal.country,
+          source: deal.source,
+          status: "Deal",
+          assignTo: deal.assignedTo,
+          createdAt: deal.createdAt,
+          followUpDate: deal.followUpDate,
+          email: deal.email,
+          noOfAdults:   deal.noOfAdults,
+          noOfChildren: deal.noOfChildren,
+          travelDate: deal.travelDate,
+          _type: "deal",
+          ...deal,
+        }));
+
+        const combined  = [...leads, ...transformedDeals].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        const total     = combined.length;
+        const paginated = combined.slice(skip, skip + limit);
+
+        console.log(`📋 [getLeads] Operations view — leads: ${leads.length}, deals: ${deals.length}, total: ${total}`);
+
+        return res.status(200).json({
+          leads: paginated,
+          totalLeads: total,
+          totalPages: Math.ceil(total / limit),
+          currentPage: page,
+        });
+      }
+
+      /* ── Admin / Sales role ── */
+      const filter = roleName === "admin" ? {} : { assignTo: req.user._id };
+
+      if (req.query.search) {
+        const s = req.query.search;
+        filter.$or = [
+          { leadName:    { $regex: s, $options: "i" } },
+          { email:       { $regex: s, $options: "i" } },
+          { phoneNumber: { $regex: s, $options: "i" } },
+          { destination: { $regex: s, $options: "i" } },
+          { phoneNumber: { $regex: s.replace(/\s+/g, ""), $options: "i" } },
+        ];
+      }
+
+      if (req.query.status) filter.status = req.query.status;
+      if (req.query.source) filter.source = req.query.source;
+
+      if (req.query.assignee) {
+        const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(req.query.assignee);
+        if (isValidObjectId) {
+          filter.assignTo = req.query.assignee;
         } else {
-          console.log(`📋 [getLeads] No user found for assignee filter: "${req.query.assignee}"`);
-          return res.status(200).json({ 
-            leads: [], 
-            totalLeads: 0, 
-            totalPages: 0, 
-            currentPage: page 
-          });
+          const matchedUser = await userModel.findOne({
+            $or: [
+              { firstName: { $regex: req.query.assignee, $options: "i" } },
+              { lastName:  { $regex: req.query.assignee, $options: "i" } },
+            ]
+          }).select("_id").lean();
+          if (matchedUser) {
+            filter.assignTo = matchedUser._id;
+          } else {
+            return res.status(200).json({ leads: [], totalLeads: 0, totalPages: 0, currentPage: page });
+          }
         }
       }
+
+      const [leads, totalLeads] = await Promise.all([
+        Lead.find(filter)
+          .populate("assignTo", "firstName lastName email role")
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        Lead.countDocuments(filter),
+      ]);
+
+      // ✅ FIX: Normalize fromEmail for all leads in the response.
+      // Old leads created before fromEmail field existed will have fromEmail: undefined.
+      // We must treat undefined as false so the TM badge logic works correctly.
+      // Rule: show TM badge ONLY when source === "Trip Magic" AND fromEmail === true explicitly.
+      const normalizedLeads = leads.map((lead) => ({
+        ...lead,
+        fromEmail: lead.fromEmail === true, // undefined → false, true → true, false → false
+      }));
+
+      console.log(`📋 [getLeads] Fetched ${leads.length} leads (page ${page}/${Math.ceil(totalLeads / limit)}) | Total DB: ${totalLeads}`);
+
+      res.status(200).json({
+        leads: normalizedLeads,
+        totalLeads,
+        totalPages: Math.ceil(totalLeads / limit),
+        currentPage: page,
+      });
+    } catch (error) {
+      console.error("❌ [getLeads] Error:", error.message);
+      res.status(500).json({ message: error.message });
     }
-
-    const [leads, totalLeads] = await Promise.all([
-      Lead.find(filter)
-        .populate("assignTo", "firstName lastName email role")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Lead.countDocuments(filter),
-    ]);
-
-    const facebookLeads = leads.filter(l => l.source === "Facebook");
-    const manualLeads   = leads.filter(l => l.source !== "Facebook");
-    console.log(`📋 [getLeads] Fetched ${leads.length} leads (page ${page}/${Math.ceil(totalLeads / limit)}) | Manual: ${manualLeads.length}, Facebook: ${facebookLeads.length}, Total DB: ${totalLeads}`);
-
-    res.status(200).json({
-      leads,
-      totalLeads,
-      totalPages: Math.ceil(totalLeads / limit),
-      currentPage: page,
-    });
-  } catch (error) {
-    console.error("❌ [getLeads] Error:", error.message);
-    res.status(500).json({ message: error.message });
-  }
-},
-
+  },
 
   /* ── Get Lead by ID ── */
   getLeadById: async (req, res) => {
@@ -897,9 +912,13 @@ getLeads: async (req, res) => {
       const lead = await Lead.findById(req.params.id).populate("assignTo", "firstName lastName email role");
       if (!lead) return res.status(404).json({ message: "Lead not found" });
 
-      console.log(`🔍 [getLeadById] Lead fetched: ${lead._id} — "${lead.leadName}" | source: ${lead.source}`);
+      console.log(`🔍 [getLeadById] Lead fetched: ${lead._id} — "${lead.leadName}" | source: ${lead.source} | fromEmail: ${lead.fromEmail}`);
 
-      res.status(200).json(lead);
+      // ✅ FIX: normalize fromEmail in single lead response too
+      const leadObj = lead.toObject();
+      leadObj.fromEmail = leadObj.fromEmail === true;
+
+      res.status(200).json(leadObj);
     } catch (error) {
       console.error("❌ [getLeadById] Error:", error.message);
       res.status(500).json({ message: error.message });
@@ -909,10 +928,14 @@ getLeads: async (req, res) => {
   /* ── Update Lead ── */
   updateLead: async (req, res) => {
     try {
-      const before = await Lead.findById(req.params.id).select("status assignTo leadName followUpDate attachments");
+      const before = await Lead.findById(req.params.id).select("status assignTo leadName followUpDate attachments fromEmail");
       if (!before) return res.status(404).json({ message: "Lead not found" });
 
       const patch = { ...req.body };
+
+      // ✅ FIX: Never allow fromEmail to be changed via manual update
+      // fromEmail is only set by the TripMagics poller, never by user edits
+      delete patch.fromEmail;
 
       let existingAttachments = [];
       if (req.body.existingAttachments) {
@@ -930,22 +953,14 @@ getLeads: async (req, res) => {
 
       patch.attachments = [...existingAttachments, ...newFiles];
 
-      // Handle travelDate
       if (patch.travelDate && patch.travelDate !== "null" && String(patch.travelDate).trim() !== "") {
         patch.travelDate = new Date(patch.travelDate);
       } else if (patch.travelDate === "" || patch.travelDate === "null") {
         patch.travelDate = null;
       }
 
-      // Handle noOfAdults
-      if (patch.noOfAdults !== undefined) {
-        patch.noOfAdults = parseTravellerField(patch.noOfAdults);
-      }
-
-      // Handle noOfChildren
-      if (patch.noOfChildren !== undefined) {
-        patch.noOfChildren = parseTravellerField(patch.noOfChildren);
-      }
+      if (patch.noOfAdults   !== undefined) patch.noOfAdults   = parseTravellerField(patch.noOfAdults);
+      if (patch.noOfChildren !== undefined) patch.noOfChildren = parseTravellerField(patch.noOfChildren);
 
       let followUpDateChanged = false;
       if (patch.followUpDate && patch.followUpDate !== "null" && patch.followUpDate.trim() !== "") {
@@ -973,7 +988,7 @@ getLeads: async (req, res) => {
         const fullName = `${updated.assignTo?.firstName || ""} ${updated.assignTo?.lastName || ""}`.trim();
         if (userId) notifyUser(userId, "deal:converted", { leadId: updated._id, leadName: updated.leadName, when: new Date() });
         if (updated.assignTo?.email) {
-          await sendEmail({ to: updated.assignTo.email, subject: `🎉 Deal Converted: ${updated.leadName}`, text: `Deal converted for lead ${updated.leadName}. Congrats, ${fullName}!` });
+          await sendEmail({ to: updated.assignTo.email, subject: `🎉 Deal Converted: ${updated.leadName}`, subject: `Deal converted for lead ${updated.leadName}. Congrats, ${fullName}!` });
         }
       }
 
@@ -1080,7 +1095,6 @@ getLeads: async (req, res) => {
         totalPurchasingCost:  pLand   + pTicket,
         totalSellingCost:     sLand   + sTicket,
         profit:               (sLand  + sTicket) - (pLand + pTicket),
-        // ── UPDATED: use noOfAdults/noOfChildren from body, fallback to lead fields ──
         noOfAdults:   noOfAdults   != null ? parseTravellerField(noOfAdults)   : (lead.noOfAdults   || null),
         noOfChildren: noOfChildren != null ? parseTravellerField(noOfChildren) : (lead.noOfChildren || null),
         travelDate:   travelDate   ? new Date(travelDate) : (lead.travelDate || null),
@@ -1160,4 +1174,4 @@ getLeads: async (req, res) => {
       res.status(500).json({ message: error.message });
     }
   },
-};//all work correctly fine....
+};
