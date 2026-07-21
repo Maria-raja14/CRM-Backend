@@ -106,6 +106,7 @@
 
 import User from "../models/user.model.js";
 import Lead from "../models/leads.model.js";
+import Deal from "../models/deals.model.js";
 import Invoice from "../models/invoice.model.js";
 import mongoose from "mongoose";
 
@@ -124,51 +125,41 @@ const getSalesPerformance = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    // ── Filter loginHistory by date (date filter applies ONLY to sessions) ──
     let loginData = [];
     if (user.loginHistory && Array.isArray(user.loginHistory)) {
       loginData = user.loginHistory.filter((item) => {
         if (!item.login) return false;
         const itemDate = new Date(item.login);
         if (startDate && endDate) {
-          const start = new Date(startDate);
-          start.setHours(0, 0, 0, 0);
-          const end = new Date(endDate);
-          end.setHours(23, 59, 59, 999);
+          const start = new Date(startDate); start.setHours(0, 0, 0, 0);
+          const end   = new Date(endDate);   end.setHours(23, 59, 59, 999);
           return itemDate >= start && itemDate <= end;
         }
         if (startDate) {
-          const start = new Date(startDate);
-          start.setHours(0, 0, 0, 0);
-          const end = new Date(startDate);
-          end.setHours(23, 59, 59, 999);
+          const start = new Date(startDate); start.setHours(0, 0, 0, 0);
+          const end   = new Date(startDate); end.setHours(23, 59, 59, 999);
           return itemDate >= start && itemDate <= end;
         }
         return true;
       });
     }
 
-    const dateFilter = {};
-    if (startDate || endDate) {
-      dateFilter.createdAt = {};
-      if (startDate) dateFilter.createdAt.$gte = new Date(startDate);
-      if (endDate) dateFilter.createdAt.$lte = new Date(endDate);
-    }
+    // ── Leads: all assigned to this user, with createdAt for date-wise grouping ──
+    const leads = await Lead.find({ assignTo: user._id })
+      .select("leadName status createdAt updatedAt")
+      .lean();
 
-    const leads = await Lead.find({
-      assignTo: user._id,
-      ...dateFilter,
-    }).lean();
+    // ── Deals: stage + updatedAt (updatedAt = when stage last changed) ──
+    const deals = await Deal.find({ assignedTo: user._id })
+      .select("leadId dealName stage createdAt updatedAt")
+      .lean();
 
-    // (Optional) fetch invoices if needed
-    let invoices = [];
-    try {
-      invoices = await Invoice.find({
-        assignedTo: user._id,
-        ...dateFilter,
-      }).lean();
-    } catch (invoiceErr) {
-      console.warn("Invoice model may not be set up – ignoring:", invoiceErr.message);
-    }
+    const wonLeads    = deals.filter((d) => d.stage === "Closed Won").length;
+    const closedLeads = deals.filter((d) => d.stage === "Closed Lost").length;
+
+    // Total assigned = only active leads in leads collection
+    const totalLeadsAssigned = leads.length;
 
     res.status(200).json({
       salesperson: {
@@ -178,13 +169,12 @@ const getSalesPerformance = async (req, res) => {
       },
       loginHistory: loginData,
       metrics: {
-        totalLeadsAssigned: leads.length,
-        // totalActivitiesAssigned removed
-        totalInvoicesAssigned: invoices.length,
+        totalLeadsAssigned,
+        wonLeadsCount:    wonLeads,
+        closedLeadsCount: closedLeads,
       },
       leads,
-      // activities removed
-      invoices,
+      deals,
     });
   } catch (err) {
     console.error("❌ Error in getSalesPerformance:", err);
